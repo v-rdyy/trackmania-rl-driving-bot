@@ -55,6 +55,13 @@ replays before selecting website clips:
 .\.venv\Scripts\python.exe .\scripts\capture_progress_replays.py
 ```
 
+Round-trip representative saved inputs and compare their playback with the
+original outcomes:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\validate_progress_replays.py
+```
+
 The fixed matrix and replay/video evidence protocol are documented in
 [`docs/video-evidence.md`](docs/video-evidence.md).
 

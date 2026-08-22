@@ -60,6 +60,41 @@ handoff where a new bridge client could not start the pre-race countdown after
 the preceding stage's intercepted finish. Snapshot rewind remains responsible
 for repeated episodes within one stage.
 
+## Replay round-trip verification
+
+`scripts/validate_progress_replays.py` checks that preserved input files are
+actually reusable rather than trusting successful writes. It verifies the local
+replay hash against its capture manifest and the exact copy in TMInterface's
+Scripts directory, loads the raw input file, restarts from a full countdown,
+records 100 ms telemetry, and compares outcome, elapsed time, and maximum path
+progress with the original capture. TMInterface's official command reference
+defines `load [filename.txt]` as loading inputs from the configured Scripts
+folder: https://donadigo.com/tminterface/commands.
+
+The representative V0/V1/V2 gate passed in one uninterrupted sequence:
+
+| Case | Original / playback outcome | Time delta | Maximum-progress delta |
+| --- | --- | ---: | ---: |
+| V0 Phase 1, 2,048 steps | timeout / timeout | `0 ms` | `0.000` |
+| V1 final, episode 1 | fall / fall | `+100 ms` | `0.000` |
+| V2 final, episode 4 | finish / finish | `+100 ms` | `0.000` |
+| V2 final, episode 1 | timeout / timeout | `0 ms` | `-0.001` |
+
+The one-step timing differences are within the fixed 100 ms callback period.
+The raw replay files contain TMInterface `steer` and signed `gas` commands, so
+their playback does not depend on the later correction to Python's pedal labels.
+The ignored final summary SHA-256 is
+`F1889C965FBA93F08ACA03F9343FB8A86DD4D85F6490AAE2FE9B83BE7668607E`.
+
+Several earlier attempts reproduced an intermittent handoff after an intercepted
+finish: the next connection remained frozen at race time `30100` despite bridge
+`GiveUp` requests, so no next-replay telemetry was accepted. Stronger synthetic
+Delete input and a two-second connection delay were individually insufficient.
+The validator now waits for verified foreground focus and, if the mandatory
+negative-to-nonnegative countdown transition still does not appear, reloads A01
+through TMInterface's `map` command. The clean four-case run required one restart
+attempt per case; the fallback remains fail-fast protection for future batches.
+
 ## Optional direct video capture
 
 With A01 Race loaded and TMInterface enabled:

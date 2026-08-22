@@ -132,15 +132,32 @@ def focus_window(target: WindowTarget) -> None:
     user32.SetForegroundWindow(target.handle)
 
 
+def wait_for_foreground(target: WindowTarget, timeout_seconds: float = 1.0) -> None:
+    """Wait until Windows has actually completed the focus handoff."""
+    user32 = ctypes.windll.user32
+    deadline = time.perf_counter() + timeout_seconds
+    while time.perf_counter() < deadline:
+        if int(user32.GetForegroundWindow()) == target.handle:
+            return
+        user32.SetForegroundWindow(target.handle)
+        time.sleep(0.05)
+    raise VideoCaptureError("TrackMania did not become the foreground window")
+
+
 def restart_trackmania_race() -> WindowTarget:
     """Send TrackMania's Delete restart key before a checkpoint stage."""
     target = find_trackmania_window()
     focus_window(target)
+    wait_for_foreground(target)
+    time.sleep(0.1)
     user32 = ctypes.windll.user32
-    if not user32.PostMessageW(target.handle, 0x0100, 0x2E, 0):  # WM_KEYDOWN
-        raise VideoCaptureError("could not send the TrackMania restart key down")
-    if not user32.PostMessageW(target.handle, 0x0101, 0x2E, 0):  # WM_KEYUP
-        raise VideoCaptureError("could not send the TrackMania restart key up")
+    # TrackMania reads driving/restart keys through keyboard state. Posting
+    # WM_KEYDOWN can be ignored after an intercepted finish, so synthesize the
+    # same system-level Delete press the user would make physically.
+    scan_code = user32.MapVirtualKeyW(0x2E, 0)
+    user32.keybd_event(0x2E, scan_code, 0, 0)
+    time.sleep(0.05)
+    user32.keybd_event(0x2E, scan_code, 0x0002, 0)  # KEYEVENTF_KEYUP
     time.sleep(0.75)
     return target
 
