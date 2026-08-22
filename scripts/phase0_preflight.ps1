@@ -22,6 +22,7 @@ $manifestPath = Join-Path $steamRoot 'steamapps\appmanifest_11020.acf'
 $gamePath = Join-Path $steamRoot 'steamapps\common\TrackMania Nations Forever'
 $tmLoaderPath = Join-Path $env:LOCALAPPDATA 'TMLoader\TMLoader.exe'
 $tmLoaderProfile = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\profiles\default.yaml'
+$tmInterfaceDll = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\products\TMInterface\2.2.1\TMInterface.dll'
 $pluginPath = Join-Path $env:USERPROFILE 'Documents\TMInterface\Plugins\python_link.as'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPython = Join-Path $workspaceRoot '.venv\Scripts\python.exe'
@@ -37,6 +38,7 @@ $profile = if (Test-Path -LiteralPath $tmLoaderProfile) {
 } else {
     ''
 }
+$tmInterfacePinned = $profile -match '(?ms)^\s*-\s*id:\s*TMInterface\s*\r?\n\s*version:\s*2\.2\.1\s*$'
 
 $pythonCommand = if (Test-Path -LiteralPath $projectPython) {
     Get-Item -LiteralPath $projectPython
@@ -62,7 +64,8 @@ $checks = @(
     New-Check -Name 'TMNF game files' -Passed (Test-Path -LiteralPath (Join-Path $gamePath 'TmForever.exe')) -Detail $gamePath
     New-Check -Name 'TMNF running' -Passed ([bool](Get-Process TmForever -ErrorAction SilentlyContinue)) -Detail 'Launch through the approved TMLoader profile for live checks.'
     New-Check -Name 'TMLoader installed' -Passed (Test-Path -LiteralPath $tmLoaderPath) -Detail $tmLoaderPath
-    New-Check -Name 'TMInterface enabled in profile' -Passed ($profile -match '(?im)^\s*-?\s*id:\s*TMInterface\s*$') -Detail $tmLoaderProfile
+    New-Check -Name 'TMInterface 2.2.1 in profile' -Passed $tmInterfacePinned -Detail $tmLoaderProfile
+    New-Check -Name 'TMInterface 2.2.1 payload' -Passed (Test-Path -LiteralPath $tmInterfaceDll) -Detail $tmInterfaceDll
     New-Check -Name 'python_link.as bridge' -Passed (Test-Path -LiteralPath $pluginPath) -Detail $pluginPath
     New-Check -Name 'Python runtime' -Passed $pythonReady -Detail $pythonDetail.Trim()
 )

@@ -8,6 +8,7 @@ __pycache__/
 .env
 config/local.toml
 config/platforms.yaml
+config/tmloader-game-settings.local.yaml
 
 # Phase 0 telemetry and later training artifacts
 artifacts/telemetry/*.csv
@@ -16,4 +17,3 @@ artifacts/logs/
 checkpoints/
 runs/
 tensorboard/
-
