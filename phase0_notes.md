@@ -56,6 +56,13 @@ Last updated: 2026-08-22
 - Yaw/pitch/roll spans are approximately `[6.257191, 1.078489, 0.353209]`, and the maximum rotation-matrix change from the starting orientation is `2.828427`.
 - A live post-lap bridge query returned `race_finished=True`, confirming the sample reaches a completed race rather than only a partial drive.
 
+## Scripted-input evidence
+
+- The input probe held acceleration for 2.5 seconds, then held acceleration plus left steering for 1.5 seconds while sampling the same bridge telemetry.
+- It captured 41 finite driving samples in `artifacts/telemetry/phase0_input.jsonl`; the ignored local evidence file SHA-256 is `5C8903706E7EB25A0A4DE4B3BA2622B2FD38C6006CC9C6B4BE834DF7B68D9953`.
+- The car moved `85.562` units, displayed speed rose from `0` to a maximum of `157`, and yaw changed by `2.147260` radians during the steering phase.
+- `scripts/probe_input.py` rejects runs with less than 5 units of movement, a maximum displayed speed below 20, a steering yaw change below 0.05 radians, or nonfinite telemetry.
+
 ## Python environment
 
 - Runtime: CPython `3.11.9` (64-bit), installed by the official Python install manager `26.3`.
@@ -69,15 +76,14 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 ## Exit criteria
 
 - [x] Raw telemetry is reliable over a full manual lap, with a captured sample reviewed for changing position, velocity, orientation, and speed and no NaN/stale values.
-- [ ] Scripted accelerate and steer inputs move the car as expected.
+- [x] Scripted accelerate and steer inputs move the car as expected.
 - [ ] Accelerated game speed works with telemetry and input.
 - [ ] A short, low-complexity training track is selected and the reason is documented.
 - [x] Python environment is installed and the Phase 0 dependency set is pinned.
 
 ## Next hands-on checks
 
-1. Run a scripted-input probe that separately verifies accelerate and steer movement.
-2. Run an accelerated-time probe while telemetry and scripted input remain active.
+1. Run an accelerated-time probe while telemetry and scripted input remain active.
 
 ## Track choice
 
@@ -91,3 +97,4 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 - TMLoader needed a one-time game-location setting and its official install control before the command-line profile launch would work. The original profile is preserved as `default.before-tminterface.yaml` in TMLoader's profile directory.
 - The TMInterface safety prompt appears on startup; Phase 0 uses `Stay offline` and does not authorize online play or leaderboard submission.
 - The plugin registers `custom_port` after TMLoader processes its startup config string, so setting that variable in the profile produced a harmless `Unknown variable` warning. The Phase 0 profile now relies on the audited bridge's pinned default `8478` instead.
+- TMInterface's `GiveUp()` respawns the car but does not reset the absolute race clock in this post-finish flow. Input probes use elapsed time from their first race callback rather than assuming race time begins at zero.

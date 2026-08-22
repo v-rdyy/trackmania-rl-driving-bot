@@ -11,7 +11,8 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). Work is currentl
 - Python 3.11.9 and the pinned Phase 0 dependencies are installed in `.venv`.
 - The audited `python_link.as` bridge is live on `127.0.0.1:8478`; its Python handshake, immediate command path, graceful disconnect, and reconnect are verified.
 - Full-lap A01 telemetry is verified with finite, changing position, velocity, orientation, and speed data.
-- Scripted input and accelerated-time verification remain Phase 0 exit checks.
+- Scripted acceleration and steering are verified from resulting motion telemetry.
+- Accelerated-time verification remains the final Phase 0 exit check.
 
 Run the non-mutating local audit from PowerShell:
 

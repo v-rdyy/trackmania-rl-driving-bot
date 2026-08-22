@@ -100,6 +100,32 @@ class TmiBridgeClient:
         self._send(struct.pack("<ii", MessageType.C_EXECUTE_COMMAND, len(payload)))
         self._send(payload)
 
+    def set_input_state(
+        self,
+        *,
+        left: bool = False,
+        right: bool = False,
+        accelerate: bool = False,
+        brake: bool = False,
+    ) -> None:
+        """Set the four digital driving inputs consumed by the bridge."""
+
+        self._send(
+            struct.pack(
+                "<iBBBB",
+                MessageType.C_SET_INPUT_STATE,
+                left,
+                right,
+                accelerate,
+                brake,
+            )
+        )
+
+    def give_up(self) -> None:
+        """Reset the current local run through TMInterface."""
+
+        self._send_int32(MessageType.C_GIVE_UP)
+
     def get_simulation_state(self) -> SimStateData:
         self._send_int32(MessageType.C_GET_SIMULATION_STATE)
         state_length = self.read_int32()

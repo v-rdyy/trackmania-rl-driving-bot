@@ -72,6 +72,33 @@ class TmiBridgeClientTests(unittest.TestCase):
         responder.join()
         self.assertEqual(requests, [MessageType.C_RACE_FINISHED])
 
+    def test_set_input_state_encodes_four_digital_inputs(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.set_input_state(left=True, accelerate=True)
+
+        self.assertEqual(
+            server.recv(8),
+            struct.pack("<iBBBB", MessageType.C_SET_INPUT_STATE, 1, 0, 1, 0),
+        )
+
+    def test_give_up_sends_protocol_request(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.give_up()
+
+        self.assertEqual(
+            server.recv(4), struct.pack("<i", MessageType.C_GIVE_UP)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
