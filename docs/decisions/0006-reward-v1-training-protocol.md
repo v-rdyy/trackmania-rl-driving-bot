@@ -80,3 +80,13 @@ raw action `[0, 0, 1]` applied gas `-65536`, but the car progressed approximatel
 vertical offset was only `-0.203`, so it timed out and correctly failed the probe.
 The 10-unit threshold remains provisional; reproduce the stochastic PPO behavior
 or add an explicit behind-start boundary before restarting formal training.
+
+The stochastic-policy reproduction then completed 8,192 steps with the actual
+seed-42 PPO/gSDE sampling path. It produced 87 episode boundaries: 78 crossed the
+10-unit vertical threshold, nine timed out, and none finished. The minimum
+vertical offset was `-12.061`. This reproduces the owner's visible grass-drop
+observation and validates that a 10-unit local vertical boundary catches the
+failure without classifying normal on-track motion from the fixed-action probe.
+Its final summary initially failed because detailed action records lacked the
+specific terminal-reason fields; preserve that schema failure and rerun the probe
+after adding those fields before formal training.

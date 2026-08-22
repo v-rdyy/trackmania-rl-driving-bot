@@ -79,6 +79,19 @@ log SHA-256 is
 `DCEE08E43643EBB4753F51CEB833A54BA5CDE995E4E6A17C72CDDDDC5ABD04A0`.
 Formal training remains stopped while the visible PPO trajectory is reproduced.
 
+The actual stochastic PPO reproduction completed 8,192 steps and matched the
+visual report. Its 87 episode boundaries contained 78 vertical falls, nine
+timeouts, and zero finishes; minimum vertical offset was `-12.061`, maximum path
+progress was `173.242`, and maximum displayed speed was `123`. The 10-unit local
+vertical boundary therefore detects the repeated grass drop.
+
+Post-processing failed after collection with `KeyError: 'timeout'` because the
+action log recorded generic truncation plus telemetry but omitted explicit
+terminal-reason fields. The full 8,192-record log is intact with SHA-256
+`490B73E375FF52F800C107B74234F55C6DDC5108082E6FEAF006823468C7E3B7`.
+This is a reporting-schema bug, not a lost trajectory; formal training remains
+stopped until the schema is fixed and the probe reruns cleanly.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.

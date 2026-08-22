@@ -413,6 +413,11 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "valid": True,
                     "applied_steer": result.applied_steer,
                     "applied_gas": result.applied_gas,
+                    "display_speed": int(result.state.display_speed),
+                    "position": np.asarray(
+                        result.state.position,
+                        dtype=np.float64,
+                    ).tolist(),
                     "reward": reward,
                     "reward_function": self.reward_name,
                     "terminated": terminated,
