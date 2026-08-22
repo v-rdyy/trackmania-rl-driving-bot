@@ -40,8 +40,9 @@ isolated unit test. Ignored local evidence hashes:
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.
-- Train substantially longer than the Phase 1 integration smoke test; fix the
-  exact budget before training begins.
+- Train for at least 500,000 environment steps under the fixed hyperparameters
+  in Decision 0006. Stable-Baselines3 may complete its current 2,048-step rollout,
+  so record the exact actual total.
 - Evaluate finish rate and episode-length trend quantitatively.
 - Inspect the TensorBoard reward curve for sparse/flat behavior or unexpected
   learning signal.
