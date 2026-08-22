@@ -147,6 +147,29 @@ class TmiBridgeClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "positive uint32"):
             client.set_response_timeout(0x1_0000_0000)
 
+    def test_recover_inputs_sends_safe_tm_interface_command(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.recover_inputs("v2_speed_final_take_001_ep_01.txt")
+
+        command = b"recover_inputs v2_speed_final_take_001_ep_01.txt"
+        self.assertEqual(
+            server.recv(8 + len(command)),
+            struct.pack("<ii", MessageType.C_EXECUTE_COMMAND, len(command)) + command,
+        )
+
+    def test_recover_inputs_rejects_paths_and_non_txt_names(self) -> None:
+        client = TmiBridgeClient()
+
+        for filename in ("../replay.txt", "folder/replay.txt", "replay.gbx", ""):
+            with self.subTest(filename=filename):
+                with self.assertRaisesRegex(ValueError, "simple alphanumeric"):
+                    client.recover_inputs(filename)
+
     def test_rewind_to_state_encodes_snapshot_length_and_bytes(self) -> None:
         server, client_socket = socket.socketpair()
         self.addCleanup(server.close)

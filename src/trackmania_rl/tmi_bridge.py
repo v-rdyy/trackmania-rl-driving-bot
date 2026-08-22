@@ -11,6 +11,7 @@ from __future__ import annotations
 import socket
 import struct
 import math
+import re
 from enum import IntEnum, auto
 
 from tminterface.structs import CheckpointData, SimStateData
@@ -126,6 +127,14 @@ class TmiBridgeClient:
         self._send(
             struct.pack("<iI", MessageType.C_SET_TIMEOUT, timeout_ms)
         )
+
+    def recover_inputs(self, filename: str) -> None:
+        """Save the current run's input stream through TMInterface."""
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.txt", filename):
+            raise ValueError(
+                "replay filename must be a simple alphanumeric .txt filename"
+            )
+        self.execute_command(f"recover_inputs {filename}")
 
     def set_input_state(
         self,

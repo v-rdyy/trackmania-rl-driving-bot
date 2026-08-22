@@ -212,6 +212,12 @@ class LiveTmiSession:
             applied_gas=applied_gas,
         )
 
+    def recover_inputs(self, filename: str) -> None:
+        """Persist the current episode's TMInterface input replay."""
+        if not self._connected or not self._pending_step:
+            raise RuntimeError("input recovery requires a pending live race step")
+        self.client.recover_inputs(filename)
+
     def close(self) -> None:
         if not self._connected:
             return

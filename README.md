@@ -45,6 +45,16 @@ then validates and captures a deterministic start snapshot:
 .\.venv\Scripts\python.exe .\scripts\train_phase1_smoke.py
 ```
 
+Preserve the staged V0-V2 checkpoint progression as compact TMInterface input
+replays before selecting website clips:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\capture_progress_replays.py
+```
+
+The fixed matrix and replay/video evidence protocol are documented in
+[`docs/video-evidence.md`](docs/video-evidence.md).
+
 Run the non-mutating local audit from PowerShell:
 
 ```powershell

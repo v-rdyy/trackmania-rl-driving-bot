@@ -14,7 +14,9 @@ config/tmloader-game-settings.local.yaml
 artifacts/telemetry/*.csv
 artifacts/telemetry/*.jsonl
 artifacts/logs/
+artifacts/replays/
 artifacts/smoke/*.json
+artifacts/videos/
 checkpoints/
 runs/
 tensorboard/
