@@ -105,6 +105,41 @@ class TmiBridgeClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "speed must be"):
             client.set_speed(0.0)
 
+    def test_set_on_step_period_encodes_valid_tick_multiple(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.set_on_step_period(100)
+
+        self.assertEqual(
+            server.recv(8),
+            struct.pack("<ii", MessageType.C_SET_ON_STEP_PERIOD, 100),
+        )
+
+    def test_set_on_step_period_rejects_non_tick_value(self) -> None:
+        client = TmiBridgeClient()
+
+        with self.assertRaisesRegex(ValueError, "multiple of 10"):
+            client.set_on_step_period(25)
+
+    def test_rewind_to_state_encodes_snapshot_length_and_bytes(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+        snapshot = b"snapshot"
+
+        client.rewind_to_state(snapshot)
+
+        self.assertEqual(
+            server.recv(8 + len(snapshot)),
+            struct.pack("<ii", MessageType.C_REWIND_TO_STATE, len(snapshot)) + snapshot,
+        )
+
     def test_continuous_input_encodes_analog_steer_and_gas(self) -> None:
         server, client_socket = socket.socketpair()
         self.addCleanup(server.close)

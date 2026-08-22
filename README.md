@@ -16,6 +16,7 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: envir
 - Decision 0002's normalized continuous controls are verified end to end against TMInterface's analog steer/gas inputs.
 - The A01 driven reference line is provenance-pinned and resampled into 443 fixed-spacing points per Decision 0003.
 - The documented 26-value engineered observation is finite and progress-consistent across the full manual lap.
+- TMInterface snapshot rewind is live-verified as the reliable Phase 1 episode-reset primitive.
 
 Run the non-mutating local audit from PowerShell:
 

@@ -8,6 +8,7 @@ Last updated: 2026-08-22
 - The live bridge applies true analog `Steer` and `Gas` values without changing the Phase 0 digital protocol.
 - Decision 0003 defines the provenance-pinned A01 driven reference path.
 - The engineered 26-value observation builder is implemented and validated against the full manual lap.
+- Snapshot rewind and 100 ms synchronous callback control are verified live for episode resets.
 - The Gymnasium `reset()`/`step()` wrapper and PPO smoke test have not yet been implemented.
 
 ## Action contract
@@ -40,3 +41,7 @@ TMInterface rotation columns are car `[right, up, forward]`; the transpose conve
 ## Temporary smoke-test reward
 
 Decision 0004 records the owner-approved disposable reward: `display_speed / 1000.0` each step, minus `1.0` on timeout/off-track truncation, with no finish bonus. This infrastructure reward is not one of the later pre-registered reward experiments.
+
+## Reset primitive
+
+The wrapper will capture one known start snapshot and restore its raw TMInterface simulation bytes on every reset. A live round-trip moved the car `17.554` units under analog throttle, then restored the captured position with `0.000000` measured error. The next callback advanced from captured race time `7343600` to `7343700`, matching the configured 100 ms game-time step period.

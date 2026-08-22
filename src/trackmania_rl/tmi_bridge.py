@@ -109,6 +109,15 @@ class TmiBridgeClient:
             raise ValueError(f"speed must be in (0, 1000], got {speed}")
         self._send(struct.pack("<if", MessageType.C_SET_SPEED, speed))
 
+    def set_on_step_period(self, period_ms: int) -> None:
+        """Set the game-time interval between synchronous run-step callbacks."""
+
+        if period_ms <= 0 or period_ms % 10 != 0:
+            raise ValueError("step period must be a positive multiple of 10 ms")
+        self._send(
+            struct.pack("<ii", MessageType.C_SET_ON_STEP_PERIOD, period_ms)
+        )
+
     def set_input_state(
         self,
         *,
@@ -162,6 +171,17 @@ class TmiBridgeClient:
         """Reset the current local run through TMInterface."""
 
         self._send_int32(MessageType.C_GIVE_UP)
+
+    def rewind_to_state(self, state: SimStateData | bytes | bytearray) -> None:
+        """Rewind to a simulation snapshot captured by ``get_simulation_state``."""
+
+        payload = bytes(state if isinstance(state, (bytes, bytearray)) else state.data)
+        if not payload:
+            raise ValueError("simulation snapshot cannot be empty")
+        self._send(
+            struct.pack("<ii", MessageType.C_REWIND_TO_STATE, len(payload))
+        )
+        self._send(payload)
 
     def get_simulation_state(self) -> SimStateData:
         self._send_int32(MessageType.C_GET_SIMULATION_STATE)
