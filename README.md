@@ -17,6 +17,8 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: envir
 - The A01 driven reference line is provenance-pinned and resampled into 443 fixed-spacing points per Decision 0003.
 - The documented 26-value engineered observation is finite and progress-consistent across the full manual lap.
 - TMInterface snapshot rewind is live-verified as the reliable Phase 1 episode-reset primitive.
+- The Gymnasium wrapper completed 20 consecutive live episodes and 100 finite
+  steps with deterministic resets and per-step raw-action auditing.
 
 Run the non-mutating local audit from PowerShell:
 

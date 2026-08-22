@@ -1,6 +1,6 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Phase 0 complete. Phase 1 has not started.
+**Status:** Phase 0 complete. Phase 1 environment wrapper complete; PPO smoke test pending.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Target end state (from projected resume, this is what "done" looks like):**
@@ -65,10 +65,10 @@ Document the exact shape/normalization of this observation vector in code commen
 
 **Exit criteria:**
 
-- [ ] `reset()` and `step()` work reliably over at least 20 consecutive episodes without the env hanging or erroring
+- [x] `reset()` and `step()` work reliably over at least 20 consecutive episodes without the env hanging or erroring
 - [ ] PPO training runs for a short smoke-test duration without crashing
 - [ ] Tensorboard shows reward/episode-length curves, confirming logging works
-- [ ] Observation vector shape and each component documented in code
+- [x] Observation vector shape and each component documented in code
 
 **Deliverable:** Working env code, committed in small pieces (telemetry reader, input sender, centerline/reference path builder, env wrapper, training smoke-test script), each with its own commit. No giant single commit.
 
