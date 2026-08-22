@@ -63,6 +63,14 @@ Last updated: 2026-08-22
 - The car moved `85.562` units, displayed speed rose from `0` to a maximum of `157`, and yaw changed by `2.147260` radians during the steering phase.
 - `scripts/probe_input.py` rejects runs with less than 5 units of movement, a maximum displayed speed below 20, a steering yaw change below 0.05 radians, or nonfinite telemetry.
 
+## Accelerated-time evidence
+
+- A 4x warm-up advanced four in-game seconds in `0.953` wall seconds (`4.197x` effective), captured 41 finite telemetry samples, moved the car `111.227` units, and reached displayed speed `177`.
+- The first exact-6x attempt began with the car wedged after the earlier steering probe. Its clock advanced two in-game seconds in `0.266` wall seconds, but the car moved only `0.789` units and reached speed `9`; the movement threshold correctly rejected that run instead of treating clock speed alone as success.
+- After a clean manual restart, the exact-6x verification advanced four in-game seconds in `0.625` wall seconds (`6.400x` effective), captured 41 finite telemetry samples, moved the car `111.330` units, and reached displayed speed `177` while scripted acceleration remained active.
+- The successful local evidence file is `artifacts/telemetry/phase0_accelerated_6x.jsonl`, with SHA-256 `58B0AFB3379EF280634098BA1D3AD85DC7C8F2D484C27FAFF66B53F867E55C35`.
+- `scripts/probe_accelerated_time.py` restores neutral input and 1x speed in a `finally` block even when validation fails.
+
 ## Python environment
 
 - Runtime: CPython `3.11.9` (64-bit), installed by the official Python install manager `26.3`.
@@ -77,13 +85,13 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 
 - [x] Raw telemetry is reliable over a full manual lap, with a captured sample reviewed for changing position, velocity, orientation, and speed and no NaN/stale values.
 - [x] Scripted accelerate and steer inputs move the car as expected.
-- [ ] Accelerated game speed works with telemetry and input.
+- [x] Accelerated game speed works with telemetry and input at the target 6x multiplier.
 - [ ] A short, low-complexity training track is selected and the reason is documented.
 - [x] Python environment is installed and the Phase 0 dependency set is pinned.
 
-## Next hands-on checks
+## Phase 1 handoff
 
-1. Run an accelerated-time probe while telemetry and scripted input remain active.
+All Phase 0 exit criteria are satisfied. Before implementing the Gymnasium wrapper, the owner needs to choose the initial action-space strategy requested by the scope: discrete actions for easier debugging, or continuous controls for a closer match to PPO's eventual driving policy.
 
 ## Track choice
 

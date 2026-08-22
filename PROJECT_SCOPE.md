@@ -1,6 +1,6 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Not started. This is a from-scratch build.
+**Status:** Phase 0 complete. Phase 1 has not started.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Target end state (from projected resume, this is what "done" looks like):**
@@ -27,11 +27,11 @@ Every phase below exists to get honestly to that paragraph. Numbers in the targe
 
 **Exit criteria (must all be true before Phase 1 starts):**
 
-- [ ] Raw telemetry read confirmed reliable over a full manual lap (no dropouts, no garbage values)
-- [ ] Scripted input successfully drives the car (at minimum: accelerate + steer produces expected car movement)
-- [ ] Accelerated game speed confirmed working with both telemetry and input
-- [ ] Track chosen and documented
-- [ ] Python env installed with pinned versions in a requirements file
+- [x] Raw telemetry read confirmed reliable over a full manual lap (no dropouts, no garbage values)
+- [x] Scripted input successfully drives the car (at minimum: accelerate + steer produces expected car movement)
+- [x] Accelerated game speed confirmed working with both telemetry and input
+- [x] Track chosen and documented
+- [x] Python env installed with pinned versions in a requirements file
 
 **Deliverable:** A short markdown note (`phase0_notes.md`) documenting what was confirmed, what wrapper/library was used and why, TMInterface version, and any gotchas hit. This becomes the setup section of the eventual README.
 

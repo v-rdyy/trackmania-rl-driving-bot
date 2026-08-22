@@ -86,6 +86,25 @@ class TmiBridgeClientTests(unittest.TestCase):
             struct.pack("<iBBBB", MessageType.C_SET_INPUT_STATE, 1, 0, 1, 0),
         )
 
+    def test_set_speed_encodes_float_multiplier(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.set_speed(4.0)
+
+        self.assertEqual(
+            server.recv(8), struct.pack("<if", MessageType.C_SET_SPEED, 4.0)
+        )
+
+    def test_set_speed_rejects_unsafe_multiplier(self) -> None:
+        client = TmiBridgeClient()
+
+        with self.assertRaisesRegex(ValueError, "speed must be"):
+            client.set_speed(0.0)
+
     def test_give_up_sends_protocol_request(self) -> None:
         server, client_socket = socket.socketpair()
         self.addCleanup(server.close)

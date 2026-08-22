@@ -100,6 +100,13 @@ class TmiBridgeClient:
         self._send(struct.pack("<ii", MessageType.C_EXECUTE_COMMAND, len(payload)))
         self._send(payload)
 
+    def set_speed(self, speed: float) -> None:
+        """Set the TMInterface simulation speed multiplier."""
+
+        if not 0.0 < speed <= 1000.0:
+            raise ValueError(f"speed must be in (0, 1000], got {speed}")
+        self._send(struct.pack("<if", MessageType.C_SET_SPEED, speed))
+
     def set_input_state(
         self,
         *,

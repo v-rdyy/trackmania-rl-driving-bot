@@ -103,4 +103,4 @@ if ($checks.Status -contains 'PENDING') {
     exit 1
 }
 
-Write-Host "`nStatic prerequisites are present. Continue with the manual live checks in phase0_notes.md."
+Write-Host "`nPhase 0 runtime prerequisites passed. See phase0_notes.md for completed live evidence."
