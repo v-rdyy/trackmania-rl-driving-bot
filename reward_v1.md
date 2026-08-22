@@ -49,6 +49,28 @@ finish rate, episode lengths, best/average progress, speeds, terminal causes, an
 a telemetry-based behavior description. Visible behavior during the run remains
 an explicit human observation rather than being invented from numbers alone.
 
+## Invalidated preliminary training attempt
+
+The first long run was deliberately stopped and excluded from the formal result
+at TensorBoard step `28,672`. It completed 64 episodes with zero finishes and a
+flat zero reward, but the project owner visually observed the car reversing off
+the starting platform onto the grass below on essentially every run. The Monitor
+classified 62 episodes as 45-second timeouts and only two as off-track.
+
+The discrepancy identified an environment bug rather than a reward result:
+off-track detection measured only horizontal X/Z distance from the reference
+path. A car directly below the start could remain horizontally close and spend
+the rest of the episode on the lower grass. Those episode lengths therefore mix
+sparse-reward behavior with missing vertical crash detection. The partial run is
+preserved under `reward_v1_failed_vertical_drop` and must not be counted toward
+the fixed 500,000-step budget.
+
+Ignored local artifact hashes:
+
+- failed-run manifest: `2B4E0356BCD43C11FC3FA4C6A4A91720BC0253722E541110EE5EE651E9C591FE`;
+- Monitor CSV: `6C0895098369B27F60C9909247C92F4F64EBBF56F2EC02A77765015D9D510330`;
+- TensorBoard event: `7D33E411F11F636761E104330BE9A3B8292F3689CB4CD89A6ED44664F03DD1CA`.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.
