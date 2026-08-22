@@ -11,7 +11,7 @@ Last updated: 2026-08-21
 | TrackMania ModLoader installed | Confirmed | TMLoader `1.0.1` at `C:\Users\Vardhan\AppData\Local\TMLoader\TMLoader.exe` |
 | TMInterface installed/enabled | Not yet confirmed | Official changelog and TMLoader catalog both identify `2.2.1` as current, but the active `default` profile currently contains only `TmForever` |
 | TMInterface Python bridge present | Missing | `C:\Users\Vardhan\Documents\TMInterface` and `Plugins\python_link.as` were absent |
-| Python 3.10/3.11 available | Missing | `py` is absent; `python.exe` and `python3.exe` resolve only to Microsoft Store aliases |
+| Python 3.10/3.11 available | Confirmed | Official Python install manager `26.3` installed Python `3.11.9`; project `.venv` imports all pinned Phase 0 packages successfully |
 
 ## Compatibility research
 
@@ -19,6 +19,14 @@ Last updated: 2026-08-21
 - Current TMInterface uses an AngelScript plugin API. On 2026-08-21, the official TMInterface changelog and the locally installed TMLoader catalog both identified 2.2.1 as the current release.
 - The actively developed `dersiwi/trackmania-gym` project uses current TMInterface with an AngelScript `python_link.as` plugin that exposes a TCP bridge compatible with the older Python protocol. Its repository was updated in July 2026 and documents telemetry plus input injection.
 - Stable-Baselines3 2.9.0 is the current stable release and requires Python 3.10 or newer. Gymnasium 1.3.0 also requires Python 3.10 or newer.
+
+## Python environment
+
+- Runtime: CPython `3.11.9` (64-bit), installed by the official Python install manager `26.3`.
+- Project environment: `.venv` (excluded from Git).
+- Verified imports: Stable-Baselines3 `2.9.0`, Gymnasium `1.3.0`, NumPy `2.4.6`, TensorBoard `2.21.0`, and PyTorch `2.13.0+cpu`.
+- The Python manager's signed online index resolves `3.11` on Windows to `3.11.9`. Newer 3.11 security releases are source-only, so `3.11.9` remains the current official prebuilt Windows runtime in that line.
+- The installed PyTorch wheel is CPU-only (`torch.cuda.is_available() == False`). Phase 0 does not require GPU training; revisit the PyTorch build before any later workload that would materially benefit from CUDA.
 
 The owner approved the modern integration on 2026-08-21. The decision and version verification are documented in `docs/decisions/0001-tminterface-bridge.md`.
 
@@ -28,14 +36,13 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 - [ ] Scripted accelerate and steer inputs move the car as expected.
 - [ ] Accelerated game speed works with telemetry and input.
 - [ ] A short, low-complexity training track is selected and the reason is documented.
-- [ ] Python environment is installed and the final dependency set is pinned.
+- [x] Python environment is installed and the Phase 0 dependency set is pinned.
 
 ## Next hands-on checks
 
 1. Enable TMInterface 2.2.1 in TMLoader and launch the game through that profile.
 2. Confirm the launcher/game version shown by the running game and record it here.
-3. Install Python and create `.venv` from `requirements.txt`.
-4. Add the approved bridge and run separate telemetry and scripted-input probes.
+3. Add the approved bridge and run separate telemetry and scripted-input probes.
 
 ## Track choice
 

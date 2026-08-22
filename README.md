@@ -7,8 +7,8 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). Work is currentl
 - TrackMania Nations Forever is installed through Steam.
 - TrackMania ModLoader is installed.
 - TMInterface is not enabled in the active ModLoader profile.
-- A real Python installation is not present yet.
-- The TMInterface-to-Python bridge choice is awaiting human approval; see [`docs/decisions/0001-tminterface-bridge.md`](docs/decisions/0001-tminterface-bridge.md).
+- Python 3.11.9 and the pinned Phase 0 dependencies are installed in `.venv`.
+- The modern TMInterface 2.2.1 plus `python_link.as` bridge is approved in [`docs/decisions/0001-tminterface-bridge.md`](docs/decisions/0001-tminterface-bridge.md); enabling and live verification are next.
 
 Run the non-mutating local audit from PowerShell:
 

@@ -23,6 +23,8 @@ $gamePath = Join-Path $steamRoot 'steamapps\common\TrackMania Nations Forever'
 $tmLoaderPath = Join-Path $env:LOCALAPPDATA 'TMLoader\TMLoader.exe'
 $tmLoaderProfile = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\profiles\default.yaml'
 $pluginPath = Join-Path $env:USERPROFILE 'Documents\TMInterface\Plugins\python_link.as'
+$workspaceRoot = Split-Path -Parent $PSScriptRoot
+$projectPython = Join-Path $workspaceRoot '.venv\Scripts\python.exe'
 
 $manifest = if (Test-Path -LiteralPath $manifestPath) {
     Get-Content -Raw -LiteralPath $manifestPath
@@ -36,7 +38,11 @@ $profile = if (Test-Path -LiteralPath $tmLoaderProfile) {
     ''
 }
 
-$pythonCommand = Get-Command py -ErrorAction SilentlyContinue
+$pythonCommand = if (Test-Path -LiteralPath $projectPython) {
+    Get-Item -LiteralPath $projectPython
+} else {
+    Get-Command py -ErrorAction SilentlyContinue
+}
 if (-not $pythonCommand) {
     $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
 }
@@ -44,7 +50,7 @@ if (-not $pythonCommand) {
 $pythonIsStoreAlias = $pythonCommand -and $pythonCommand.Source -like '*\Microsoft\WindowsApps\python*.exe'
 $pythonReady = [bool]$pythonCommand -and -not $pythonIsStoreAlias
 $pythonDetail = if ($pythonReady) {
-    & $pythonCommand.Source --version 2>&1 | Out-String
+    & $pythonCommand.FullName --version 2>&1 | Out-String
 } elseif ($pythonIsStoreAlias) {
     'Only the Microsoft Store execution alias is present.'
 } else {
