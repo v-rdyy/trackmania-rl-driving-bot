@@ -1,6 +1,6 @@
 # Trackmania RL Driving Bot
 
-This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: environment and tooling verification is complete.** Phase 1 has not started; its initial action-space choice is waiting for the project owner's decision. Development history follows the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: environment and tooling verification is complete.** Phase 1 has started with the owner-approved continuous action contract in [`Decision 0002`](docs/decisions/0002-continuous-action-space.md). Development history follows the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Current status
 

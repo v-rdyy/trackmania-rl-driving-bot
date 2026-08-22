@@ -91,7 +91,7 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 
 ## Phase 1 handoff
 
-All Phase 0 exit criteria are satisfied. Before implementing the Gymnasium wrapper, the owner needs to choose the initial action-space strategy requested by the scope: discrete actions for easier debugging, or continuous controls for a closer match to PPO's eventual driving policy.
+All Phase 0 exit criteria are satisfied. On 2026-08-22, the owner selected continuous steer/throttle/brake control for Phase 1 and required raw per-step action logging with finite/range validation. The contract is recorded in `docs/decisions/0002-continuous-action-space.md`.
 
 ## Track choice
 

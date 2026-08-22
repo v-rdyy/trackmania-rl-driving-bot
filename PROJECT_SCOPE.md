@@ -53,7 +53,7 @@ Document the exact shape/normalization of this observation vector in code commen
 
 **Action space:**
 
-- Continuous or discrete steer/accelerate/brake (decide and document which, continuous is more realistic for PPO but discrete is simpler to debug first, human should weigh in if unclear)
+- Continuous steer/throttle/brake, approved by the owner and specified in `docs/decisions/0002-continuous-action-space.md`. The Phase 1 smoke test logs and validates every raw action before analog conversion.
 
 **Tasks:**
 
