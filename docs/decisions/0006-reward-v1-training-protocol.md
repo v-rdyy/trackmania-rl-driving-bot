@@ -34,6 +34,7 @@ Run reward v1 with this protocol:
 - PPO clip range: `0.2`;
 - environment: 6x simulation, 100 ms control period, 45-second timeout, and
   50-unit lateral off-track boundary;
+- vertical fall boundary: 10 units below the local reference-path height;
 - checkpoint interval: every `50,000` callback steps, plus a final checkpoint;
 - TensorBoard run name: `reward_v1_sparse`;
 - post-training evaluation: at least 20 deterministic episodes.
@@ -58,3 +59,24 @@ or a new custom distribution. That keeps actions bounded and transparent and
 holds policy architecture constant across reward comparisons. Its exploration
 behavior may affect learning, so the eventual analysis must name it rather than
 claiming the reward is the only conceivable cause of the result.
+
+## Pre-run amendment: vertical fall detection
+
+The first preliminary run was stopped at TensorBoard step 28,672 after visual
+review showed repeated backward falls from the starting platform onto the grass
+below. Because the environment only measured horizontal X/Z offset, 62 of 64
+episodes waited for the 45-second timeout instead of recognizing the fall. That
+run is preserved but invalidated in `reward_v1.md`.
+
+Before restarting the formal budget from zero, add a truncation when the car is
+more than 10 vertical units below the height of its nearest reference-path point.
+This is a crash/invalid-state boundary, not reward shaping: sparse reward remains
+zero for the truncation. Verify the threshold by deliberately reversing off the
+A01 start and record the measured vertical offset before the formal run begins.
+
+The first verification attempt did not reproduce the visible failure. Holding
+raw action `[0, 0, 1]` applied gas `-65536`, but the car progressed approximately
+115 path units over 100 steps instead of backing off the platform. Its minimum
+vertical offset was only `-0.203`, so it timed out and correctly failed the probe.
+The 10-unit threshold remains provisional; reproduce the stochastic PPO behavior
+or add an explicit behind-start boundary before restarting formal training.

@@ -34,6 +34,7 @@ class ObservationTests(unittest.TestCase):
 
         self.assertAlmostEqual(projection.progress, 5.0)
         self.assertAlmostEqual(projection.lateral_offset, 2.0)
+        self.assertAlmostEqual(projection.vertical_offset, 0.0)
         np.testing.assert_allclose(projection.point, [5.0, 0.0, 0.0])
 
     def test_observation_has_documented_shape_order_and_normalization(self) -> None:

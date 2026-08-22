@@ -123,6 +123,7 @@ def main() -> int:
                 "finished": bool(finished),
                 "timeout": bool(final_info["timeout"]),
                 "off_track": bool(final_info["off_track"]),
+                "fallen": bool(final_info["fallen"]),
                 "max_progress": max_progress,
                 "final_progress": float(final_info["progress"]),
                 "max_display_speed": max_display_speed,
@@ -165,6 +166,7 @@ def main() -> int:
     finishes = sum(bool(episode["finished"]) for episode in episode_records)
     timeouts = sum(bool(episode["timeout"]) for episode in episode_records)
     off_tracks = sum(bool(episode["off_track"]) for episode in episode_records)
+    falls = sum(bool(episode["fallen"]) for episode in episode_records)
     finish_times_ms = [
         int(episode["elapsed_ms"])
         for episode in episode_records
@@ -179,6 +181,7 @@ def main() -> int:
         "finish_rate": finishes / args.episodes,
         "timeouts": timeouts,
         "off_tracks": off_tracks,
+        "falls": falls,
         "average_episode_steps": statistics.fmean(
             int(episode["steps"]) for episode in episode_records
         ),

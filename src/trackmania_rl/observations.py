@@ -35,6 +35,7 @@ class PathProjection:
     point: np.ndarray
     tangent_xz: np.ndarray
     lateral_offset: float
+    vertical_offset: float
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class ObservationDiagnostics:
     lateral_offset: float
     heading_error: float
     segment_index: int
+    vertical_offset: float = 0.0
 
 
 class ReferencePath:
@@ -109,6 +111,7 @@ class ReferencePath:
         lateral_offset = float(
             tangent_xz[1] * offset_xz[0] - tangent_xz[0] * offset_xz[1]
         )
+        vertical_offset = float(position[1] - point[1])
         progress = float(
             self.distances[segment_index]
             + fraction
@@ -121,6 +124,7 @@ class ReferencePath:
             point=point,
             tangent_xz=tangent_xz,
             lateral_offset=lateral_offset,
+            vertical_offset=vertical_offset,
         )
 
     def points_at_distances(self, distances: np.ndarray) -> np.ndarray:
@@ -187,5 +191,6 @@ def build_observation(
         lateral_offset=projection.lateral_offset,
         heading_error=heading_error,
         segment_index=projection.segment_index,
+        vertical_offset=projection.vertical_offset,
     )
     return observation, diagnostics

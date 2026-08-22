@@ -160,6 +160,7 @@ def main() -> int:
         "step_period_ms": 100,
         "max_episode_ms": 45_000,
         "max_lateral_offset": 50.0,
+        "max_vertical_drop": 10.0,
         "n_steps": 2_048,
         "batch_size": 64,
         "n_epochs": 10,
@@ -182,7 +183,13 @@ def main() -> int:
     monitored_env = Monitor(
         base_env,
         filename=str(MONITOR_PREFIX),
-        info_keywords=("timeout", "off_track", "race_finished", "progress"),
+        info_keywords=(
+            "timeout",
+            "off_track",
+            "fallen",
+            "race_finished",
+            "progress",
+        ),
         override_existing=args.resume is None,
     )
     if args.resume:
@@ -276,6 +283,7 @@ def main() -> int:
     finishes = sum(row["race_finished"] == "True" for row in monitor_rows)
     timeouts = sum(row["timeout"] == "True" for row in monitor_rows)
     off_tracks = sum(row["off_track"] == "True" for row in monitor_rows)
+    falls = sum(row["fallen"] == "True" for row in monitor_rows)
     final_checkpoint_path = FINAL_CHECKPOINT.with_suffix(".zip")
     checkpoint_paths = sorted(CHECKPOINT_DIR.glob("*.zip"))
     completed_at = datetime.now(timezone.utc)
@@ -294,6 +302,7 @@ def main() -> int:
         "finishes": finishes,
         "timeouts": timeouts,
         "off_tracks": off_tracks,
+        "falls": falls,
         "episode_reward_minimum": min(episode_rewards),
         "episode_reward_maximum": max(episode_rewards),
         "episode_length_minimum": min(episode_lengths),

@@ -35,8 +35,10 @@ class EnvironmentConfig:
     step_period_ms: int = 100
     max_episode_ms: int = 45_000
     max_lateral_offset: float = 50.0
+    max_vertical_drop: float = 10.0
     max_start_progress: float = 25.0
     max_start_lateral_offset: float = 10.0
+    max_start_vertical_offset: float = 5.0
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
     max_initial_respawn_steps: int = 100
@@ -164,6 +166,14 @@ class LiveTmiSession:
                 raise RuntimeError(
                     f"car speed is {self._current_state.display_speed}; "
                     "wait at the A01 start before capturing the episode snapshot"
+                )
+            if (
+                abs(diagnostics.vertical_offset)
+                > self.config.max_start_vertical_offset
+            ):
+                raise RuntimeError(
+                    f"car is {diagnostics.vertical_offset:.3f} vertical units from "
+                    "the reference path; wait for a clean A01 respawn"
                 )
             self._initial_snapshot = bytes(self._current_state.data)
 
@@ -358,8 +368,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
         timed_out = elapsed_ms >= self.config.max_episode_ms
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
+        fallen = diagnostics.vertical_offset < -self.config.max_vertical_drop
         terminated = bool(result.race_finished)
-        truncated = bool(not terminated and (timed_out or off_track))
+        truncated = bool(not terminated and (timed_out or off_track or fallen))
         if self._last_diagnostics is None:
             raise RuntimeError("step requires reset diagnostics")
         transition = RewardTransition(
@@ -371,6 +382,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             truncated=truncated,
             timed_out=timed_out,
             off_track=off_track,
+            fallen=fallen,
         )
         reward = float(self.reward_function(transition))
         if not math.isfinite(reward):
@@ -384,6 +396,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "applied_gas": result.applied_gas,
                 "timeout": timed_out,
                 "off_track": off_track,
+                "fallen": fallen,
                 "race_finished": terminated,
                 "reward_function": self.reward_name,
             }
@@ -406,6 +419,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "truncated": truncated,
                     "progress": diagnostics.progress,
                     "lateral_offset": diagnostics.lateral_offset,
+                    "vertical_offset": diagnostics.vertical_offset,
                     "heading_error": diagnostics.heading_error,
                 }
             )
@@ -422,6 +436,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             "display_speed": int(state.display_speed),
             "progress": diagnostics.progress,
             "lateral_offset": diagnostics.lateral_offset,
+            "vertical_offset": diagnostics.vertical_offset,
             "heading_error": diagnostics.heading_error,
             "segment_index": diagnostics.segment_index,
         }

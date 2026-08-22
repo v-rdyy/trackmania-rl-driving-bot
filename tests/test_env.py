@@ -23,9 +23,16 @@ from trackmania_rl.rewards import sparse_finish_reward
 from trackmania_rl.tmi_bridge import MessageType
 
 
-def state(*, x: float, z: float, speed: int, race_time: int) -> SimpleNamespace:
+def state(
+    *,
+    x: float,
+    z: float,
+    speed: int,
+    race_time: int,
+    y: float = 0.0,
+) -> SimpleNamespace:
     return SimpleNamespace(
-        position=np.asarray([x, 0.0, z]),
+        position=np.asarray([x, y, z]),
         velocity=np.asarray([float(speed) / 3.6, 0.0, 0.0]),
         rotation_matrix=np.asarray(
             [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
@@ -192,6 +199,31 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertFalse(terminated)
         self.assertTrue(truncated)
         self.assertTrue(info["timeout"])
+
+    def test_vertical_fall_is_truncated_before_timeout(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, y=-11, z=0, speed=100, race_time=100),
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(max_vertical_drop=10.0),
+            reference_path=self.path,
+            session=session,
+        )
+        env.reset()
+
+        _, reward, terminated, truncated, info = env.step(
+            np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertAlmostEqual(reward, -0.9)
+        self.assertFalse(terminated)
+        self.assertTrue(truncated)
+        self.assertTrue(info["fallen"])
+        self.assertFalse(info["timeout"])
 
     def test_reward_function_is_injected_and_named_in_info(self) -> None:
         session = FakeSession(

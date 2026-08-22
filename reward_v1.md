@@ -71,6 +71,14 @@ Ignored local artifact hashes:
 - Monitor CSV: `6C0895098369B27F60C9909247C92F4F64EBBF56F2EC02A77765015D9D510330`;
 - TensorBoard event: `7D33E411F11F636761E104330BE9A3B8292F3689CB4CD89A6ED44664F03DD1CA`.
 
+A first fixed-action reproduction also failed honestly: `[steer=0, throttle=0,
+brake=1]` applied gas `-65536` but moved about 115 path units forward rather than
+backing off the start. Over 100 steps its minimum vertical offset was only
+`-0.203`, so the proposed 10-unit fall boundary did not fire. The ignored action
+log SHA-256 is
+`DCEE08E43643EBB4753F51CEB833A54BA5CDE995E4E6A17C72CDDDDC5ABD04A0`.
+Formal training remains stopped while the visible PPO trajectory is reproduced.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.

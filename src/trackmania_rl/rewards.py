@@ -20,6 +20,7 @@ class RewardTransition:
     truncated: bool
     timed_out: bool
     off_track: bool
+    fallen: bool = False
 
 
 RewardFunction = Callable[[RewardTransition], float]
