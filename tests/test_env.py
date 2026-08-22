@@ -12,8 +12,14 @@ import numpy as np
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.env import EnvironmentConfig, SessionStep, TrackmaniaEnv
+from trackmania_rl.env import (
+    EnvironmentConfig,
+    LiveTmiSession,
+    SessionStep,
+    TrackmaniaEnv,
+)
 from trackmania_rl.observations import ReferencePath
+from trackmania_rl.tmi_bridge import MessageType
 
 
 def state(*, x: float, z: float, speed: int, race_time: int) -> SimpleNamespace:
@@ -57,6 +63,20 @@ class FakeSession:
 
     def close(self) -> None:
         self.closed = True
+
+
+class RecordingBridgeClient:
+    def __init__(self) -> None:
+        self.calls: list[object] = []
+
+    def give_up(self) -> None:
+        self.calls.append("give_up")
+
+    def set_continuous_input(self, *, steer, throttle, brake):
+        self.calls.append(("input", steer, throttle, brake))
+
+    def respond(self, message_type) -> None:
+        self.calls.append(("respond", message_type))
 
 
 class TrackmaniaEnvTests(unittest.TestCase):
@@ -165,6 +185,51 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertFalse(terminated)
         self.assertTrue(truncated)
         self.assertTrue(info["timeout"])
+
+
+class LiveTmiSessionTests(unittest.TestCase):
+    def test_prepare_respawns_and_advances_one_neutral_step(self) -> None:
+        session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=True))
+        client = RecordingBridgeClient()
+        initial_state = state(x=20, z=0, speed=100, race_time=1000)
+        respawned_state = state(x=0, z=0, speed=0, race_time=1100)
+        session.client = client
+        session._connected = True
+        session._pending_step = True
+        session._current_state = initial_state
+
+        def complete_respawn_step() -> None:
+            session._current_state = respawned_state
+            session._current_race_time = respawned_state.race_time
+            session._pending_step = True
+
+        session._wait_for_run_step = complete_respawn_step
+
+        prepared = session.prepare()
+
+        self.assertIs(prepared, respawned_state)
+        self.assertEqual(
+            client.calls,
+            [
+                "give_up",
+                ("input", 0.0, 0.0, 0.0),
+                ("respond", MessageType.SC_RUN_STEP_SYNC),
+            ],
+        )
+
+    def test_prepare_can_preserve_current_state_when_auto_respawn_disabled(self) -> None:
+        session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=False))
+        client = RecordingBridgeClient()
+        current_state = state(x=20, z=0, speed=100, race_time=1000)
+        session.client = client
+        session._connected = True
+        session._pending_step = True
+        session._current_state = current_state
+
+        prepared = session.prepare()
+
+        self.assertIs(prepared, current_state)
+        self.assertEqual(client.calls, [])
 
 
 if __name__ == "__main__":

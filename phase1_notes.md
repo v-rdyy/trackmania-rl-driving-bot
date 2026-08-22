@@ -79,6 +79,22 @@ logging path. Local artifact hashes:
 
 The wrapper captures one known start snapshot and restores its raw TMInterface simulation bytes on every reset. Before capture it refuses states above 5 displayed speed, beyond 25 path-progress units, or more than 10 lateral units from the reference path. A live round-trip moved the car `17.554` units under analog throttle, then restored the captured position with `0.000000` measured error. The next callback advanced from captured race time `7343600` to `7343700`, matching the configured 100 ms game-time step period.
 
+After Phase 1, the first initial-respawn attempt made `prepare()` issue
+TMInterface `GiveUp()`, apply neutral analog input, and advance one synchronized
+step before snapshot capture. Its 20-episode live test completed all 100 steps,
+but correctly failed the strict reset comparison: maximum observation drift was
+`0.000083494`, above the `0.00001` threshold.
+
+The raw action log identified the lifecycle cause. `GiveUp()` placed episode 0
+inside the pre-race countdown (`-2500` through `-2100` ms), so gas `22938` did
+not move the car. Snapshot rewind restored the car state for episode 1 but did
+not restore the absolute clock, which remained near `201200` ms; the same gas
+then accelerated normally. The failed attempt's ignored action log contains 100
+valid finite actions and has SHA-256
+`0F1C475DD6534025FB18B7CCFD9715EA6EE6F099E2B657485ADDE6E0D3C02635`.
+The follow-up must wait through the negative countdown before capturing the
+snapshot rather than weakening the determinism threshold.
+
 The reliability smoke test ran 20 consecutive live episodes with a deliberately
 short 500 ms timeout, producing 100 finite `reset()`/`step()` interactions. All
 100 raw `[steer, throttle, brake]` actions were finite and in range before the

@@ -32,6 +32,7 @@ class EnvironmentConfig:
     max_start_progress: float = 25.0
     max_start_lateral_offset: float = 10.0
     max_start_speed: int = 5
+    auto_respawn_on_connect: bool = True
 
 
 @dataclass(frozen=True)
@@ -99,10 +100,20 @@ class LiveTmiSession:
             self._handle_non_step(message_type)
 
     def prepare(self) -> object:
-        """Connect and expose the current state without capturing a snapshot."""
+        """Connect, optionally respawn, and expose a snapshot candidate."""
         self._connect()
         if not self._pending_step or self._current_state is None:
             raise RuntimeError("prepare requires a pending simulation step")
+        if self.config.auto_respawn_on_connect:
+            self.client.give_up()
+            self.client.set_continuous_input(
+                steer=0.0,
+                throttle=0.0,
+                brake=0.0,
+            )
+            self.client.respond(MessageType.SC_RUN_STEP_SYNC)
+            self._pending_step = False
+            self._wait_for_run_step()
         return self._current_state
 
     def reset(self, diagnostics: ObservationDiagnostics | None = None) -> object:

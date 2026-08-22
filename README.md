@@ -26,7 +26,9 @@ follows the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
   second, wrote verified TensorBoard reward/episode-length metrics, and audited
   every policy and environment action without hidden clipping per Decision 0005.
 
-Run the Phase 1 PPO smoke test from a clean, stationary A01 start:
+Run the Phase 1 PPO smoke test while A01 is loaded. Initial respawn automation
+is under active validation after its first live attempt exposed a countdown-state
+mismatch; until the follow-up fix passes, use a clean stationary start:
 
 ```powershell
 .\.venv\Scripts\python.exe .\scripts\train_phase1_smoke.py
