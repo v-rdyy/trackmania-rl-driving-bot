@@ -140,7 +140,13 @@ def capture_stage(
     action_log = take_dir / "actions.jsonl"
     reward_function = REWARDS[str(stage["reward"])]
     env = TrackmaniaEnv(
-        config=EnvironmentConfig(port=port, simulation_speed=simulation_speed),
+        config=EnvironmentConfig(
+            port=port,
+            simulation_speed=simulation_speed,
+            legacy_reversed_pedal_mapping=bool(
+                stage["legacy_reversed_pedal_mapping"]
+            ),
+        ),
         reward_function=reward_function,
         action_log_path=action_log,
     )

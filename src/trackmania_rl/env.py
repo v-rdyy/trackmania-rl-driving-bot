@@ -43,6 +43,9 @@ class EnvironmentConfig:
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
     max_initial_respawn_steps: int = 100
+    # Compatibility only for models trained before the signed Gas direction was
+    # verified. New training must use the corrected default (False).
+    legacy_reversed_pedal_mapping: bool = False
 
 
 @dataclass(frozen=True)
@@ -195,10 +198,14 @@ class LiveTmiSession:
             or self._current_race_time is None
         ):
             raise RuntimeError("advance requires a pending simulation step")
+        throttle = float(action[1])
+        brake = float(action[2])
+        if self.config.legacy_reversed_pedal_mapping:
+            throttle, brake = brake, throttle
         applied_steer, applied_gas = self.client.set_continuous_input(
             steer=float(action[0]),
-            throttle=float(action[1]),
-            brake=float(action[2]),
+            throttle=throttle,
+            brake=brake,
         )
         self.client.respond(MessageType.SC_RUN_STEP_SYNC)
         self._pending_step = False

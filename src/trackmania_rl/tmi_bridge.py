@@ -174,7 +174,9 @@ class TmiBridgeClient:
             raise ValueError(f"brake must be in [0, 1], got {brake}")
 
         steer_value = round(steer * 65536)
-        gas_value = round((throttle - brake) * 65536)
+        # TMNF's signed Gas axis is negative for forward acceleration and
+        # positive for reverse/braking, as verified live on A01.
+        gas_value = round((brake - throttle) * 65536)
         self._send(
             struct.pack(
                 "<iii",

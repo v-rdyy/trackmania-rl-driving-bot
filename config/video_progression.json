@@ -11,6 +11,7 @@
       "reward": "phase1_smoke",
       "model_timesteps": 0,
       "checkpoint": null,
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -19,6 +20,7 @@
       "reward": "phase1_smoke",
       "model_timesteps": 2048,
       "checkpoint": "checkpoints/phase1_ppo_smoke.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -27,6 +29,7 @@
       "reward": "reward_v1",
       "model_timesteps": 50000,
       "checkpoint": "checkpoints/reward_v1/ppo_reward_v1_50000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -35,6 +38,7 @@
       "reward": "reward_v1",
       "model_timesteps": 250000,
       "checkpoint": "checkpoints/reward_v1/ppo_reward_v1_250000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -43,6 +47,7 @@
       "reward": "reward_v1",
       "model_timesteps": 501200,
       "checkpoint": "checkpoints/reward_v1/final_model.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 2
     },
     {
@@ -51,6 +56,7 @@
       "reward": "reward_v2",
       "model_timesteps": 50000,
       "checkpoint": "checkpoints/reward_v2/ppo_reward_v2_50000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -59,6 +65,7 @@
       "reward": "reward_v2",
       "model_timesteps": 250000,
       "checkpoint": "checkpoints/reward_v2/ppo_reward_v2_250000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -67,6 +74,7 @@
       "reward": "reward_v2",
       "model_timesteps": 500000,
       "checkpoint": "checkpoints/reward_v2/ppo_reward_v2_500000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -75,6 +83,7 @@
       "reward": "reward_v2",
       "model_timesteps": 750000,
       "checkpoint": "checkpoints/reward_v2/ppo_reward_v2_750000_steps.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 1
     },
     {
@@ -83,6 +92,7 @@
       "reward": "reward_v2",
       "model_timesteps": 1001120,
       "checkpoint": "checkpoints/reward_v2/final_model.zip",
+      "legacy_reversed_pedal_mapping": true,
       "episodes": 5
     }
   ]

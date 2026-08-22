@@ -50,7 +50,11 @@ def benchmark_speed(
     monitor_prefix = MONITOR_DIR / f"speed_{speed:g}x"
     monitor_path = monitor_prefix.with_suffix(".monitor.csv")
     base_env = TrackmaniaEnv(
-        config=EnvironmentConfig(port=port, simulation_speed=speed),
+        config=EnvironmentConfig(
+            port=port,
+            simulation_speed=speed,
+            legacy_reversed_pedal_mapping=True,
+        ),
         reward_function=sparse_finish_reward,
     )
     env = Monitor(

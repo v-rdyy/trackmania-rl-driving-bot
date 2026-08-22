@@ -196,11 +196,11 @@ class TmiBridgeClientTests(unittest.TestCase):
             steer=-0.5, throttle=0.75, brake=0.25
         )
 
-        self.assertEqual(applied, (-32768, 32768))
+        self.assertEqual(applied, (-32768, -32768))
         self.assertEqual(
             server.recv(12),
             struct.pack(
-                "<iii", MessageType.C_SET_ANALOG_INPUT_STATE, -32768, 32768
+                "<iii", MessageType.C_SET_ANALOG_INPUT_STATE, -32768, -32768
             ),
         )
 

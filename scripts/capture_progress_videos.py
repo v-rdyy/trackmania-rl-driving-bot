@@ -65,6 +65,11 @@ def load_plan(path: Path) -> dict[str, Any]:
             raise ValueError(f"episodes must be positive for {stage_id}")
         if int(stage.get("model_timesteps", -1)) < 0:
             raise ValueError(f"model_timesteps must be nonnegative for {stage_id}")
+        if not isinstance(stage.get("legacy_reversed_pedal_mapping"), bool):
+            raise ValueError(
+                "legacy_reversed_pedal_mapping must be explicit and boolean "
+                f"for {stage_id}"
+            )
     return plan
 
 
@@ -146,7 +151,13 @@ def capture_stage(
     action_log = take_dir / "actions.jsonl"
     reward_function = REWARDS[str(stage["reward"])]
     env = TrackmaniaEnv(
-        config=EnvironmentConfig(port=port, simulation_speed=simulation_speed),
+        config=EnvironmentConfig(
+            port=port,
+            simulation_speed=simulation_speed,
+            legacy_reversed_pedal_mapping=bool(
+                stage["legacy_reversed_pedal_mapping"]
+            ),
+        ),
         reward_function=reward_function,
         action_log_path=action_log,
     )

@@ -58,6 +58,7 @@ def main() -> int:
         port=args.port,
         max_episode_ms=args.timeout_ms,
         max_vertical_drop=args.vertical_drop,
+        legacy_reversed_pedal_mapping=True,
     )
     env = TrackmaniaEnv(
         config=config,

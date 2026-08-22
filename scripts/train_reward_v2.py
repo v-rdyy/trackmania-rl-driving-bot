@@ -271,6 +271,7 @@ def main() -> int:
         "gae_lambda": 0.95,
         "clip_range": 0.2,
         "checkpoint_interval": 50_000,
+        "legacy_reversed_pedal_mapping": True,
         "power_preflight": power_preflight,
         "reward_doc_sha256": sha256(REWARD_DOC),
         "protocol_doc_sha256": sha256(PROTOCOL_DOC),
@@ -281,6 +282,7 @@ def main() -> int:
     config = EnvironmentConfig(
         port=args.port,
         simulation_speed=SIMULATION_SPEED,
+        legacy_reversed_pedal_mapping=True,
     )
     base_env = TrackmaniaEnv(
         config=config,

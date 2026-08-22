@@ -86,7 +86,10 @@ def main() -> int:
         raise SystemExit(f"checkpoint does not exist: {args.checkpoint}")
 
     env = TrackmaniaEnv(
-        config=EnvironmentConfig(port=args.port),
+        config=EnvironmentConfig(
+            port=args.port,
+            legacy_reversed_pedal_mapping=True,
+        ),
         reward_function=sparse_finish_reward,
         action_log_path=args.action_log,
     )

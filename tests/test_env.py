@@ -72,7 +72,7 @@ class FakeSession:
             race_time_ms=self.states[self.index].race_time,
             race_finished=self.race_finished,
             applied_steer=round(float(action[0]) * 65536),
-            applied_gas=round(float(action[1] - action[2]) * 65536),
+            applied_gas=round(float(action[2] - action[1]) * 65536),
         )
 
     def close(self) -> None:
@@ -105,7 +105,7 @@ class RecordingBridgeClient:
 
     def set_continuous_input(self, *, steer, throttle, brake):
         self.calls.append(("input", steer, throttle, brake))
-        return round(steer * 65536), round((throttle - brake) * 65536)
+        return round(steer * 65536), round((brake - throttle) * 65536)
 
     def respond(self, message_type) -> None:
         self.calls.append(("respond", message_type))
@@ -144,7 +144,7 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertFalse(terminated)
             self.assertFalse(truncated)
             self.assertEqual(info["applied_steer"], 32768)
-            self.assertEqual(info["applied_gas"], 32768)
+            self.assertEqual(info["applied_gas"], -32768)
             record = json.loads(log_path.read_text(encoding="utf-8"))
             self.assertEqual(record["raw_action"], [0.5, 0.75, 0.25])
             self.assertTrue(record["finite"])
@@ -296,6 +296,48 @@ class TrackmaniaEnvTests(unittest.TestCase):
 
 
 class LiveTmiSessionTests(unittest.TestCase):
+    def _ready_session(
+        self,
+        *,
+        legacy: bool = False,
+    ) -> tuple[LiveTmiSession, RecordingBridgeClient]:
+        session = LiveTmiSession(
+            EnvironmentConfig(legacy_reversed_pedal_mapping=legacy)
+        )
+        client = RecordingBridgeClient()
+        current_state = state(x=0, z=0, speed=0, race_time=0)
+        session.client = client
+        session._connected = True
+        session._pending_step = True
+        session._current_state = current_state
+        session._current_race_time = 0
+
+        def complete_step() -> None:
+            session._pending_step = True
+
+        session._wait_for_run_step = complete_step
+        return session, client
+
+    def test_advance_uses_corrected_throttle_and_brake_semantics(self) -> None:
+        session, client = self._ready_session()
+
+        result = session.advance(
+            np.asarray([0.25, 0.75, 0.125], dtype=np.float32)
+        )
+
+        self.assertEqual(client.calls[0], ("input", 0.25, 0.75, 0.125))
+        self.assertEqual(result.applied_gas, -40960)
+
+    def test_advance_can_reproduce_legacy_reversed_pedal_mapping(self) -> None:
+        session, client = self._ready_session(legacy=True)
+
+        result = session.advance(
+            np.asarray([0.25, 0.75, 0.125], dtype=np.float32)
+        )
+
+        self.assertEqual(client.calls[0], ("input", 0.25, 0.125, 0.75))
+        self.assertEqual(result.applied_gas, 40960)
+
     def test_connect_callback_extends_timeout_before_training_work(self) -> None:
         config = EnvironmentConfig(
             simulation_speed=100.0,

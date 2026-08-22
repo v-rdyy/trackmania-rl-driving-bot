@@ -97,7 +97,10 @@ def main() -> int:
     event_files_before = set(DEFAULT_TENSORBOARD_ROOT.rglob("events.out.tfevents.*"))
 
     base_env = TrackmaniaEnv(
-        config=EnvironmentConfig(port=args.port),
+        config=EnvironmentConfig(
+            port=args.port,
+            legacy_reversed_pedal_mapping=True,
+        ),
         action_log_path=DEFAULT_ENV_ACTION_LOG,
     )
     monitored_env = Monitor(base_env, filename=str(DEFAULT_MONITOR_PATH))
