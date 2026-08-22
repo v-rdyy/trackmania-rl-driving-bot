@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import statistics
 from typing import Any
 
 import numpy as np
@@ -158,8 +159,8 @@ def trajectory_precision_metrics(records: list[dict[str, Any]]) -> dict[str, Any
     )
     if not np.isfinite(values).all():
         raise ValueError("trajectory contains nonfinite precision telemetry")
-    if np.any(np.diff(times_ms) <= 0.0):
-        raise ValueError("trajectory race times must be strictly increasing")
+    if np.any(np.diff(times_ms) < 0.0):
+        raise ValueError("trajectory race times must be nondecreasing")
 
     time_deltas_seconds = np.diff(times_ms) / 1000.0
     absolute_lateral = np.abs(lateral)
@@ -225,6 +226,57 @@ def trajectory_precision_metrics(records: list[dict[str, Any]]) -> dict[str, Any
         "lateral_deviation": lateral_metrics,
         "upside_down": upside_metrics,
         "stuck": stuck_metrics,
+    }
+
+
+def aggregate_precision_metrics(
+    episode_metrics: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate fixed precision metrics without discarding episode details."""
+    if not episode_metrics:
+        raise ValueError("precision aggregation requires at least one episode")
+    return {
+        "episode_count": len(episode_metrics),
+        "oscillation_detected_episodes": sum(
+            bool(metrics["steering"]["oscillation_detected"])
+            for metrics in episode_metrics
+        ),
+        "mean_peak_sign_crossings_in_2_seconds": statistics.fmean(
+            int(metrics["steering"]["peak_sign_crossings_in_2_seconds"])
+            for metrics in episode_metrics
+        ),
+        "maximum_peak_sign_crossings_in_2_seconds": max(
+            int(metrics["steering"]["peak_sign_crossings_in_2_seconds"])
+            for metrics in episode_metrics
+        ),
+        "mean_p95_absolute_lateral_offset": statistics.fmean(
+            float(metrics["lateral_deviation"]["p95_absolute_offset"])
+            for metrics in episode_metrics
+        ),
+        "maximum_absolute_lateral_offset": max(
+            float(metrics["lateral_deviation"]["maximum_absolute_offset"])
+            for metrics in episode_metrics
+        ),
+        "upside_down_detected_episodes": sum(
+            bool(metrics["upside_down"]["upside_down_detected"])
+            for metrics in episode_metrics
+        ),
+        "total_upside_down_seconds": sum(
+            float(metrics["upside_down"]["total_duration_seconds"])
+            for metrics in episode_metrics
+        ),
+        "stuck_detected_episodes": sum(
+            bool(metrics["stuck"]["stuck_detected"])
+            for metrics in episode_metrics
+        ),
+        "total_stuck_seconds": sum(
+            float(metrics["stuck"]["total_duration_seconds"])
+            for metrics in episode_metrics
+        ),
+        "maximum_stuck_seconds": max(
+            float(metrics["stuck"]["maximum_duration_seconds"])
+            for metrics in episode_metrics
+        ),
     }
 
 

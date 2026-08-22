@@ -18,6 +18,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
 from trackmania_rl.evaluation_metrics import (
+    aggregate_precision_metrics,
     evaluation_metric_protocol,
     steering_precision_metrics,
     trajectory_precision_metrics,
@@ -136,15 +137,15 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     )
     oscillation_episodes = sum(
         bool(episode["trajectory"]["precision"]["steering"]["oscillation_detected"])
-        for episode in episode_records
+        for episode in episodes
     )
     upside_down_episodes = sum(
         bool(episode["trajectory"]["precision"]["upside_down"]["upside_down_detected"])
-        for episode in episode_records
+        for episode in episodes
     )
     stuck_episodes = sum(
         bool(episode["trajectory"]["precision"]["stuck"]["stuck_detected"])
-        for episode in episode_records
+        for episode in episodes
     )
     falls = sum(bool(episode["fallen"]) for episode in episodes)
     timeouts = sum(bool(episode["timeout"]) for episode in episodes)
@@ -154,6 +155,8 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     descriptions = [
         f"Finished {finishes} of {len(episodes)} deterministic episodes.",
         f"Telemetry flagged {exploit_candidates} speed-farming loop/oscillation candidates.",
+        f"Fixed precision metrics flagged steering oscillation in {oscillation_episodes}, "
+        f"inversion in {upside_down_episodes}, and stuck periods in {stuck_episodes} episodes.",
         f"Terminal causes included {falls} falls and {timeouts} timeouts.",
         f"Best projected path progress was {best_progress:.3f} units.",
     ]
@@ -275,6 +278,9 @@ def main() -> int:
         bool(episode["trajectory"]["speed_farming_candidate"])
         for episode in episode_records
     )
+    precision_summary = aggregate_precision_metrics(
+        [episode["trajectory"]["precision"] for episode in episode_records]
+    )
     finish_times_ms = [
         int(episode["elapsed_ms"])
         for episode in episode_records
@@ -293,9 +299,7 @@ def main() -> int:
         "falls": falls,
         "speed_farming_candidate_episodes": exploit_candidates,
         "precision_metric_protocol": evaluation_metric_protocol(),
-        "oscillation_detected_episodes": oscillation_episodes,
-        "upside_down_detected_episodes": upside_down_episodes,
-        "stuck_detected_episodes": stuck_episodes,
+        "precision_summary": precision_summary,
         "average_episode_steps": statistics.fmean(
             int(episode["steps"]) for episode in episode_records
         ),

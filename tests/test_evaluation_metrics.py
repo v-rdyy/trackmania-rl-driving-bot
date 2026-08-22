@@ -8,6 +8,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.evaluation_metrics import (
+    aggregate_precision_metrics,
     steering_precision_metrics,
     trajectory_precision_metrics,
 )
@@ -97,6 +98,61 @@ class EvaluationMetricsTests(unittest.TestCase):
         metrics = trajectory_precision_metrics(records)
 
         self.assertFalse(metrics["stuck"]["stuck_detected"])
+
+    def test_duplicate_terminal_timestamp_contributes_zero_duration(self) -> None:
+        records = [
+            trajectory_record(0, x=0.0, progress=0.0),
+            trajectory_record(1, x=1.0, progress=1.0),
+            trajectory_record(1, x=2.0, progress=2.0, lateral=12.0, upright=-1.0),
+        ]
+
+        metrics = trajectory_precision_metrics(records)
+
+        self.assertAlmostEqual(metrics["duration_seconds"], 0.1)
+        self.assertAlmostEqual(
+            metrics["lateral_deviation"]["seconds_above_10_units"],
+            0.0,
+        )
+        self.assertAlmostEqual(
+            metrics["upside_down"]["total_duration_seconds"],
+            0.0,
+        )
+
+    def test_trajectory_rejects_backward_race_time(self) -> None:
+        records = [
+            trajectory_record(1, x=0.0, progress=0.0),
+            trajectory_record(0, x=1.0, progress=1.0),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "nondecreasing"):
+            trajectory_precision_metrics(records)
+
+    def test_precision_aggregation_preserves_severity_totals(self) -> None:
+        first = {
+            "steering": steering_precision_metrics([(0.0, -0.5), (0.1, 0.5)]),
+            **trajectory_precision_metrics(
+                [
+                    trajectory_record(0, x=0.0, progress=0.0),
+                    trajectory_record(1, x=0.0, progress=0.0, lateral=12.0, upright=-1.0),
+                ]
+            ),
+        }
+        second = {
+            "steering": steering_precision_metrics([(0.0, 0.0), (0.1, 0.0)]),
+            **trajectory_precision_metrics(
+                [
+                    trajectory_record(0, x=0.0, progress=0.0),
+                    trajectory_record(1, x=1.0, progress=1.0, lateral=4.0),
+                ]
+            ),
+        }
+
+        summary = aggregate_precision_metrics([first, second])
+
+        self.assertEqual(summary["episode_count"], 2)
+        self.assertEqual(summary["upside_down_detected_episodes"], 1)
+        self.assertAlmostEqual(summary["total_upside_down_seconds"], 0.1)
+        self.assertAlmostEqual(summary["maximum_absolute_lateral_offset"], 12.0)
 
 
 if __name__ == "__main__":

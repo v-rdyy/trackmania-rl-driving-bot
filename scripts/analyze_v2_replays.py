@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -14,6 +13,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 sys.path.insert(0, str(WORKSPACE_ROOT / "scripts"))
 
 from trackmania_rl.evaluation_metrics import (
+    aggregate_precision_metrics,
     evaluation_metric_protocol,
     steering_precision_metrics,
     trajectory_precision_metrics,
@@ -65,52 +65,6 @@ def load_telemetry(path: Path) -> list[dict[str, Any]]:
     ]
 
 
-def aggregate(episodes: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "episode_count": len(episodes),
-        "oscillation_detected_episodes": sum(
-            bool(episode["metrics"]["steering"]["oscillation_detected"])
-            for episode in episodes
-        ),
-        "mean_peak_sign_crossings_in_2_seconds": statistics.fmean(
-            int(episode["metrics"]["steering"]["peak_sign_crossings_in_2_seconds"])
-            for episode in episodes
-        ),
-        "maximum_peak_sign_crossings_in_2_seconds": max(
-            int(episode["metrics"]["steering"]["peak_sign_crossings_in_2_seconds"])
-            for episode in episodes
-        ),
-        "mean_p95_absolute_lateral_offset": statistics.fmean(
-            float(episode["metrics"]["lateral_deviation"]["p95_absolute_offset"])
-            for episode in episodes
-        ),
-        "maximum_absolute_lateral_offset": max(
-            float(episode["metrics"]["lateral_deviation"]["maximum_absolute_offset"])
-            for episode in episodes
-        ),
-        "upside_down_detected_episodes": sum(
-            bool(episode["metrics"]["upside_down"]["upside_down_detected"])
-            for episode in episodes
-        ),
-        "total_upside_down_seconds": sum(
-            float(episode["metrics"]["upside_down"]["total_duration_seconds"])
-            for episode in episodes
-        ),
-        "stuck_detected_episodes": sum(
-            bool(episode["metrics"]["stuck"]["stuck_detected"])
-            for episode in episodes
-        ),
-        "total_stuck_seconds": sum(
-            float(episode["metrics"]["stuck"]["total_duration_seconds"])
-            for episode in episodes
-        ),
-        "maximum_stuck_seconds": max(
-            float(episode["metrics"]["stuck"]["maximum_duration_seconds"])
-            for episode in episodes
-        ),
-    }
-
-
 def main() -> int:
     args = parse_args()
     cases = [
@@ -151,9 +105,13 @@ def main() -> int:
     summary = {
         "status": "complete",
         "metric_protocol": evaluation_metric_protocol(),
-        "all_v2": aggregate(episodes),
+        "all_v2": aggregate_precision_metrics(
+            [episode["metrics"] for episode in episodes]
+        ),
         "stages": {
-            stage_id: aggregate(stage_episodes)
+            stage_id: aggregate_precision_metrics(
+                [episode["metrics"] for episode in stage_episodes]
+            )
             for stage_id, stage_episodes in sorted(stages.items())
         },
         "episodes": episodes,
