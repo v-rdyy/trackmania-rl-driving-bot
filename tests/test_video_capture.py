@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -76,6 +77,58 @@ class VideoCaptureTests(unittest.TestCase):
             second = MODULE.next_take_directory(root, "v2_speed_final")
             self.assertEqual(first.name, "take_001")
             self.assertEqual(second.name, "take_002")
+
+    def test_replay_catalog_aggregates_successes_and_failures(self) -> None:
+        replay_script = WORKSPACE_ROOT / "scripts" / "capture_progress_replays.py"
+        spec = importlib.util.spec_from_file_location(
+            "capture_progress_replays",
+            replay_script,
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            success_dir = root / "stage" / "take_001"
+            failure_dir = root / "stage" / "take_002"
+            success_dir.mkdir(parents=True)
+            failure_dir.mkdir(parents=True)
+            (success_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "stage": {"id": "stage", "model_timesteps": 50},
+                        "checkpoint_sha256": "ABC",
+                        "episodes": [
+                            {
+                                "finished": True,
+                                "fallen": False,
+                                "off_track": False,
+                                "timeout": False,
+                                "input_replay": "replay.txt",
+                                "input_replay_bytes": 123,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (failure_dir / "failure_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "stage": {"id": "stage"},
+                        "error": "countdown failed",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            catalog = module.build_catalog(root, WORKSPACE_ROOT / "plan.json")
+
+            self.assertEqual(catalog["successful_take_count"], 1)
+            self.assertEqual(catalog["failed_take_count"], 1)
+            self.assertEqual(catalog["input_replay_count"], 1)
+            self.assertEqual(catalog["input_replay_bytes"], 123)
+            self.assertEqual(catalog["successful_takes"][0]["outcomes"], ["finish"])
 
 
 if __name__ == "__main__":

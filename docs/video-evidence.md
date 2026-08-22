@@ -11,6 +11,8 @@ outcome.
 Replay output is local under `artifacts/replays/progression/`; later H.264 renders
 are under `artifacts/videos/progression/`. Each rerun creates `take_001`,
 `take_002`, and so on, and neither capture tool replaces an earlier take.
+`capture_catalog.json` inventories every successful and failed take across all
+invocations, including checkpoint/manifest hashes and episode outcomes.
 
 ## Progression matrix
 
@@ -50,6 +52,8 @@ With A01 Race loaded and TMInterface enabled:
 The resulting `.txt` files are TMInterface input replays. Keeping them is faster
 and smaller than recording every checkpoint directly to video, and they can be
 loaded later through TMInterface's `load` command for consistent rendering.
+Use `--catalog-only` to rebuild the aggregate index without connecting to the
+game.
 Before every checkpoint stage, the collector focuses the verified `TmForever`
 window and sends TrackMania's Delete restart key. This avoids an intermittent
 handoff where a new bridge client could not start the pre-race countdown after

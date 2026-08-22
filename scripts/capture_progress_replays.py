@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage", action="append", dest="stages")
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--catalog-only", action="store_true")
     return parser.parse_args()
 
 
@@ -64,6 +65,64 @@ def outcome_name(terminated: bool, info: dict[str, Any]) -> str:
     if info["off_track"]:
         return "off_track"
     return "timeout"
+
+
+def relative_or_absolute(path: Path) -> str:
+    try:
+        return str(path.relative_to(WORKSPACE_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def build_catalog(output_root: Path, plan_path: Path) -> dict[str, Any]:
+    successful_takes: list[dict[str, Any]] = []
+    failed_takes: list[dict[str, Any]] = []
+    replay_count = 0
+    replay_bytes = 0
+    for manifest_path in sorted(output_root.rglob("manifest.json")):
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        episodes = list(manifest["episodes"])
+        replay_count += len(episodes)
+        replay_bytes += sum(int(episode["input_replay_bytes"]) for episode in episodes)
+        successful_takes.append(
+            {
+                "stage_id": manifest["stage"]["id"],
+                "take": manifest_path.parent.name,
+                "model_timesteps": int(manifest["stage"]["model_timesteps"]),
+                "checkpoint_sha256": manifest.get("checkpoint_sha256"),
+                "outcomes": [
+                    outcome_name(bool(episode["finished"]), episode)
+                    for episode in episodes
+                ],
+                "input_replays": [episode["input_replay"] for episode in episodes],
+                "manifest": relative_or_absolute(manifest_path),
+                "manifest_sha256": sha256(manifest_path),
+            }
+        )
+    for manifest_path in sorted(output_root.rglob("failure_manifest.json")):
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        failed_takes.append(
+            {
+                "stage_id": manifest["stage"]["id"],
+                "take": manifest_path.parent.name,
+                "error": manifest["error"],
+                "manifest": relative_or_absolute(manifest_path),
+                "manifest_sha256": sha256(manifest_path),
+            }
+        )
+    catalog = {
+        "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "plan": relative_or_absolute(plan_path),
+        "successful_takes": successful_takes,
+        "failed_takes": failed_takes,
+        "successful_take_count": len(successful_takes),
+        "failed_take_count": len(failed_takes),
+        "input_replay_count": replay_count,
+        "input_replay_bytes": replay_bytes,
+    }
+    output_root.mkdir(parents=True, exist_ok=True)
+    write_json(output_root / "capture_catalog.json", catalog)
+    return catalog
 
 
 def capture_stage(
@@ -210,6 +269,14 @@ def main() -> int:
                 f"steps={stage['model_timesteps']} episodes={stage['episodes']}"
             )
         return 0
+    if args.catalog_only:
+        catalog = build_catalog(args.output_dir, args.plan)
+        print(
+            f"replay catalog complete: replays={catalog['input_replay_count']} "
+            f"failed_takes={catalog['failed_take_count']}",
+            flush=True,
+        )
+        return 0
     if not args.tmi_scripts_dir.is_dir():
         raise SystemExit(
             f"TMInterface Scripts directory does not exist: {args.tmi_scripts_dir}"
@@ -226,14 +293,12 @@ def main() -> int:
         )
         for stage in stages
     ]
-    catalog = {
-        "updated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "plan": str(args.plan.relative_to(WORKSPACE_ROOT)),
-        "captures": captures,
-    }
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    write_json(args.output_dir / "latest_capture_catalog.json", catalog)
-    print(f"replay capture complete: stages={len(captures)}", flush=True)
+    catalog = build_catalog(args.output_dir, args.plan)
+    print(
+        f"replay capture complete: stages={len(captures)} "
+        f"total_replays={catalog['input_replay_count']}",
+        flush=True,
+    )
     return 0
 
 
