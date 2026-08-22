@@ -92,8 +92,17 @@ not restore the absolute clock, which remained near `201200` ms; the same gas
 then accelerated normally. The failed attempt's ignored action log contains 100
 valid finite actions and has SHA-256
 `0F1C475DD6534025FB18B7CCFD9715EA6EE6F099E2B657485ADDE6E0D3C02635`.
-The follow-up must wait through the negative countdown before capturing the
-snapshot rather than weakening the determinism threshold.
+A second attempt waited until race time was nonnegative, but it exposed a more
+subtle transition: the first callback after `GiveUp()` still carried the old
+positive clock, so the readiness check returned before observing the new
+countdown. The following callback then entered `-2500` ms. Episode 0 stayed in
+that countdown, while rewound episodes restored a start state facing backward
+(`heading_error` approximately pi) at the old positive clock. The maximum reset
+observation delta was `2.258129597`. Its ignored 100-action log has SHA-256
+`20D22DD39F27B3340FC5786D037C4D4CD6DDAA68A7C1581FD61256981F206CF6`.
+The next implementation must observe the negative countdown transition before
+accepting a later nonnegative callback, rather than merely testing `>= 0` or
+weakening the determinism threshold.
 
 The reliability smoke test ran 20 consecutive live episodes with a deliberately
 short 500 ms timeout, producing 100 finite `reset()`/`step()` interactions. All

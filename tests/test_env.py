@@ -188,17 +188,24 @@ class TrackmaniaEnvTests(unittest.TestCase):
 
 
 class LiveTmiSessionTests(unittest.TestCase):
-    def test_prepare_respawns_and_advances_one_neutral_step(self) -> None:
+    def test_prepare_respawns_and_waits_neutral_through_countdown(self) -> None:
         session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=True))
         client = RecordingBridgeClient()
         initial_state = state(x=20, z=0, speed=100, race_time=1000)
-        respawned_state = state(x=0, z=0, speed=0, race_time=1100)
+        countdown_states = iter(
+            [
+                state(x=0, z=0, speed=0, race_time=-200),
+                state(x=0, z=0, speed=0, race_time=-100),
+                state(x=0, z=0, speed=0, race_time=0),
+            ]
+        )
         session.client = client
         session._connected = True
         session._pending_step = True
         session._current_state = initial_state
 
         def complete_respawn_step() -> None:
+            respawned_state = next(countdown_states)
             session._current_state = respawned_state
             session._current_race_time = respawned_state.race_time
             session._pending_step = True
@@ -207,15 +214,43 @@ class LiveTmiSessionTests(unittest.TestCase):
 
         prepared = session.prepare()
 
-        self.assertIs(prepared, respawned_state)
+        self.assertEqual(prepared.race_time, 0)
         self.assertEqual(
             client.calls,
             [
                 "give_up",
                 ("input", 0.0, 0.0, 0.0),
                 ("respond", MessageType.SC_RUN_STEP_SYNC),
+                ("input", 0.0, 0.0, 0.0),
+                ("respond", MessageType.SC_RUN_STEP_SYNC),
+                ("input", 0.0, 0.0, 0.0),
+                ("respond", MessageType.SC_RUN_STEP_SYNC),
             ],
         )
+
+    def test_prepare_fails_if_respawn_countdown_never_finishes(self) -> None:
+        session = LiveTmiSession(
+            EnvironmentConfig(
+                auto_respawn_on_connect=True,
+                max_initial_respawn_steps=2,
+            )
+        )
+        client = RecordingBridgeClient()
+        countdown_state = state(x=0, z=0, speed=0, race_time=-1000)
+        session.client = client
+        session._connected = True
+        session._pending_step = True
+        session._current_state = countdown_state
+
+        def stalled_countdown_step() -> None:
+            session._current_state = countdown_state
+            session._current_race_time = countdown_state.race_time
+            session._pending_step = True
+
+        session._wait_for_run_step = stalled_countdown_step
+
+        with self.assertRaisesRegex(RuntimeError, "countdown did not finish"):
+            session.prepare()
 
     def test_prepare_can_preserve_current_state_when_auto_respawn_disabled(self) -> None:
         session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=False))

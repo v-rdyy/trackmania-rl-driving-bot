@@ -33,6 +33,7 @@ class EnvironmentConfig:
     max_start_lateral_offset: float = 10.0
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
+    max_initial_respawn_steps: int = 100
 
 
 @dataclass(frozen=True)
@@ -106,14 +107,26 @@ class LiveTmiSession:
             raise RuntimeError("prepare requires a pending simulation step")
         if self.config.auto_respawn_on_connect:
             self.client.give_up()
-            self.client.set_continuous_input(
-                steer=0.0,
-                throttle=0.0,
-                brake=0.0,
-            )
-            self.client.respond(MessageType.SC_RUN_STEP_SYNC)
-            self._pending_step = False
-            self._wait_for_run_step()
+            if self.config.max_initial_respawn_steps <= 0:
+                raise ValueError("max_initial_respawn_steps must be positive")
+            for _ in range(self.config.max_initial_respawn_steps):
+                self.client.set_continuous_input(
+                    steer=0.0,
+                    throttle=0.0,
+                    brake=0.0,
+                )
+                self.client.respond(MessageType.SC_RUN_STEP_SYNC)
+                self._pending_step = False
+                self._wait_for_run_step()
+                if self._current_race_time is None:
+                    raise RuntimeError("respawn callback did not include race time")
+                if self._current_race_time >= 0:
+                    break
+            else:
+                raise RuntimeError(
+                    "initial respawn countdown did not finish within "
+                    f"{self.config.max_initial_respawn_steps} steps"
+                )
         return self._current_state
 
     def reset(self, diagnostics: ObservationDiagnostics | None = None) -> object:
