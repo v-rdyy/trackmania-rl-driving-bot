@@ -10,6 +10,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 from trackmania_rl.observations import ObservationDiagnostics
 from trackmania_rl.rewards import (
     RewardTransition,
+    clamped_forward_progress_reward,
     dense_speed_reward,
     phase1_smoke_reward,
     sparse_finish_reward,
@@ -19,17 +20,25 @@ from trackmania_rl.rewards import (
 def transition(
     *,
     display_speed: int = 100,
+    previous_progress: float = 10.0,
+    progress: float = 10.0,
     terminated: bool = False,
     truncated: bool = False,
 ) -> RewardTransition:
+    previous_diagnostics = ObservationDiagnostics(
+        progress=previous_progress,
+        lateral_offset=0.0,
+        heading_error=0.0,
+        segment_index=1,
+    )
     diagnostics = ObservationDiagnostics(
-        progress=10.0,
+        progress=progress,
         lateral_offset=0.0,
         heading_error=0.0,
         segment_index=1,
     )
     return RewardTransition(
-        previous_diagnostics=diagnostics,
+        previous_diagnostics=previous_diagnostics,
         diagnostics=diagnostics,
         display_speed=display_speed,
         elapsed_ms=100,
@@ -68,6 +77,44 @@ class RewardTests(unittest.TestCase):
         self.assertEqual(
             dense_speed_reward(transition(display_speed=123, terminated=True)),
             0.123,
+        )
+
+    def test_v3_reward_normalizes_positive_forward_progress(self) -> None:
+        self.assertAlmostEqual(
+            clamped_forward_progress_reward(
+                transition(previous_progress=10.0, progress=14.0)
+            ),
+            0.4,
+        )
+
+    def test_v3_reward_ignores_backward_progress(self) -> None:
+        self.assertEqual(
+            clamped_forward_progress_reward(
+                transition(previous_progress=10.0, progress=7.0)
+            ),
+            0.0,
+        )
+
+    def test_v3_reward_clamps_projection_jumps_without_terminal_shaping(self) -> None:
+        self.assertEqual(
+            clamped_forward_progress_reward(
+                transition(
+                    previous_progress=10.0,
+                    progress=25.0,
+                    terminated=True,
+                )
+            ),
+            1.0,
+        )
+        self.assertAlmostEqual(
+            clamped_forward_progress_reward(
+                transition(
+                    previous_progress=10.0,
+                    progress=14.0,
+                    truncated=True,
+                )
+            ),
+            0.4,
         )
 
 

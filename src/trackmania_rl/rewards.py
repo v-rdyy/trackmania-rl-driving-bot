@@ -25,6 +25,8 @@ class RewardTransition:
 
 RewardFunction = Callable[[RewardTransition], float]
 
+V3_PROGRESS_CLAMP_UNITS = 10.0
+
 
 def phase1_smoke_reward(transition: RewardTransition) -> float:
     """Owner-approved disposable Phase 1 integration reward."""
@@ -42,3 +44,13 @@ def sparse_finish_reward(transition: RewardTransition) -> float:
 def dense_speed_reward(transition: RewardTransition) -> float:
     """Reward v2: normalized displayed speed with no terminal shaping."""
     return transition.display_speed / 1000.0
+
+
+def clamped_forward_progress_reward(transition: RewardTransition) -> float:
+    """Reward v3: positive centerline progress, capped per decision step."""
+    forward_progress = max(
+        0.0,
+        transition.diagnostics.progress
+        - transition.previous_diagnostics.progress,
+    )
+    return min(forward_progress, V3_PROGRESS_CLAMP_UNITS) / V3_PROGRESS_CLAMP_UNITS
