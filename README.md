@@ -2,9 +2,10 @@
 
 This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phases 0 and 1
 are complete.** The live Gymnasium loop and bounded PPO/TensorBoard smoke test
-have passed. Phase 2 reward v1 is complete: the pre-registered sparse finish-only
-baseline produced zero finishes and a flat reward curve over more than 500,000
-steps. Development history follows the rules in
+have passed. Phase 2 reward v1 and v2 are complete: sparse finish-only reward
+produced zero finishes and a flat curve, while dense speed reward produced a
+35% deterministic finish rate but an oscillatory line and unreliable hoop jump.
+Development history follows the rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Current status
@@ -31,6 +32,10 @@ steps. Development history follows the rules in
   finishes. Its 20-episode deterministic evaluation repeatedly accelerated hard
   left and fell from the A01 start, partially supporting the sparse-reward
   hypothesis while exposing an unexpected harmful behavior change.
+- Reward v2 completed 1,001,120 PPO timesteps at 100x. Its 20-episode
+  deterministic evaluation finished seven times, timed out 13 times, and showed
+  no in-place loop exploit. Visible review instead found left/right oscillation
+  after the first major turn and a right-edge hoop collision after the second.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,

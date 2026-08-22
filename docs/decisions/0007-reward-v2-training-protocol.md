@@ -1,6 +1,6 @@
 # Decision 0007: Reward-v2 training and evaluation protocol
 
-Status: Fixed before training
+Status: Completed
 
 Date: 2026-08-22
 
@@ -145,3 +145,21 @@ one-shot finish flag before invalidating the checkpoint and consume it from the
 next `race_finished` request. This retains Gymnasium termination semantics while
 keeping TrackMania in active simulation. Replay attempt nine and preserve both
 failed manifests.
+
+## Outcome
+
+The final attempt reached `1,001,120` model timesteps and saved checkpoint
+`400D64EEC5E9AB305A2B26FD1225FC2987A678735AD93CC7694FEFDFBF4BB070`.
+It completed 3,273 episodes after resuming from 100,000 steps and recorded 720
+finishes. Combined with the 308 complete episodes retained before that checkpoint,
+the retained model path contains 3,581 completed episodes and a `20.106%` training
+finish rate. The 41,481 unsaved interactions from interrupted attempts remain
+preserved and disclosed but were not learned by the final model.
+
+The fixed 20-episode deterministic evaluation at 6x produced seven finishes,
+13 timeouts, no fall/off-track terminations, and zero telemetry-qualified
+in-place speed-farming candidates. Visible review found oscillatory steering on
+the straight after the first major left and a too-far-right approach after the
+second left that sometimes clips the hoop jump and flips the car. Thus the exact
+looping prediction was not supported, but the experiment still demonstrated that
+speed alone is insufficient for smooth, reliable completion.

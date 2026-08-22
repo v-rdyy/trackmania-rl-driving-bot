@@ -89,6 +89,10 @@ Document the exact shape/normalization of this observation vector in code commen
 
 - Hypothesis: rewarding speed every tick will give denser signal but risks reward hacking, since speed isn't the same as progress.
 - Train it. Target outcome per scope: agent exploits it by looping/oscillating to farm speed without ever finishing.
+- Actual outcome: the final policy finished 7/20 deterministic episodes and did
+  not loop in place. It oscillated on the straight after the first major left and
+  sometimes clipped the lower-right edge of the hoop jump after the second left,
+  flipping onto its roof. Preserve this mismatch between prediction and result.
 - Document actual outcome and, if reward hacking occurs, capture a specific example (a short clip, telemetry snippet, or description of the exploit behavior). This is the best interview story in the whole project, don't lose it.
 
 **Reward v3 — Clamped progress-along-centerline with stuck detection**

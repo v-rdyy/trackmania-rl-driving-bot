@@ -1,6 +1,6 @@
 # Reward v2: Dense speed
 
-Status: Hypothesis pre-registered; training resumes from a preserved 100k checkpoint
+Status: Training and 20-episode deterministic evaluation complete
 
 Date pre-registered: 2026-08-22
 
@@ -189,4 +189,64 @@ checkpoint callbacks remain free of nested socket exchanges.
 
 ## Actual outcome
 
-Pending. Formal training will resume from the preserved 100,000-step checkpoint.
+Training completed at `1,001,120` model timesteps. Across the original run,
+replayed recovery windows, and final uninterrupted attempt, the host executed
+`1,042,601` observed environment interactions. The final checkpoint is
+`checkpoints/reward_v2/final_model.zip`, SHA-256
+`400D64EEC5E9AB305A2B26FD1225FC2987A678735AD93CC7694FEFDFBF4BB070`.
+
+The canonical Monitor contains 3,694 completed episodes from every attempt: 725
+finishes, 360 timeouts, 2,581 falls, and 28 horizontal off-tracks. Because failed
+windows were replayed from the 100,000-step checkpoint, those totals describe
+all observed interactions, not the retained model path alone. Counting only the
+308 episodes completed before that checkpoint and the 3,273 episodes from the
+successful final attempt gives 3,581 retained-path completed episodes: 720
+finishes (`20.106%`), 330 timeouts, 2,508 falls, and 23 horizontal off-tracks.
+The episode in progress at each checkpoint boundary is excluded from these
+completed-episode counts.
+
+The TensorBoard reward curve supplied the dense signal v1 lacked. Its 100-episode
+rolling mean rose from `2.883` at the beginning to `65.696` at the end, with a
+recorded minimum of `1.413` and maximum of `68.501`. Mean episode length did not
+improve monotonically: it started at `179.0`, peaked at `427.52`, and ended at
+`272.12` steps. Within the uninterrupted 100k-to-finish segment, the first 100
+completed episodes averaged `58.258` reward, `353.51` steps, and six finishes;
+the last 100 averaged `65.696` reward, `272.12` steps, and 11 finishes. All
+901,120 actions audited during that final segment were finite, inside the declared
+space, and applied without hidden clipping.
+
+The final deterministic evaluation ran 20 episodes at 6x. It finished seven
+(`35%`), timed out 13, and had no fall or horizontal off-track termination. Finish
+times ranged from `29.570` to `32.910` seconds and averaged `30.267` seconds.
+Timeouts still reached between `2129.057` and `2179.228` of the reference path's
+`2206.528` progress units. All 7,972 evaluation actions were valid. Automated
+trajectory analysis classified zero of 20 episodes as an in-place loop or
+steering-oscillation speed-farming exploit because average forward-progress
+efficiency remained high and the car drove almost the entire route.
+
+Visible review by the project owner nevertheless found two repeatable quality
+failures. On the straight after the first major 90-degree left turn, the car
+oscillates left and right instead of holding a straight line. After the second
+left turn, it approaches the hoop jump too far right, clips the hoop's lower-right
+edge, and sometimes flips onto its roof. The upside-down car can remain above the
+vertical-fall boundary until the 45-second timeout, explaining why these failures
+appear as timeouts rather than falls in the quantitative summary.
+
+The exact pre-registered prediction was therefore not supported: v2 did not
+settle into an in-place loop and did learn a policy capable of finishing A01.
+The broader reward-alignment concern was supported. Raw speed alone produced a
+fast, near-complete route with steering jitter and unreliable jump alignment,
+because it provides no direct incentive for smooth controls, centerline
+placement, successful obstacle traversal, or completion. Reward v3 should target
+forward centerline progress and stuck detection while retaining explicit
+measurement of steering smoothness and jump failures as evaluation metrics rather
+than silently changing this completed v2 experiment.
+
+Ignored local evaluation evidence:
+
+- action log SHA-256:
+  `B05274B78E918602A06F74A6FE156857406CD2DBAF61ED692CBD3A071DD6490D`;
+- evaluation summary SHA-256:
+  `B3ABB48ADA4F25B679DD191B7AD7FDF69E36E480630D3499519C0DDA499FACE1`;
+- training summary SHA-256:
+  `EDE04C118284FF59BF9FB088C84BC0C2D1BB4F56FA8A4339B7E4B00C6F4B8F7A`.
