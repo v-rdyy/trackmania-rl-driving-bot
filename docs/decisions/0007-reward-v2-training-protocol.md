@@ -90,3 +90,10 @@ attempt-one Monitor includes one finish after the checkpoint; preserve it as
 observed discarded-window evidence, but do not claim that the resumed checkpoint
 contains that behavior. Combine numbered TensorBoard segments and retain the
 appended Monitor history in the final quantitative report.
+
+The first resume connected at the TCP layer but received no initial simulation
+callback and timed out before collecting a step. This confirms the game-side
+synchronous state remained stalled after attempt one. Restart the race callback,
+retain the same 100,000-step checkpoint, and retry without a protocol change.
+Also make logger cleanup safe when environment reset fails before SB3 initializes
+its logger; this reporting fix does not alter training behavior.

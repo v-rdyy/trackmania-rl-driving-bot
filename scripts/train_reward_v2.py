@@ -127,6 +127,13 @@ def prior_wall_seconds(manifest: dict[str, Any]) -> float:
     return max(0.0, (failed_at - started_at).total_seconds())
 
 
+def close_model_logger(model: PPO) -> None:
+    """Close an initialized SB3 logger, tolerating pre-setup connection failure."""
+    logger = getattr(model, "_logger", None)
+    if logger is not None:
+        logger.close()
+
+
 class PeriodicProgressCallback(BaseCallback):
     def __init__(self, interval: int = 25_000) -> None:
         super().__init__(verbose=0)
@@ -378,7 +385,7 @@ def main() -> int:
         raise
     finally:
         monitored_env.close()
-        model.logger.close()
+        close_model_logger(model)
     wall_seconds = time.perf_counter() - wall_started
 
     event_files = formal_tensorboard_event_files()

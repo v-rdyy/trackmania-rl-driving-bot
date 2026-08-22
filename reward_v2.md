@@ -86,6 +86,17 @@ segments. Ignored evidence hashes:
 - 100,000-step checkpoint: `F9606CA5F114E48D98BFC47A02A68E69C13B97F301C5B5C6B143CFCDEF6BFF46`;
 - attempt-one TensorBoard event: `BF8C2E7BA2E56E1CD5288341AD876E1D4736CD33FE164A7E42B89034CD70D220`.
 
+The first reconnect attempt confirmed that the server-side callback remained
+stalled: a new TCP connection opened, but no initial simulation callback arrived
+within 30 seconds, so the model collected zero new steps. Cleanup then raised a
+secondary `AttributeError` because Stable-Baselines3 had not initialized its
+logger before environment reset failed. The original timeout is intact in the
+manifest. Logger cleanup now tolerates this pre-setup failure, and the game must
+be explicitly restarted before another unchanged 100k-checkpoint resume.
+
+- stalled-reconnect manifest:
+  `F6C4DB1DFF7D4675BAA6AA297CB333BA29970F4B1D13A35C68F844A4144E7C1B`.
+
 ## Actual outcome
 
 Pending. Formal training will resume from the preserved 100,000-step checkpoint.

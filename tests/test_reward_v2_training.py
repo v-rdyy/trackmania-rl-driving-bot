@@ -44,6 +44,27 @@ class RewardV2TrainingTests(unittest.TestCase):
         self.assertEqual(MODULE.TENSORBOARD_RUN_NAME, "reward_v2_dense_speed")
         self.assertEqual(MODULE.RUN_DIR.name, "reward_v2")
 
+    def test_logger_cleanup_tolerates_failure_before_sb3_setup(self) -> None:
+        class ModelWithoutLogger:
+            pass
+
+        MODULE.close_model_logger(ModelWithoutLogger())
+
+    def test_logger_cleanup_closes_initialized_logger(self) -> None:
+        class Logger:
+            closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        class Model:
+            _logger = Logger()
+
+        model = Model()
+        MODULE.close_model_logger(model)
+
+        self.assertTrue(model._logger.closed)
+
 
 if __name__ == "__main__":
     unittest.main()
