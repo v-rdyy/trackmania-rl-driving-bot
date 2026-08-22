@@ -60,7 +60,7 @@ Document the exact shape/normalization of this observation vector in code commen
 1. Build `reset()`: restart/respawn the car at track start, clear any internal state (stuck counters, episode timers).
 2. Build `step(action)`: send input to TMInterface, read new telemetry, compute observation vector, compute reward (trivial for now, e.g. +speed each tick), check termination (crash, timeout, or finish).
 3. Build the centerline representation: this needs a reference path for the chosen track (recorded from a manual clean lap, or extracted from track geometry, decide approach and document it) so lateral offset and look-ahead points are computable.
-4. Wire a first-pass dumb reward: something like `+speed_this_tick`, large negative on crash/reset, nothing fancier. This is explicitly not the final reward, just enough for PPO to have gradient signal.
+4. Wire the owner-approved disposable smoke reward from `docs/decisions/0004-phase1-smoke-reward.md`: normalized display speed with a timeout/off-track penalty and no finish bonus. This is explicitly not a formal reward iteration, just enough for PPO to have gradient signal.
 5. Connect stable-baselines3 PPO to the env, run a short training job (a few thousand steps, not the full 6M) purely to confirm nothing crashes, tensorboard logs show up, and reward is changing over time (even if it's not learning anything good yet).
 
 **Exit criteria:**

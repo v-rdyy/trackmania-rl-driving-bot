@@ -37,6 +37,6 @@ TMInterface rotation columns are car `[right, up, forward]`; the transpose conve
 - Maximum absolute heading error: `0.489704` radians (`0.155878` after normalization).
 - Maximum normalized magnitudes: speed `0.442`, car-frame velocity `1.230450`, lateral offset `0.005589`, look-ahead coordinates `1.000000`.
 
-## Pending owner decision
+## Temporary smoke-test reward
 
-The scope authorizes only a trivial Phase 1 smoke-test reward, but reward design remains owner-controlled. Select the exact temporary reward before the Gymnasium wrapper's `step()` behavior is committed.
+Decision 0004 records the owner-approved disposable reward: `display_speed / 1000.0` each step, minus `1.0` on timeout/off-track truncation, with no finish bonus. This infrastructure reward is not one of the later pre-registered reward experiments.
