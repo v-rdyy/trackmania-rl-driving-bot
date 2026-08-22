@@ -37,6 +37,12 @@ isolated unit test. Ignored local evidence hashes:
 - action log: `71C2A4A7685A590D23138AD50CAC69B1A70B054C89ACA752A6A52655F904D513`;
 - summary: `08FDF010A1A996BBBD2BC95E0207D817FA19B287DB6374443111CFA0BAA86A88`.
 
+`scripts/train_reward_v1.py` implements Decision 0006 with periodic checkpoints,
+a distinct `reward_v1_sparse` TensorBoard run, Monitor episode outcomes, exact
+artifact hashes, failure manifests, and resumable checkpoints. Every action is
+still checked for finite/bounded/affine behavior, but the long run stores compact
+aggregate extrema instead of flushing two JSON records per step.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.

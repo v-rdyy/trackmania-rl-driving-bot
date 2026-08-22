@@ -384,6 +384,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "applied_gas": result.applied_gas,
                 "timeout": timed_out,
                 "off_track": off_track,
+                "race_finished": terminated,
                 "reward_function": self.reward_name,
             }
         )

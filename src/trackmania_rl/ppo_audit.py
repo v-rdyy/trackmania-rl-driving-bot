@@ -129,3 +129,97 @@ class RawPpoActionAuditCallback(BaseCallback):
 
     def _on_training_end(self) -> None:
         self.close()
+
+
+class BoundedPpoActionStatsCallback(BaseCallback):
+    """Validate every PPO action while retaining only aggregate range statistics."""
+
+    def __init__(self) -> None:
+        super().__init__(verbose=0)
+        self.records_checked = 0
+        self._normalized_minimum: np.ndarray | None = None
+        self._normalized_maximum: np.ndarray | None = None
+        self._environment_minimum: np.ndarray | None = None
+        self._environment_maximum: np.ndarray | None = None
+
+    def _on_training_start(self) -> None:
+        if not self.model.use_sde or not self.model.policy.squash_output:
+            raise RuntimeError(
+                "bounded action statistics require PPO with use_sde=True and "
+                "policy squash_output=True"
+            )
+        if not isinstance(self.training_env.action_space, gym.spaces.Box):
+            raise RuntimeError(
+                "bounded action statistics require a continuous Box action space"
+            )
+
+    @staticmethod
+    def _updated_extrema(
+        current_minimum: np.ndarray | None,
+        current_maximum: np.ndarray | None,
+        value: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        if current_minimum is None or current_maximum is None:
+            return value.copy(), value.copy()
+        return np.minimum(current_minimum, value), np.maximum(current_maximum, value)
+
+    def _on_step(self) -> bool:
+        normalized_batch = np.asarray(self.locals["actions"], dtype=np.float64)
+        environment_batch = np.asarray(
+            self.locals["clipped_actions"],
+            dtype=np.float64,
+        )
+        if normalized_batch.ndim != 2 or normalized_batch.shape != environment_batch.shape:
+            raise RuntimeError("unexpected PPO action batch shape")
+
+        for normalized, environment in zip(
+            normalized_batch,
+            environment_batch,
+            strict=True,
+        ):
+            record = audit_action_pair(
+                normalized,
+                environment,
+                self.training_env.action_space,
+            )
+            if not record["valid"]:
+                raise RuntimeError(
+                    f"invalid bounded PPO action at timestep {self.num_timesteps}"
+                )
+            (
+                self._normalized_minimum,
+                self._normalized_maximum,
+            ) = self._updated_extrema(
+                self._normalized_minimum,
+                self._normalized_maximum,
+                normalized,
+            )
+            (
+                self._environment_minimum,
+                self._environment_maximum,
+            ) = self._updated_extrema(
+                self._environment_minimum,
+                self._environment_maximum,
+                environment,
+            )
+            self.records_checked += 1
+        return True
+
+    def summary(self) -> dict[str, Any]:
+        if (
+            self.records_checked == 0
+            or self._normalized_minimum is None
+            or self._normalized_maximum is None
+            or self._environment_minimum is None
+            or self._environment_maximum is None
+        ):
+            raise RuntimeError("no bounded PPO actions were checked")
+        return {
+            "records_checked": self.records_checked,
+            "all_finite_in_range_and_affine": True,
+            "hidden_clipping": False,
+            "policy_normalized_minimum": self._normalized_minimum.tolist(),
+            "policy_normalized_maximum": self._normalized_maximum.tolist(),
+            "environment_action_minimum": self._environment_minimum.tolist(),
+            "environment_action_maximum": self._environment_maximum.tolist(),
+        }

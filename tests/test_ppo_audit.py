@@ -13,7 +13,11 @@ from stable_baselines3 import PPO
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.ppo_audit import RawPpoActionAuditCallback, audit_action_pair
+from trackmania_rl.ppo_audit import (
+    BoundedPpoActionStatsCallback,
+    RawPpoActionAuditCallback,
+    audit_action_pair,
+)
 
 
 class TinyContinuousEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -119,6 +123,28 @@ class PpoActionAuditTests(unittest.TestCase):
             self.assertTrue(
                 all(record["hidden_clipping"] is False for record in records)
             )
+
+    def test_stats_callback_validates_without_per_step_files(self) -> None:
+        callback = BoundedPpoActionStatsCallback()
+        model = PPO(
+            "MlpPolicy",
+            TinyContinuousEnv(),
+            n_steps=2,
+            batch_size=2,
+            n_epochs=1,
+            use_sde=True,
+            policy_kwargs={"squash_output": True},
+            seed=1,
+            device="cpu",
+            verbose=0,
+        )
+        model.learn(total_timesteps=4, callback=callback)
+
+        summary = callback.summary()
+        self.assertEqual(summary["records_checked"], 4)
+        self.assertTrue(summary["all_finite_in_range_and_affine"])
+        self.assertFalse(summary["hidden_clipping"])
+        self.assertEqual(len(summary["environment_action_minimum"]), 3)
 
 
 if __name__ == "__main__":
