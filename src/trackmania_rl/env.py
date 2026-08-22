@@ -57,6 +57,13 @@ class SessionStep:
     applied_gas: int
 
 
+@dataclass(frozen=True)
+class PlaybackStep:
+    state: object
+    race_time_ms: int
+    race_finished: bool
+
+
 class EpisodeSession(Protocol):
     def prepare(self) -> object: ...
 
@@ -217,6 +224,23 @@ class LiveTmiSession:
             race_finished=race_finished,
             applied_steer=applied_steer,
             applied_gas=applied_gas,
+        )
+
+    def advance_playback(self) -> PlaybackStep:
+        """Advance a loaded TMInterface input file without overriding its inputs."""
+        if (
+            not self._pending_step
+            or self._current_state is None
+            or self._current_race_time is None
+        ):
+            raise RuntimeError("playback advance requires a pending simulation step")
+        self.client.respond(MessageType.SC_RUN_STEP_SYNC)
+        self._pending_step = False
+        self._wait_for_run_step()
+        return PlaybackStep(
+            state=self._current_state,
+            race_time_ms=int(self._current_race_time),
+            race_finished=self.client.race_finished(),
         )
 
     def recover_inputs(self, filename: str) -> None:

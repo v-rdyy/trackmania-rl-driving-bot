@@ -7,7 +7,6 @@ import hashlib
 import json
 import math
 import sys
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,8 +17,9 @@ import numpy as np
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.observations import ReferencePath, build_observation
-from trackmania_rl.tmi_bridge import MessageType, ProtocolError, TmiBridgeClient
+from trackmania_rl.env import EnvironmentConfig, LiveTmiSession
+from trackmania_rl.observations import ObservationDiagnostics, ReferencePath, build_observation
+from trackmania_rl.tmi_bridge import ProtocolError
 from trackmania_rl.video_capture import restart_trackmania_race
 
 DEFAULT_CATALOG = (
@@ -61,12 +61,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--all-v2", action="store_true")
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--simulation-speed", type=float, default=6.0)
-    parser.add_argument(
-        "--handoff-delay",
-        type=float,
-        default=2.0,
-        help="wall seconds between bridge clients so post-finish shutdown completes",
-    )
     return parser.parse_args()
 
 
@@ -241,11 +235,11 @@ def compare_playback(
 def play_case(
     case: ReplayCase,
     *,
+    session: LiveTmiSession,
+    reset_diagnostics: ObservationDiagnostics | None,
     tmi_scripts_dir: Path,
     output_dir: Path,
     reference_path: ReferencePath,
-    port: int,
-    simulation_speed: float,
 ) -> dict[str, Any]:
     if not case.input_replay.is_file():
         raise FileNotFoundError(f"preserved replay does not exist: {case.input_replay}")
@@ -265,96 +259,30 @@ def play_case(
             f"TMInterface Scripts copy differs for {case.case_id}: {external_hash}"
         )
 
-    restart_trackmania_race()
+    session.client.execute_command("unload")
+    session.client.execute_command(f"load {external_replay.name}")
+    state = session.reset(reset_diagnostics)
     records: list[dict[str, Any]] = []
-    client = TmiBridgeClient(port=port, timeout_seconds=30.0)
-    connected = False
-    countdown_observed = False
-    run_started = False
-    countdown_steps = 0
-    countdown_restart_attempts = 1
-    recent_prestart_race_times: list[int] = []
-    try:
-        client.connect()
-        connected = True
-        while True:
-            message_type = client.read_message_type()
-            if message_type is MessageType.SC_ON_CONNECT_SYNC:
-                client.set_response_timeout(30_000)
-                client.execute_command("set unfocused_fps_limit false")
-                client.execute_command("set disable_forced_camera true")
-                client.execute_command("unload")
-                client.execute_command(f"load {external_replay.name}")
-                client.set_speed(simulation_speed)
-                client.set_on_step_period(100)
-                client.give_up()
-                client.respond(message_type)
-                continue
-
-            if message_type is MessageType.SC_CHECKPOINT_COUNT_CHANGED_SYNC:
-                client.read_int32()
-                client.read_int32()
-                client.respond(message_type)
-                continue
-            if message_type is MessageType.SC_LAP_COUNT_CHANGED_SYNC:
-                client.read_int32()
-                client.read_int32()
-                client.respond(message_type)
-                continue
-            if message_type is not MessageType.SC_RUN_STEP_SYNC:
-                client.respond(message_type)
-                continue
-
-            race_time = client.read_int32()
-            state = client.get_simulation_state()
-            if not run_started:
-                countdown_steps += 1
-                recent_prestart_race_times.append(race_time)
-                recent_prestart_race_times = recent_prestart_race_times[-10:]
-                if race_time < 0:
-                    countdown_observed = True
-                elif countdown_observed:
-                    run_started = True
-                elif countdown_steps >= 100:
-                    if countdown_restart_attempts >= 3:
-                        raise ProtocolError(
-                            "replay restart did not cross a negative-to-"
-                            "nonnegative countdown transition after three "
-                            f"restart attempts; recent race times="
-                            f"{recent_prestart_race_times}"
-                        )
-                    client.execute_command("map A01-Race.Challenge.Gbx")
-                    countdown_restart_attempts += 1
-                    countdown_steps = 0
-                    countdown_observed = False
-                    recent_prestart_race_times.clear()
-                    client.respond(message_type)
-                    continue
-
-            outcome: str | None = None
-            if run_started:
-                finished = race_time > 0 and client.race_finished()
-                record = telemetry_record(
-                    state,
-                    reference_path,
-                    race_finished=finished,
-                )
-                records.append(record)
-                outcome = terminal_outcome(record)
-                if race_time > 45_100:
-                    raise ProtocolError(
-                        f"replay {case.case_id} exceeded the 45-second safety limit"
-                    )
-
-            if outcome is not None:
-                client.execute_command("unload")
-                client.set_speed(1.0)
-            client.respond(message_type)
-            if outcome is not None:
-                break
-    finally:
-        if connected:
-            client.close()
+    record = telemetry_record(
+        state,
+        reference_path,
+        race_finished=False,
+    )
+    records.append(record)
+    outcome = terminal_outcome(record)
+    while outcome is None:
+        result = session.advance_playback()
+        record = telemetry_record(
+            result.state,
+            reference_path,
+            race_finished=result.race_finished,
+        )
+        records.append(record)
+        outcome = terminal_outcome(record)
+        if result.race_time_ms > 45_100:
+            raise ProtocolError(
+                f"replay {case.case_id} exceeded the 45-second safety limit"
+            )
 
     if not records:
         raise ProtocolError(f"replay {case.case_id} produced no run telemetry")
@@ -388,7 +316,7 @@ def play_case(
         "telemetry": str(telemetry_path.relative_to(WORKSPACE_ROOT)),
         "telemetry_sha256": sha256(telemetry_path),
         "telemetry_records": len(records),
-        "countdown_restart_attempts": countdown_restart_attempts,
+        "shared_snapshot_rewind": True,
         "comparison": comparison,
     }
 
@@ -405,8 +333,6 @@ def main() -> int:
     args = parse_args()
     if not 0.0 < args.simulation_speed <= 1000.0:
         raise SystemExit("--simulation-speed must be in (0, 1000]")
-    if not math.isfinite(args.handoff_delay) or args.handoff_delay < 0.0:
-        raise SystemExit("--handoff-delay must be finite and nonnegative")
     cases = select_cases(
         load_cases(args.catalog),
         args.case_ids,
@@ -414,34 +340,48 @@ def main() -> int:
     )
     reference_path = ReferencePath.from_csv(REFERENCE_PATH)
     results: list[dict[str, Any]] = []
-    for index, case in enumerate(cases, start=1):
-        if index > 1:
-            time.sleep(args.handoff_delay)
-        result = play_case(
-            case,
-            tmi_scripts_dir=args.tmi_scripts_dir,
-            output_dir=args.output_dir,
-            reference_path=reference_path,
+    restart_trackmania_race()
+    session = LiveTmiSession(
+        EnvironmentConfig(
             port=args.port,
             simulation_speed=args.simulation_speed,
         )
-        results.append(result)
-        comparison = result["comparison"]
-        print(
-            f"round-trip {index}/{len(cases)} {case.case_id}: "
-            f"expected={comparison['expected_outcome']} "
-            f"observed={comparison['observed_outcome']} "
-            f"elapsed_delta={comparison['elapsed_delta_ms']}ms "
-            f"progress_delta={comparison['maximum_progress_delta']:.3f} "
-            f"passed={comparison['passed']}",
-            flush=True,
-        )
+    )
+    try:
+        start_state = session.prepare()
+        _, start_diagnostics = build_observation(start_state, reference_path)
+        for index, case in enumerate(cases, start=1):
+            result = play_case(
+                case,
+                session=session,
+                reset_diagnostics=start_diagnostics if index == 1 else None,
+                tmi_scripts_dir=args.tmi_scripts_dir,
+                output_dir=args.output_dir,
+                reference_path=reference_path,
+            )
+            results.append(result)
+            comparison = result["comparison"]
+            print(
+                f"round-trip {index}/{len(cases)} {case.case_id}: "
+                f"expected={comparison['expected_outcome']} "
+                f"observed={comparison['observed_outcome']} "
+                f"elapsed_delta={comparison['elapsed_delta_ms']}ms "
+                f"progress_delta={comparison['maximum_progress_delta']:.3f} "
+                f"passed={comparison['passed']}",
+                flush=True,
+            )
+    finally:
+        try:
+            session.client.execute_command("unload")
+        except (OSError, RuntimeError):
+            pass
+        session.close()
 
     summary = {
         "status": "passed" if all(item["comparison"]["passed"] for item in results) else "failed",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "simulation_speed": args.simulation_speed,
-        "handoff_delay_seconds": args.handoff_delay,
+        "shared_snapshot_rewind": True,
         "case_count": len(results),
         "cases": results,
     }

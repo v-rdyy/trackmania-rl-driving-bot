@@ -339,6 +339,20 @@ class LiveTmiSessionTests(unittest.TestCase):
         self.assertEqual(client.calls[0], ("input", 0.25, 0.125, 0.75))
         self.assertEqual(result.applied_gas, 40960)
 
+    def test_playback_advance_does_not_override_loaded_inputs(self) -> None:
+        session, client = self._ready_session()
+
+        result = session.advance_playback()
+
+        self.assertEqual(
+            client.calls,
+            [
+                ("respond", MessageType.SC_RUN_STEP_SYNC),
+                "race_finished",
+            ],
+        )
+        self.assertEqual(result.race_time_ms, 0)
+
     def test_connect_callback_extends_timeout_before_training_work(self) -> None:
         config = EnvironmentConfig(
             simulation_speed=100.0,
