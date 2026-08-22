@@ -54,8 +54,15 @@ does not require a system-setting change.
 
 ## Training protocol
 
-Pending. The step budget and fixed PPO/evaluation settings will be documented
-before training begins.
+Decision 0007 fixes a 1,000,000-step minimum with the same seed-42 PPO/gSDE,
+environment, and 100x training settings used for the valid reward-v1 run. Only
+the injected reward changes. Checkpoints are written every 50,000 steps and
+TensorBoard uses the distinct `reward_v2_dense_speed` run name.
+
+After training, evaluate 20 deterministic episodes at 6x. Record finish rate,
+episode lengths, reward curve shape, path progress, world distance/displacement,
+speed, steering changes, and terminal causes. Review the visible behavior for
+looping or oscillation rather than inferring it from reward alone.
 
 ## Actual outcome
 
