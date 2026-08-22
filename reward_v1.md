@@ -122,6 +122,17 @@ Decision 0006, the formal run will restart from zero at 100x while retaining the
 same 100 ms game-time control interval and 500,000-step minimum. This is a
 wall-clock optimization, not a reward or sample-budget change.
 
+## Checkpointed 100x bridge interruption
+
+The first formal 100x attempt reached model timestep `450,560` before the PC
+went to sleep, aborting the local bridge socket with Windows error `10053`. This
+was an external host interruption, not evidence of 100x instability. The last
+checkpoint at `450,000` is preserved, so the fixed experiment resumes from there
+and replays only 560 interactions. No reward, environment, policy, seed, or
+training parameter changes for the resumed segment. Decision 0006 records the
+failure artifacts and requires the final summary to combine both TensorBoard
+segments and disclose cumulative time and replayed steps.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.

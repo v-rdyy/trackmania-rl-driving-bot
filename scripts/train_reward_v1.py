@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -70,6 +71,26 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
     )
 
 
+def formal_tensorboard_event_files() -> list[Path]:
+    """Return only numbered segments from the current formal reward-v1 run."""
+    return sorted(
+        path
+        for path in TENSORBOARD_ROOT.rglob("events.out.tfevents.*")
+        if re.fullmatch(r"reward_v1_sparse_\d+", path.parent.name)
+    )
+
+
+def prior_wall_seconds(manifest: dict[str, Any]) -> float:
+    """Recover cumulative elapsed time from either manifest schema."""
+    if "cumulative_wall_seconds" in manifest:
+        return float(manifest["cumulative_wall_seconds"])
+    if "failed_at_utc" not in manifest or "started_at_utc" not in manifest:
+        return 0.0
+    failed_at = datetime.fromisoformat(str(manifest["failed_at_utc"]))
+    started_at = datetime.fromisoformat(str(manifest["started_at_utc"]))
+    return max(0.0, (failed_at - started_at).total_seconds())
+
+
 class PeriodicProgressCallback(BaseCallback):
     def __init__(self, interval: int = 25_000) -> None:
         super().__init__(verbose=0)
@@ -112,8 +133,9 @@ def read_monitor_rows() -> list[dict[str, str]]:
 def read_tensorboard_metrics(event_files: list[Path]) -> dict[str, dict[str, Any]]:
     required_tags = ("rollout/ep_rew_mean", "rollout/ep_len_mean")
     values_by_tag: dict[str, list[float]] = {tag: [] for tag in required_tags}
-    for event_file in event_files:
-        accumulator = EventAccumulator(str(event_file.parent))
+    event_directories = sorted({event_file.parent for event_file in event_files})
+    for event_directory in event_directories:
+        accumulator = EventAccumulator(str(event_directory))
         accumulator.Reload()
         available = set(accumulator.Tags().get("scalars", []))
         for tag in required_tags:
@@ -148,11 +170,34 @@ def main() -> int:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     TENSORBOARD_ROOT.mkdir(parents=True, exist_ok=True)
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
-    event_files_before = set(TENSORBOARD_ROOT.rglob("events.out.tfevents.*"))
-    started_at = datetime.now(timezone.utc)
+    attempt_started_at = datetime.now(timezone.utc)
+    previous_manifest: dict[str, Any] = {}
+    if args.resume:
+        if not MANIFEST_PATH.exists():
+            raise SystemExit("--resume requires the existing reward-v1 manifest")
+        previous_manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    original_started_at = str(
+        previous_manifest.get(
+            "original_started_at_utc",
+            previous_manifest.get("started_at_utc", attempt_started_at.isoformat()),
+        )
+    )
+    attempt_number = int(
+        previous_manifest.get("attempt_number", 1 if previous_manifest else 0)
+    ) + 1
+    cumulative_wall_before = prior_wall_seconds(previous_manifest)
+    previous_failure_timesteps = int(
+        previous_manifest.get("timesteps_at_failure", 0)
+    )
+    discarded_steps_before = int(
+        previous_manifest.get("discarded_steps_total", 0)
+    )
     manifest: dict[str, Any] = {
         "status": "running",
-        "started_at_utc": started_at.isoformat(),
+        "started_at_utc": attempt_started_at.isoformat(),
+        "original_started_at_utc": original_started_at,
+        "attempt_number": attempt_number,
+        "cumulative_wall_seconds_before_attempt": cumulative_wall_before,
         "minimum_timesteps": args.minimum_timesteps,
         "seed": args.seed,
         "reward_function": "sparse_finish_reward",
@@ -226,6 +271,11 @@ def main() -> int:
         reset_num_timesteps = True
 
     starting_timesteps = int(model.num_timesteps)
+    discarded_steps_total = discarded_steps_before + max(
+        0, previous_failure_timesteps - starting_timesteps
+    )
+    manifest["discarded_steps_total"] = discarded_steps_total
+    write_json(MANIFEST_PATH, manifest)
     remaining_timesteps = max(0, args.minimum_timesteps - starting_timesteps)
     if remaining_timesteps == 0:
         raise SystemExit(
@@ -261,12 +311,17 @@ def main() -> int:
         )
         model.save(FINAL_CHECKPOINT)
     except Exception as error:
+        attempt_wall_seconds = time.perf_counter() - wall_started
         manifest.update(
             {
                 "status": "failed",
                 "failed_at_utc": datetime.now(timezone.utc).isoformat(),
                 "error": repr(error),
                 "timesteps_at_failure": int(model.num_timesteps),
+                "attempt_wall_seconds": attempt_wall_seconds,
+                "cumulative_wall_seconds": (
+                    cumulative_wall_before + attempt_wall_seconds
+                ),
             }
         )
         write_json(MANIFEST_PATH, manifest)
@@ -276,8 +331,7 @@ def main() -> int:
         model.logger.close()
     wall_seconds = time.perf_counter() - wall_started
 
-    event_files_after = set(TENSORBOARD_ROOT.rglob("events.out.tfevents.*"))
-    event_files = sorted(event_files_after - event_files_before)
+    event_files = formal_tensorboard_event_files()
     if not event_files:
         raise ProtocolError("reward-v1 training created no TensorBoard event file")
     tensorboard_metrics = read_tensorboard_metrics(event_files)
@@ -294,12 +348,19 @@ def main() -> int:
 
     summary = {
         "status": "complete",
-        "started_at_utc": started_at.isoformat(),
+        "started_at_utc": original_started_at,
+        "final_attempt_started_at_utc": attempt_started_at.isoformat(),
         "completed_at_utc": completed_at.isoformat(),
-        "wall_seconds": wall_seconds,
+        "wall_seconds": cumulative_wall_before + wall_seconds,
+        "final_attempt_wall_seconds": wall_seconds,
+        "attempts": attempt_number,
         "minimum_timesteps": args.minimum_timesteps,
         "starting_timesteps": starting_timesteps,
         "actual_timesteps": int(model.num_timesteps),
+        "discarded_steps_after_checkpoint": discarded_steps_total,
+        "environment_interactions_observed": (
+            int(model.num_timesteps) + discarded_steps_total
+        ),
         "seed": args.seed,
         "reward_function": "sparse_finish_reward",
         "episodes": len(monitor_rows),
@@ -312,6 +373,7 @@ def main() -> int:
         "episode_length_minimum": min(episode_lengths),
         "episode_length_maximum": max(episode_lengths),
         "action_validation": action_stats.summary(),
+        "action_validation_segment_started_at_timestep": starting_timesteps,
         "tensorboard_metrics": tensorboard_metrics,
         "final_checkpoint": str(final_checkpoint_path.relative_to(WORKSPACE_ROOT)),
         "final_checkpoint_sha256": sha256(final_checkpoint_path),
@@ -336,6 +398,8 @@ def main() -> int:
             "status": "complete",
             "completed_at_utc": completed_at.isoformat(),
             "actual_timesteps": int(model.num_timesteps),
+            "cumulative_wall_seconds": cumulative_wall_before + wall_seconds,
+            "discarded_steps_total": discarded_steps_total,
             "summary_sha256": sha256(SUMMARY_PATH),
         }
     )

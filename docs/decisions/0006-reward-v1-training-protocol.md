@@ -91,6 +91,27 @@ steps before checkpoint and reporting overhead. Ignored evidence hashes:
 - interrupted 6x Monitor CSV: `33829ED2D1C209B437DCEE811B898F0747D63E378ADE4CC77A4F9BC8E96DC4E4`;
 - interrupted 6x TensorBoard event: `E31DF59DCBF8FCAE5D08D923BF5AEBB9CC33854518C8B638140C6A37CAFE389E`.
 
+## Mid-run amendment: checkpointed bridge recovery
+
+The first formal 100x attempt reached model timestep `450,560` before the PC
+went to sleep. Suspending the host aborted the local TMInterface socket during a
+synchronous response with Windows error `10053`. The latest periodic checkpoint
+is at exactly `450,000`, limiting replay to 560 environment interactions. This is
+an external host interruption, not a reward, policy, bridge, or 100x stability
+failure; resume from that checkpoint without changing any experiment parameter.
+
+Preserve the attempt-one failure manifest and TensorBoard event. The final
+training summary must combine numbered formal TensorBoard segments, retain the
+original start and cumulative wall time, and report replayed interactions rather
+than silently counting the run as uninterrupted. Because the in-memory aggregate
+action callback was lost with the process, label its final statistics as covering
+the resumed segment; environment and PPO validation remained fail-fast during
+the first segment. Ignored evidence hashes:
+
+- attempt-one failure manifest: `178DD024296A81E88096DAB210C12CC4407CA229C4B436FB4E60647DBE0C3FD7`;
+- 450,000-step checkpoint: `0C44268EFCA5445AEF796EBDC911CAC10D4A997037DA193C965381EB5D353528`;
+- attempt-one TensorBoard event: `1F826C743FC7C77C2F8FED12C1208B6E6B16138F434A65F79740E212839EEE63`.
+
 ## Pre-run amendment: vertical fall detection
 
 The first preliminary run was stopped at TensorBoard step 28,672 after visual
