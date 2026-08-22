@@ -17,6 +17,7 @@ artifacts/logs/
 artifacts/replays/
 artifacts/smoke/*.json
 artifacts/videos/
+artifacts/backups/
 checkpoints/
 runs/
 tensorboard/
