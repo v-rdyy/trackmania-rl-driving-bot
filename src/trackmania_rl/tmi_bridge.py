@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import socket
 import struct
+import math
 from enum import IntEnum, auto
 
 from tminterface.structs import CheckpointData, SimStateData
@@ -39,6 +40,7 @@ class MessageType(IntEnum):
     C_TOGGLE_INTERFACE = auto()
     C_IS_IN_MENUS = auto()
     C_GET_INPUTS = auto()
+    C_SET_ANALOG_INPUT_STATE = auto()
 
 
 class ProtocolError(RuntimeError):
@@ -127,6 +129,34 @@ class TmiBridgeClient:
                 brake,
             )
         )
+
+    def set_continuous_input(
+        self, *, steer: float, throttle: float, brake: float
+    ) -> tuple[int, int]:
+        """Validate and apply normalized analog controls per Decision 0002."""
+
+        values = {"steer": steer, "throttle": throttle, "brake": brake}
+        for name, value in values.items():
+            if not math.isfinite(value):
+                raise ValueError(f"{name} must be finite, got {value}")
+        if not -1.0 <= steer <= 1.0:
+            raise ValueError(f"steer must be in [-1, 1], got {steer}")
+        if not 0.0 <= throttle <= 1.0:
+            raise ValueError(f"throttle must be in [0, 1], got {throttle}")
+        if not 0.0 <= brake <= 1.0:
+            raise ValueError(f"brake must be in [0, 1], got {brake}")
+
+        steer_value = round(steer * 65536)
+        gas_value = round((throttle - brake) * 65536)
+        self._send(
+            struct.pack(
+                "<iii",
+                MessageType.C_SET_ANALOG_INPUT_STATE,
+                steer_value,
+                gas_value,
+            )
+        )
+        return steer_value, gas_value
 
     def give_up(self) -> None:
         """Reset the current local run through TMInterface."""

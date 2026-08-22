@@ -39,3 +39,7 @@ The Phase 1 smoke test must log every raw action before conversion. Each record 
 ## Approval record
 
 The owner selected continuous control and explicitly required per-step raw-action logging plus range and NaN sanity checks during the Phase 1 smoke test.
+
+## Live verification
+
+On 2026-08-22, the extended bridge applied normalized half throttle as gas `32768` and normalized half steering as steer `32768`. A 3.5-second probe captured 36 finite records, moved the car `51.570` units, reached displayed speed `86`, and changed yaw by `1.081477` radians. The ignored evidence file `artifacts/telemetry/phase1_analog.jsonl` has SHA-256 `58FA784C277CEBD6ED387C2B8B75299E39A10AD3D34D40CA3E3947112E5EA56E`.

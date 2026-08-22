@@ -105,6 +105,35 @@ class TmiBridgeClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "speed must be"):
             client.set_speed(0.0)
 
+    def test_continuous_input_encodes_analog_steer_and_gas(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        applied = client.set_continuous_input(
+            steer=-0.5, throttle=0.75, brake=0.25
+        )
+
+        self.assertEqual(applied, (-32768, 32768))
+        self.assertEqual(
+            server.recv(12),
+            struct.pack(
+                "<iii", MessageType.C_SET_ANALOG_INPUT_STATE, -32768, 32768
+            ),
+        )
+
+    def test_continuous_input_rejects_nonfinite_and_out_of_range_values(self) -> None:
+        client = TmiBridgeClient()
+
+        with self.assertRaisesRegex(ValueError, "steer must be finite"):
+            client.set_continuous_input(steer=float("nan"), throttle=0.0, brake=0.0)
+        with self.assertRaisesRegex(ValueError, "throttle must be in"):
+            client.set_continuous_input(steer=0.0, throttle=1.1, brake=0.0)
+        with self.assertRaisesRegex(ValueError, "brake must be in"):
+            client.set_continuous_input(steer=0.0, throttle=0.0, brake=-0.1)
+
     def test_give_up_sends_protocol_request(self) -> None:
         server, client_socket = socket.socketpair()
         self.addCleanup(server.close)

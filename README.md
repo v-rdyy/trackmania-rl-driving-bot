@@ -13,6 +13,7 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: envir
 - Full-lap A01 telemetry is verified with finite, changing position, velocity, orientation, and speed data.
 - Scripted acceleration and steering are verified from resulting motion telemetry.
 - The exact 6x target is verified with telemetry and scripted acceleration active; the measured effective rate was 6.400x.
+- Decision 0002's normalized continuous controls are verified end to end against TMInterface's analog steer/gas inputs.
 
 Run the non-mutating local audit from PowerShell:
 

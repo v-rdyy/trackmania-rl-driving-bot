@@ -25,6 +25,7 @@ enum MessageType {
     CToggleInterface = 21,
     CIsInMenus = 22,
     CGetInputs = 23,
+    CSetAnalogInputState = 24,
 }
 
 const bool debug = false;
@@ -214,6 +215,25 @@ int HandleMessage()
                 simManager.SetInputState(InputType::Down, brake?1:0);
             }
 
+            break;
+        }
+
+        case MessageType::CSetAnalogInputState: {
+            int steer = clientSock.ReadInt32();
+            int gas = clientSock.ReadInt32();
+            if (steer < -65536) steer = -65536;
+            if (steer > 65536) steer = 65536;
+            if (gas < -65536) gas = -65536;
+            if (gas > 65536) gas = 65536;
+
+            if (simManager.InRace) {
+                simManager.SetInputState(InputType::Left, 0);
+                simManager.SetInputState(InputType::Right, 0);
+                simManager.SetInputState(InputType::Up, 0);
+                simManager.SetInputState(InputType::Down, 0);
+                simManager.SetInputState(InputType::Steer, steer);
+                simManager.SetInputState(InputType::Gas, gas);
+            }
             break;
         }
 
