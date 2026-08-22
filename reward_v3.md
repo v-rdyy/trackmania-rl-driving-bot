@@ -102,6 +102,31 @@ Run 20 deterministic episodes at 6x from the final checkpoint and report:
 If V3 still clips the final checkpoint, document the result without changing the
 reward or thresholds mid-run.
 
+## Pre-training implementation verification
+
+The frozen reward and stuck cutoff passed 104 offline tests. A live A01 gate then
+ran 20 consecutive snapshot-reset episodes and 400 action steps through the real
+TMInterface bridge. Every action was finite and in range, all reset observations
+were identical (`0.0` maximum delta), and all 20 neutral-action episodes stopped
+at the 2.0-second stuck cutoff rather than a fall or timeout. The final observed
+window contained only `0.108391` units of world motion, confirming that A01's
+small start-platform settling does not cross the 2.0-unit motion threshold.
+
+The first live attempt incorrectly used full brake as a stationary action. In
+TMNF, brake from rest also selects reverse: the log showed signed Gas `+65536`,
+speed rising to `75`, zero progress, and a fall `10.184` units below the start at
+1.6 seconds. The smoke action was corrected to true neutral; no reward,
+termination, or training parameter changed. Stationary projection jitter
+produced a negligible maximum per-step reward of `0.0000334`, within the frozen
+`[0, 1]` contract.
+
+Ignored live evidence:
+
+- action log SHA-256:
+  `635803D2BD3E718BE5087F38D756285990BC103EC5A3EE02B73C064336D8748D`;
+- smoke summary SHA-256:
+  `5F8451FB46864D0B87D53FEF12113DEB0FF93EAD9D93E75EA32C0F027364A7EC`.
+
 ## Deferred context, not V3 work
 
 After reliable finishing is solved, the planned next direction is a V4 that adds

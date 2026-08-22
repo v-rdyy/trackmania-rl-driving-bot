@@ -13,6 +13,7 @@ config/tmloader-game-settings.local.yaml
 # Phase 0 telemetry and later training artifacts
 artifacts/telemetry/*.csv
 artifacts/telemetry/*.jsonl
+artifacts/telemetry/*.png
 artifacts/logs/
 artifacts/replays/
 artifacts/smoke/*.json

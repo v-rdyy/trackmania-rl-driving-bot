@@ -15,6 +15,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
 from trackmania_rl.rewards import (
+    clamped_forward_progress_reward,
     dense_speed_reward,
     phase1_smoke_reward,
     sparse_finish_reward,
@@ -31,7 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument(
         "--reward",
-        choices=("phase1", "sparse-finish", "dense-speed"),
+        choices=(
+            "phase1",
+            "sparse-finish",
+            "dense-speed",
+            "clamped-progress",
+        ),
         default="phase1",
     )
     parser.add_argument(
@@ -67,12 +73,19 @@ def main() -> int:
         raise SystemExit("--episodes must be at least 20 for the Phase 1 check")
     if args.episode_ms <= 0 or args.episode_ms % 10 != 0:
         raise SystemExit("--episode-ms must be a positive 10 ms multiple")
+    if args.reward == "clamped-progress" and args.episode_ms <= 2_000:
+        raise SystemExit("V3 live smoke requires --episode-ms above 2000")
 
-    config = EnvironmentConfig(port=args.port, max_episode_ms=args.episode_ms)
+    config = EnvironmentConfig(
+        port=args.port,
+        max_episode_ms=args.episode_ms,
+        stuck_window_ms=2_000 if args.reward == "clamped-progress" else None,
+    )
     reward_functions = {
         "phase1": phase1_smoke_reward,
         "sparse-finish": sparse_finish_reward,
         "dense-speed": dense_speed_reward,
+        "clamped-progress": clamped_forward_progress_reward,
     }
     reward_function = reward_functions[args.reward]
     env = TrackmaniaEnv(
@@ -80,7 +93,12 @@ def main() -> int:
         action_log_path=args.action_log,
         reward_function=reward_function,
     )
-    action = np.asarray([0.0, 0.35, 0.0], dtype=np.float32)
+    action = np.asarray(
+        [0.0, 0.0, 0.0]
+        if args.reward == "clamped-progress"
+        else [0.0, 0.35, 0.0],
+        dtype=np.float32,
+    )
     reset_observations: list[np.ndarray] = []
     episode_records: list[dict[str, object]] = []
     total_steps = 0
@@ -116,7 +134,12 @@ def main() -> int:
                 if steps > args.episode_ms // config.step_period_ms + 1:
                     raise ProtocolError(f"episode {episode} did not truncate on time")
 
-            if terminated or not truncated or not bool(info["timeout"]):
+            if args.reward == "clamped-progress":
+                if terminated or not truncated or not bool(info["stuck"]):
+                    raise ProtocolError(
+                        f"episode {episode} did not reach the expected V3 stuck cutoff"
+                    )
+            elif terminated or not truncated or not bool(info["timeout"]):
                 raise ProtocolError(
                     f"episode {episode} ended without the expected timeout truncation"
                 )
@@ -129,6 +152,7 @@ def main() -> int:
                     "reset_progress": float(reset_info["progress"]),
                     "reset_lateral_offset": float(reset_info["lateral_offset"]),
                     "final_reward": float(reward),
+                    "stuck": bool(info.get("stuck", False)),
                 }
             )
     finally:
@@ -157,6 +181,10 @@ def main() -> int:
         for reward, record in zip(rewards, audit_records, strict=True)
     ):
         raise ProtocolError("dense speed reward diverged from displayed_speed / 1000")
+    if args.reward == "clamped-progress" and any(
+        reward < 0.0 or reward > 1.0 for reward in rewards
+    ):
+        raise ProtocolError("V3 progress reward left its registered [0, 1] range")
 
     repeatable_resets = np.stack(reset_observations)
     max_repeat_reset_delta = float(
@@ -174,6 +202,7 @@ def main() -> int:
         "simulation_speed": config.simulation_speed,
         "step_period_ms": config.step_period_ms,
         "episode_timeout_ms": config.max_episode_ms,
+        "stuck_window_ms": config.stuck_window_ms,
         "raw_action": action.tolist(),
         "reward_function": reward_function.__name__,
         "reward_minimum": min(rewards),
