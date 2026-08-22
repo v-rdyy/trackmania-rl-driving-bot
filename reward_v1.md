@@ -43,6 +43,12 @@ artifact hashes, failure manifests, and resumable checkpoints. Every action is
 still checked for finite/bounded/affine behavior, but the long run stores compact
 aggregate extrema instead of flushing two JSON records per step.
 
+`scripts/evaluate_reward_v1.py` fixes the post-training evaluation at 20 or more
+deterministic episodes. It records every evaluation action and episode outcome,
+finish rate, episode lengths, best/average progress, speeds, terminal causes, and
+a telemetry-based behavior description. Visible behavior during the run remains
+an explicit human observation rather than being invented from numbers alone.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.
