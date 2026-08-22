@@ -156,6 +156,14 @@ the retained model path contains 3,581 completed episodes and a `20.106%` traini
 finish rate. The 41,481 unsaved interactions from interrupted attempts remain
 preserved and disclosed but were not learned by the final model.
 
+A post-training retention audit partitions the canonical Monitor without
+discarding evidence. The retained path contains 720 finishes, 330 timeouts,
+2,508 falls, and 23 horizontal off-tracks. The 113 discarded or
+checkpoint-crossing completed episodes contain five finishes, 30 timeouts, 73
+falls, and five horizontal off-tracks. One timeout crossed the 100,000-step
+checkpoint from step 99,997 to 100,447 and is classified outside the retained
+path because the successful resume rewound before its completion.
+
 The fixed 20-episode deterministic evaluation at 6x produced seven finishes,
 13 timeouts, no fall/off-track terminations, and zero telemetry-qualified
 in-place speed-farming candidates. Visible review found oscillatory steering on
@@ -163,3 +171,10 @@ the straight after the first major left and a too-far-right approach after the
 second left that sometimes clips the hoop jump and flips the car. Thus the exact
 looping prediction was not supported, but the experiment still demonstrated that
 speed alone is insufficient for smooth, reliable completion.
+
+The later fixed-threshold precision retrospective preserved the original
+evaluation and ran another 20 deterministic episodes. It finished six and timed
+out 14; all 20 met the oscillation threshold, 19 went upside down, and all 14
+timeouts contained a stuck period. Live review attributed the inversion to
+lower-right contact at the final checkpoint/hoop. These results strengthen the
+broader reward-alignment conclusion without changing the completed V2 protocol.

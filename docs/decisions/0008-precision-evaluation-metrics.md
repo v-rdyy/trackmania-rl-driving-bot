@@ -1,6 +1,6 @@
 # Decision 0008: Precision and failure metrics
 
-Status: Pre-registered before retrospective V2 replay analysis
+Status: Accepted; retrospective replay and 20-episode evaluation complete
 
 Date: 2026-08-22
 
@@ -55,3 +55,27 @@ lateral offsets are comparative precision measurements rather than claims about
 legal track limits. Upside-down detection uses orientation instead of a visual
 guess. All thresholds are frozen for this retrospective pass and will not be
 retuned after viewing the V2 numbers.
+
+## Outcome
+
+All nine preserved V2 replays passed checksum and live round-trip validation in
+one shared snapshot-rewind session before analysis. Eight of nine met the fixed
+oscillation threshold. Five went upside down for `89.30` seconds total, and four
+contained stuck periods for `58.30` seconds total, with a `15.40`-second maximum.
+Mean episode 95th-percentile absolute lateral offset was `13.713` units and the
+archive maximum was `22.746` units. The only non-oscillating replay was the 50k
+checkpoint; every replay from 250k onward met the oscillation threshold. All five
+final-policy replays went upside down, and four became stuck.
+
+The distinct 20-episode precision retrospective was more conclusive: all 20
+episodes oscillated, 19 went upside down for `303.22` seconds total, and all 14
+timeouts contained stuck periods totaling `209.90` seconds. The longest stuck
+period was `17.20` seconds. It finished six episodes; five of those finishes also
+included inversion. The mean episode 95th-percentile absolute lateral offset was
+`13.507` units and the maximum was `18.595` units.
+
+The owner identified the visible cause as repeated lower-right contact at the
+final checkpoint/hoop, which flips the car. The metrics do not infer collision
+geometry, but they quantify the resulting inversion and immobility without
+changing V2's policy or reward. The frozen thresholds were not adjusted after
+seeing these results.

@@ -83,17 +83,28 @@ The representative V0/V1/V2 gate passed in one uninterrupted sequence:
 The one-step timing differences are within the fixed 100 ms callback period.
 The raw replay files contain TMInterface `steer` and signed `gas` commands, so
 their playback does not depend on the later correction to Python's pedal labels.
-The ignored final summary SHA-256 is
+The ignored representative summary SHA-256 is
 `F1889C965FBA93F08ACA03F9343FB8A86DD4D85F6490AAE2FE9B83BE7668607E`.
 
 Several earlier attempts reproduced an intermittent handoff after an intercepted
 finish: the next connection remained frozen at race time `30100` despite bridge
 `GiveUp` requests, so no next-replay telemetry was accepted. Stronger synthetic
 Delete input and a two-second connection delay were individually insufficient.
-The validator now waits for verified foreground focus and, if the mandatory
-negative-to-nonnegative countdown transition still does not appear, reloads A01
-through TMInterface's `map` command. The clean four-case run required one restart
-attempt per case; the fallback remains fail-fast protection for future batches.
+The fix is architectural: the validator now holds one live bridge connection,
+captures one clean A01 start snapshot, loads each input file without overriding
+its controls, and rewinds that same snapshot between cases. The requested live
+nine-replay V2 batch then passed all five finishes and four timeouts, including
+repeated finish-to-finish and finish-to-timeout transitions. Outcome, elapsed
+time, and maximum progress all matched; finish playback differed by one 100 ms
+callback step and timeout playback by 0 ms. The ignored nine-case summary SHA-256
+is `C8A52200B98B25A74E10B4750B9492E2E1DEBDC076B7FB6F67FD5F517600DE21`.
+
+The fixed Decision 0008 precision metrics were then applied to every V2 replay,
+not only selected failures. Eight of nine oscillated, five went upside down, and
+four became stuck. All five final-model replays oscillated and went upside down;
+four were stuck for 12.9 to 15.4 seconds, while the one finish still spent 2.0
+seconds inverted. The ignored precision-summary SHA-256 is
+`86AD9C5F50716CFAE3E917ADFBE5C642997BE8C8EB459AC891A22AE4E2F9E9FD`.
 
 ## Optional direct video capture
 

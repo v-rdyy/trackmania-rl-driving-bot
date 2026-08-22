@@ -1,6 +1,6 @@
 # Reward v2: Dense speed
 
-Status: Training and 20-episode deterministic evaluation complete
+Status: Training, deterministic evaluation, and precision retrospective complete
 
 Date pre-registered: 2026-08-22
 
@@ -226,8 +226,13 @@ all observed interactions, not the retained model path alone. Counting only the
 308 episodes completed before that checkpoint and the 3,273 episodes from the
 successful final attempt gives 3,581 retained-path completed episodes: 720
 finishes (`20.106%`), 330 timeouts, 2,508 falls, and 23 horizontal off-tracks.
-The episode in progress at each checkpoint boundary is excluded from these
-completed-episode counts.
+The remaining 113 completed episodes belong to discarded or checkpoint-crossing
+windows: five finishes, 30 timeouts, 73 falls, and five horizontal off-tracks.
+One 450-step timeout began at step 99,997 and ended at 100,447, crossing the
+100,000-step checkpoint; it is not counted as retained because the successful
+resume started from the checkpoint before that episode completed. The audit
+reconciles 1,001,120 retained model-path interactions, 41,481 replayed/discarded
+interactions, and 1,042,601 interactions observed by the host.
 
 The TensorBoard reward curve supplied the dense signal v1 lacked. Its 100-episode
 rolling mean rose from `2.883` at the beginning to `65.696` at the end, with a
@@ -248,13 +253,30 @@ trajectory analysis classified zero of 20 episodes as an in-place loop or
 steering-oscillation speed-farming exploit because average forward-progress
 efficiency remained high and the car drove almost the entire route.
 
-Visible review by the project owner nevertheless found two repeatable quality
-failures. On the straight after the first major 90-degree left turn, the car
-oscillates left and right instead of holding a straight line. After the second
-left turn, it approaches the hoop jump too far right, clips the hoop's lower-right
-edge, and sometimes flips onto its roof. The upside-down car can remain above the
-vertical-fall boundary until the 45-second timeout, explaining why these failures
-appear as timeouts rather than falls in the quantitative summary.
+A separate 20-episode precision retrospective preserved the original evaluation
+and wrote distinct action/summary files. It finished six (`30%`) and timed out 14,
+again with no fall or horizontal off-track termination and zero in-place
+speed-farming candidates. The fixed precision metrics flagged steering
+oscillation in all 20 episodes, inversion in 19, and a physically stuck period in
+all 14 timeout episodes. Across the sample the car spent `303.22` seconds upside
+down and `209.90` seconds stuck; the longest stuck period was `17.20` seconds.
+The mean episode 95th-percentile absolute reference-line offset was `13.507`
+units and the worst absolute offset was `18.595` units. Five of six finishes also
+included an inversion, showing that finish rate alone hides substantial control
+instability. Descriptively combining the two separately preserved evaluation
+samples gives 13 finishes in 40 runs (`32.5%`); this is not treated as a new
+pre-registered evaluation protocol.
+
+Visible review by the project owner found two repeatable quality failures. On the
+straight after the first major 90-degree left turn, the car oscillates left and
+right instead of holding a straight line. At the final checkpoint/hoop after the
+second left turn, it approaches too far right and clips the structure's
+lower-right edge, causing the inversion seen in telemetry. The upside-down car
+can remain above the vertical-fall boundary until the 45-second timeout,
+explaining why these failures appear as timeouts rather than falls. This
+qualitative cause and the orientation/stuck metrics are complementary: telemetry
+measures frequency and duration, while the live review identifies the collision
+that initiates the failure.
 
 The exact pre-registered prediction was therefore not supported: v2 did not
 settle into an in-place loop and did learn a policy capable of finishing A01.
@@ -273,4 +295,12 @@ Ignored local evaluation evidence:
 - evaluation summary SHA-256:
   `B3ABB48ADA4F25B679DD191B7AD7FDF69E36E480630D3499519C0DDA499FACE1`;
 - training summary SHA-256:
-  `EDE04C118284FF59BF9FB088C84BC0C2D1BB4F56FA8A4339B7E4B00C6F4B8F7A`.
+  `EDE04C118284FF59BF9FB088C84BC0C2D1BB4F56FA8A4339B7E4B00C6F4B8F7A`;
+- precision-retrospective action log SHA-256:
+  `221B9AE3B5784227DA208D150B43884D1EFE9C9F08F94E4B251EA46DCD2FE970`;
+- precision-retrospective evaluation summary SHA-256:
+  `9D393B5BEA832B721A98C6762E05BF4E552088392E9351997B4933B81708BA19`;
+- nine-replay precision summary SHA-256:
+  `86AD9C5F50716CFAE3E917ADFBE5C642997BE8C8EB459AC891A22AE4E2F9E9FD`;
+- reconciled V2 retrospective summary SHA-256:
+  `7187DEF6E4C79C87B5522158AE92EBDC87B91FC034D42AC05DADA29246D85CCB`.

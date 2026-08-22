@@ -4,7 +4,8 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phases 0 and 1
 are complete.** The live Gymnasium loop and bounded PPO/TensorBoard smoke test
 have passed. Phase 2 reward v1 and v2 are complete: sparse finish-only reward
 produced zero finishes and a flat curve, while dense speed reward produced a
-35% deterministic finish rate but an oscillatory line and unreliable hoop jump.
+30-35% deterministic finish rate but an oscillatory line and unreliable final
+checkpoint/hoop approach.
 Development history follows the rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -39,6 +40,8 @@ Development history follows the rules in
   deterministic evaluation finished seven times, timed out 13 times, and showed
   no in-place loop exploit. Visible review instead found left/right oscillation
   after the first major turn and a right-edge hoop collision after the second.
+  A distinct fixed-metric 20-episode retrospective finished six times; all 20
+  runs oscillated, 19 went upside down, and all 14 timeouts became stuck.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,
