@@ -118,6 +118,15 @@ class TmiBridgeClient:
             struct.pack("<ii", MessageType.C_SET_ON_STEP_PERIOD, period_ms)
         )
 
+    def set_response_timeout(self, timeout_ms: int) -> None:
+        """Allow the Python client time to optimize between PPO rollouts."""
+
+        if not 0 < timeout_ms <= 0xFFFFFFFF:
+            raise ValueError("response timeout must fit a positive uint32")
+        self._send(
+            struct.pack("<iI", MessageType.C_SET_TIMEOUT, timeout_ms)
+        )
+
     def set_input_state(
         self,
         *,

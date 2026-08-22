@@ -108,6 +108,25 @@ zero-step retries do not add replayed interactions or change the protocol.
 - Escape-plus-Delete recovery manifest:
   `0B2D98A240884779979F97A23BCE000FD808395ABA790F385C639BB321EF7E84`.
 
+After the full game/TMInterface restart, attempt five re-established the bridge
+and collected `6,144` new interactions before Windows reported socket error
+`10053` at model timestep `106,144`. The boundary is diagnostic: `106,144` is
+exactly three `2,048`-step PPO rollouts after the checkpoint, and the bridge's
+default synchronous response timeout was only two seconds. Environment traffic
+stops while PPO optimizes a completed rollout, so a sufficiently long optimizer
+pass can be mistaken for a dead Python client. The bridge response timeout is
+now set to 30 seconds during its connect handshake. This is a transport
+reliability setting; it does not change the 45-second episode timeout or any
+reward, termination, action, policy, seed, or training-budget setting. The
+`6,144` unsaved interactions will be replayed from the 100k checkpoint.
+
+- rollout-boundary abort manifest:
+  `0B43310DFF0068D8D3375F58279F506FAB994C05E280243B609DC69773CFF6A9`;
+- cumulative Monitor through attempt five:
+  `06ED82229AFD4EE1CB372A4B2556FE62BF79B9AB38B4B07196ADA64D4B1B9B85`;
+- attempt-five TensorBoard event:
+  `7D2656E33EE8DD00D5CAD51DEF700D6F771A92A8A712E72BDEB6B456167D4F68`.
+
 ## Actual outcome
 
 Pending. Formal training will resume from the preserved 100,000-step checkpoint.

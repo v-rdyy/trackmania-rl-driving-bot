@@ -33,6 +33,7 @@ class EnvironmentConfig:
     port: int = 8478
     simulation_speed: float = 6.0
     step_period_ms: int = 100
+    bridge_response_timeout_ms: int = 30_000
     max_episode_ms: int = 45_000
     max_lateral_offset: float = 50.0
     max_vertical_drop: float = 10.0
@@ -84,6 +85,9 @@ class LiveTmiSession:
 
     def _handle_non_step(self, message_type: MessageType) -> None:
         if message_type is MessageType.SC_ON_CONNECT_SYNC:
+            self.client.set_response_timeout(
+                self.config.bridge_response_timeout_ms
+            )
             self.client.execute_command("set unfocused_fps_limit false")
             self.client.execute_command("set disable_forced_camera true")
             self.client.set_speed(self.config.simulation_speed)

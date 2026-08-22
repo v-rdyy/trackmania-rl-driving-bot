@@ -125,6 +125,28 @@ class TmiBridgeClientTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "multiple of 10"):
             client.set_on_step_period(25)
 
+    def test_set_response_timeout_encodes_unsigned_milliseconds(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.set_response_timeout(30_000)
+
+        self.assertEqual(
+            server.recv(8),
+            struct.pack("<iI", MessageType.C_SET_TIMEOUT, 30_000),
+        )
+
+    def test_set_response_timeout_rejects_invalid_uint32(self) -> None:
+        client = TmiBridgeClient()
+
+        with self.assertRaisesRegex(ValueError, "positive uint32"):
+            client.set_response_timeout(0)
+        with self.assertRaisesRegex(ValueError, "positive uint32"):
+            client.set_response_timeout(0x1_0000_0000)
+
     def test_rewind_to_state_encodes_snapshot_length_and_bytes(self) -> None:
         server, client_socket = socket.socketpair()
         self.addCleanup(server.close)

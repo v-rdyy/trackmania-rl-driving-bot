@@ -86,6 +86,18 @@ class RecordingBridgeClient:
     def give_up(self) -> None:
         self.calls.append("give_up")
 
+    def set_response_timeout(self, timeout_ms) -> None:
+        self.calls.append(("response_timeout", timeout_ms))
+
+    def execute_command(self, command) -> None:
+        self.calls.append(("command", command))
+
+    def set_speed(self, speed) -> None:
+        self.calls.append(("speed", speed))
+
+    def set_on_step_period(self, period_ms) -> None:
+        self.calls.append(("step_period", period_ms))
+
     def set_continuous_input(self, *, steer, throttle, brake):
         self.calls.append(("input", steer, throttle, brake))
 
@@ -278,6 +290,30 @@ class TrackmaniaEnvTests(unittest.TestCase):
 
 
 class LiveTmiSessionTests(unittest.TestCase):
+    def test_connect_callback_extends_timeout_before_training_work(self) -> None:
+        config = EnvironmentConfig(
+            simulation_speed=100.0,
+            step_period_ms=100,
+            bridge_response_timeout_ms=30_000,
+        )
+        session = LiveTmiSession(config)
+        client = RecordingBridgeClient()
+        session.client = client
+
+        session._handle_non_step(MessageType.SC_ON_CONNECT_SYNC)
+
+        self.assertEqual(
+            client.calls,
+            [
+                ("response_timeout", 30_000),
+                ("command", "set unfocused_fps_limit false"),
+                ("command", "set disable_forced_camera true"),
+                ("speed", 100.0),
+                ("step_period", 100),
+                ("respond", MessageType.SC_ON_CONNECT_SYNC),
+            ],
+        )
+
     def test_prepare_respawns_and_waits_neutral_through_countdown(self) -> None:
         session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=True))
         client = RecordingBridgeClient()

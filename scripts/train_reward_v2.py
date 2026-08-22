@@ -259,6 +259,7 @@ def main() -> int:
         "tensorboard_run_name": TENSORBOARD_RUN_NAME,
         "simulation_speed": SIMULATION_SPEED,
         "step_period_ms": 100,
+        "bridge_response_timeout_ms": 30_000,
         "max_episode_ms": 45_000,
         "max_lateral_offset": 50.0,
         "max_vertical_drop": 10.0,

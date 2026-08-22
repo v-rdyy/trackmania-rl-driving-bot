@@ -104,3 +104,13 @@ simulation callback. Each attempt timed out before collecting a model step. A
 full game/TMInterface restart is therefore required after this sleep event; the
 failed zero-step recovery attempts remain preserved as experiment evidence and
 do not change the training protocol or replay count.
+
+The first post-restart resume collected exactly three more 2,048-step rollouts,
+then aborted at model timestep `106,144` as the next rollout began. The bridge's
+two-second synchronous response timeout can expire while PPO pauses environment
+traffic to optimize a completed rollout. Set the bridge response timeout to 30
+seconds during the connect handshake. This operational setting only controls how
+long the plugin waits for Python between callbacks; the fixed 45-second episode
+timeout and every experimental parameter above remain unchanged. Replay the
+6,144 unsaved attempt-five interactions from the same 100,000-step checkpoint
+and include them in discarded-step accounting.
