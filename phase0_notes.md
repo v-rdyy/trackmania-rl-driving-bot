@@ -46,7 +46,15 @@ Last updated: 2026-08-22
 - The runtime loaded TMInterface `2.2.1`, CoreMod `1.0.11`, and the hardened `python_link.as` plugin without a bind failure.
 - The plugin log recorded a Python client connecting from `127.0.0.1`, receiving its connect callback, executing configuration and map commands, disconnecting cleanly, and reconnecting.
 - `A01-Race.Challenge.Gbx` was copied from the built-in Nations campaign to the user's local `Tracks\Challenges` directory with matching SHA-256 `F0A870809BE99DA2CB36AD5DF43A2CF63D8F74FE4AC3470ECAC68B9E97625DC3`. TMInterface now accepts and queues that map command.
-- The global main menu does not transition into Solo mode in response to the bridge's queued map command. Phase 0 telemetry therefore still requires one manual `Play Solo` transition before the lap capture can run; the command channel itself is verified.
+- The global main menu does not transition into Solo mode in response to the bridge's queued map command. One manual `Play Solo` transition was needed; after that, A01 loaded and the full-lap capture completed.
+
+## Manual-lap telemetry evidence
+
+- The first full A01 manual lap produced 361 JSON Lines records in `artifacts/telemetry/phase0_manual_lap.jsonl`; the ignored local evidence file SHA-256 is `C8469209C0A91A1421F052DBF055A900C9A092E27AA8561C230D2A650CBDB0CC`.
+- All position, velocity, rotation-matrix, and yaw/pitch/roll values are finite. Race times are monotonic from `-2600` through `33280` ms, with 360 unique timestamps across 361 samples.
+- Position spans are approximately `[967.077, 104.026, 554.008]`, traced path length is `2206.540`, velocity magnitude ranges from `0.000` to `123.046`, and displayed speed ranges from `0` to `442`.
+- Yaw/pitch/roll spans are approximately `[6.257191, 1.078489, 0.353209]`, and the maximum rotation-matrix change from the starting orientation is `2.828427`.
+- A live post-lap bridge query returned `race_finished=True`, confirming the sample reaches a completed race rather than only a partial drive.
 
 ## Python environment
 
@@ -60,7 +68,7 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 
 ## Exit criteria
 
-- [ ] Raw telemetry is reliable over a full manual lap, with a captured sample reviewed for changing position, velocity, orientation, and speed and no NaN/stale values.
+- [x] Raw telemetry is reliable over a full manual lap, with a captured sample reviewed for changing position, velocity, orientation, and speed and no NaN/stale values.
 - [ ] Scripted accelerate and steer inputs move the car as expected.
 - [ ] Accelerated game speed works with telemetry and input.
 - [ ] A short, low-complexity training track is selected and the reason is documented.
@@ -68,13 +76,12 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 
 ## Next hands-on checks
 
-1. From the already-running global menu, manually choose `Play Solo` and load the local `A01-Race` challenge.
-2. Run the telemetry probe for a complete manual lap and review its finite position, velocity, orientation, and speed ranges.
-3. Run separate scripted-input and accelerated-time probes.
+1. Run a scripted-input probe that separately verifies accelerate and steer movement.
+2. Run an accelerated-time probe while telemetry and scripted input remain active.
 
 ## Track choice
 
-`A01-Race` is the provisional Phase 0 track because it is short, flat, built into the Nations campaign, and simple enough to diagnose telemetry and input independently of difficult driving. Finalize it after the first manual drive confirms that the local copy loads correctly.
+`A01-Race` is the Phase 0 track because it is short, flat, built into the Nations campaign, and simple enough to diagnose telemetry and input independently of difficult driving. The first manual lap confirmed that the local copy loads, drives, and completes correctly.
 
 ## Gotchas
 
