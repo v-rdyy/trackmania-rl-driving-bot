@@ -1,8 +1,10 @@
 # Decision 0001: TMInterface-to-Python bridge
 
-Status: Proposed — human approval required
+Status: Approved
 
 Date: 2026-08-21
+
+Approved by the project owner on 2026-08-21.
 
 ## Context
 
@@ -10,7 +12,7 @@ The project requires live telemetry and deterministic external control from Pyth
 
 A current TMNF Gymnasium implementation demonstrates a different route: run modern TMInterface through TMLoader, load an AngelScript `python_link.as` plugin, and communicate over its local TCP protocol from Python. This retains the modern TMInterface plugin model while exposing the simulation state and input controls needed by this project.
 
-## Proposed decision
+## Decision
 
 Use:
 
@@ -19,7 +21,16 @@ Use:
 - the Python protocol client only as a transport/protocol dependency, wrapped behind this project's own small adapter;
 - loopback-only networking for the bridge.
 
-Before adoption, confirm the bridge source and license permit the intended reuse. Record its exact commit and file hash in `phase0_notes.md`.
+Before vendoring the bridge, confirm its source and license permit the intended reuse. Record its exact upstream commit and file hash in `phase0_notes.md`.
+
+## Version verification
+
+On 2026-08-21, the official TMInterface changelog listed `2.2.1` (released 2026-01-05) as the latest release. The local TMLoader catalog independently contains the same version. This confirms `2.2.1` as the installation target, but not yet as the active runtime version; the latter must be verified after enabling the mod and launching the game.
+
+Sources:
+
+- https://donadigo.com/tminterface/
+- https://donadigo.com/tminterface/installation
 
 ## Why this is recommended
 
@@ -31,7 +42,6 @@ Before adoption, confirm the bridge source and license permit the intended reuse
 
 Install TMInterface 1.4.3 and use `tminterface==1.0.2` directly. This is simpler and historically proven, but upstream explicitly calls it legacy and unmaintained. Choose it only if the modern bridge fails Phase 0 telemetry or input tests.
 
-## Approval needed
+## Approval record
 
-The owner must approve the proposed modern bridge before implementation or dependency installation proceeds.
-
+The owner approved the modern TMInterface 2.2.1 plus `python_link.as` bridge after reviewing the maintained-versus-legacy tradeoff. Phase 0 implementation may proceed, subject to the live telemetry, input, and accelerated-game exit checks.
