@@ -68,10 +68,11 @@ looping or oscillation rather than inferring it from reward alone.
 
 The first formal attempt stopped at model timestep `117,423` when the bridge
 socket remained open but delivered no new synchronous simulation callback for 30
-seconds. Automatic sleep and hibernation were still disabled, Windows logged no
-suspend/resume or TrackMania application fault, and `TmForever` remained alive
-and responsive afterward. The exact cause is unresolved and is recorded as a
-transient callback stall rather than attributed to 100x without evidence.
+seconds. The project owner subsequently confirmed that the host had slept. This
+explains why no automatic timer or application-fault evidence appeared: the
+automatic sleep and hibernation timers were still disabled, but those settings
+cannot prevent a manual or externally triggered suspend. `TmForever` remained
+alive and responsive after wake, while its synchronous callback state did not.
 
 Resume unchanged from the valid 100,000-step checkpoint, replaying 17,423 model
 interactions. The preserved attempt-one Monitor contains 357 episodes: one
@@ -91,11 +92,21 @@ stalled: a new TCP connection opened, but no initial simulation callback arrived
 within 30 seconds, so the model collected zero new steps. Cleanup then raised a
 secondary `AttributeError` because Stable-Baselines3 had not initialized its
 logger before environment reset failed. The original timeout is intact in the
-manifest. Logger cleanup now tolerates this pre-setup failure, and the game must
-be explicitly restarted before another unchanged 100k-checkpoint resume.
+manifest, and logger cleanup now tolerates this pre-setup failure.
+
+Two increasingly explicit callback-reset attempts also collected zero steps:
+first sending `Delete` directly to the verified `TmForever` process, then sending
+`Escape` followed by `Delete`. Both opened a fresh TCP connection but timed out
+before the first callback. This shows that post-sleep recovery requires a full
+game/TMInterface restart rather than only restarting the race callback. These
+zero-step retries do not add replayed interactions or change the protocol.
 
 - stalled-reconnect manifest:
-  `F6C4DB1DFF7D4675BAA6AA297CB333BA29970F4B1D13A35C68F844A4144E7C1B`.
+  `F6C4DB1DFF7D4675BAA6AA297CB333BA29970F4B1D13A35C68F844A4144E7C1B`;
+- Delete-only recovery manifest:
+  `916465C2F0F7BAF276B804F3E3CCEA5A5326F7BC787805C323840C5D00316EA3`;
+- Escape-plus-Delete recovery manifest:
+  `0B2D98A240884779979F97A23BCE000FD808395ABA790F385C639BB321EF7E84`.
 
 ## Actual outcome
 

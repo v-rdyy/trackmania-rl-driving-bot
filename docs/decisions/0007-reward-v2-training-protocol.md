@@ -78,12 +78,12 @@ avoided for the duration of the run.
 ## Mid-run amendment: checkpointed callback-timeout recovery
 
 Attempt one reached model timestep `117,423`, then timed out after 30 seconds
-without a new TMInterface simulation callback. This was not a socket-aborted
-sleep failure: automatic sleep/hibernate remained disabled, Windows recorded no
-power transition or TrackMania application fault, and the game process remained
-responsive. Preserve the failed segment and resume from the valid 100,000-step
-checkpoint without changing the reward, environment, policy, seed, timeout, or
-training budget.
+without a new TMInterface simulation callback. The project owner later confirmed
+that the host had slept. Automatic sleep/hibernate remained disabled and Windows
+recorded no automatic timer or TrackMania application fault, but those controls
+cannot prevent a manual or externally triggered suspend. Preserve the failed
+segment and resume from the valid 100,000-step checkpoint without changing the
+reward, environment, policy, seed, timeout, or training budget.
 
 The 17,423 interactions after the checkpoint must be reported as replayed. The
 attempt-one Monitor includes one finish after the checkpoint; preserve it as
@@ -97,3 +97,10 @@ synchronous state remained stalled after attempt one. Restart the race callback,
 retain the same 100,000-step checkpoint, and retry without a protocol change.
 Also make logger cleanup safe when environment reset fails before SB3 initializes
 its logger; this reporting fix does not alter training behavior.
+
+Sending `Delete` to the verified game process and then, on a separate retry,
+sending `Escape` followed by `Delete` also produced fresh TCP connections but no
+simulation callback. Each attempt timed out before collecting a model step. A
+full game/TMInterface restart is therefore required after this sleep event; the
+failed zero-step recovery attempts remain preserved as experiment evidence and
+do not change the training protocol or replay count.
