@@ -27,7 +27,7 @@ $tmLoaderProfile = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\prof
 $tmInterfaceDll = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\products\TMInterface\2.2.1\TMInterface.dll'
 $expectedTmInterfaceSha256 = 'C986CA9BC1F8FD208FCD59DA7A1BECE8386BA0ACD7E3FF20D3E2F4F9404D027B'
 $pluginPath = Join-Path $env:USERPROFILE 'Documents\TMInterface\Plugins\python_link.as'
-$expectedPluginSha256 = '17FEFF21FEC2E9578AAB59C0C5D2C7EAFBC3313462FCAB2BFC18B29A08408083'
+$expectedPluginSha256 = 'C815698A027D0BD7959E4D216051958EE828C930E3435BAF5126C91C874C3C5B'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPython = Join-Path $workspaceRoot '.venv\Scripts\python.exe'
 

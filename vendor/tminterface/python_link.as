@@ -36,6 +36,7 @@ int next_frame_requested_H = -1;
 int next_frame_requested_W = -1;
 int on_step_period = 10;
 bool on_connect_queued = false;
+uint64 last_client_activity = 0;
 auto@ simManager = GetSimulationManager();
 
 void Init_Socket(){
@@ -59,6 +60,28 @@ void close_connection(){
     Init_Socket();
     next_frame_requested_H = -1;
     RESPONSE_TIMEOUT = 2000;
+    last_client_activity = Time::Now;
+}
+
+bool AcceptClient(uint timeoutMs){
+    auto @newSock = sock.Accept(timeoutMs);
+    if (@newSock is null) {
+        return false;
+    }
+    if (@clientSock !is null) {
+        log("Replacing inactive Python client connection");
+    }
+    @clientSock = @newSock;
+    newSock.NoDelay = true;
+    last_client_activity = Time::Now;
+    log("Client connected (IP: " + clientSock.RemoteIP + ")");
+    if(GetCurrentGameState() != TM::GameState::StartUp){
+        OnConnect();
+    }
+    else{
+        on_connect_queued = true;
+    }
+    return true;
 }
 
 void WaitForResponse(MessageType type){
@@ -88,6 +111,7 @@ int HandleMessage()
         return -1;
     }
 
+    last_client_activity = Time::Now;
     int type = clientSock.ReadInt32();
     switch(type) {
         case MessageType::SCRunStepSync: {
@@ -379,21 +403,14 @@ void Render(){
         return;
     }
     if (@clientSock is null) {
-        auto @newSock = sock.Accept(100);
-        if (@newSock !is null) {
-            @clientSock = @newSock;
-            newSock.NoDelay = true;
-            log("Client connected (IP: " + clientSock.RemoteIP + ")");
-            if(GetCurrentGameState() != TM::GameState::StartUp){
-                OnConnect();
-            }
-            else{
-                on_connect_queued = true;
-            }
-        }
+        AcceptClient(100);
     }
     else if (clientSock.Available > 0) {
         HandleMessage();
+    }
+    else if (Time::Now - last_client_activity > 5000) {
+        last_client_activity = Time::Now;
+        AcceptClient(100);
     }
     if(next_frame_requested_H>=0){
         const auto@ frame = Graphics::CaptureScreenshot(vec2(next_frame_requested_W,next_frame_requested_H));

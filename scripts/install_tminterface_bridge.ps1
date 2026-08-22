@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $workspaceRoot 'vendor\tminterface\python_link.as'
-$expectedSha256 = '17FEFF21FEC2E9578AAB59C0C5D2C7EAFBC3313462FCAB2BFC18B29A08408083'
+$expectedSha256 = 'C815698A027D0BD7959E4D216051958EE828C930E3435BAF5126C91C874C3C5B'
 
 if (-not (Test-Path -LiteralPath $source)) {
     throw "Vendored bridge is missing: $source"

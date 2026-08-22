@@ -35,8 +35,8 @@ Last updated: 2026-08-22
 - Source commit: `1d066ee742e736f6388818df2e07a4a89329f598`.
 - Upstream `python_link.as` SHA-256: `63305AB927B0D199DA1DB7D011F7720C5F6397BF93C2EE2102C5AEC1CD224365`.
 - Initial vendored SHA-256: `A47CCE075B3020BE9234C95135A170A58C1B950811B69963D63831813DC6366E`; at that point it differed only by one final LF byte added by repository line-ending normalization.
-- Hardened vendored SHA-256: `17FEFF21FEC2E9578AAB59C0C5D2C7EAFBC3313462FCAB2BFC18B29A08408083`.
-- TMInterface 2.2.1 runtime hardening binds the default loopback port during plugin startup, reports listener failures, avoids accepting a second client while one is active, services graceful shutdown messages from menus, and executes Python-supplied console commands immediately through `CommandList`.
+- Hardened vendored SHA-256: `C815698A027D0BD7959E4D216051958EE828C930E3435BAF5126C91C874C3C5B`.
+- TMInterface 2.2.1 runtime hardening binds the default loopback port during plugin startup, reports listener failures, services graceful shutdown messages from menus, replaces an inactive client after an interrupted Python process, and executes Python-supplied console commands immediately through `CommandList`.
 - License: GNU GPL v3.0, preserved in `vendor/tminterface/LICENSE`.
 - Network exposure: the audited bridge binds to `127.0.0.1`; Phase 0 uses port `8478`.
 
