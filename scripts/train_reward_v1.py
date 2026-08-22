@@ -40,6 +40,7 @@ REWARD_DOC = WORKSPACE_ROOT / "reward_v1.md"
 PROTOCOL_DOC = (
     WORKSPACE_ROOT / "docs" / "decisions" / "0006-reward-v1-training-protocol.md"
 )
+SIMULATION_SPEED = 100.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -156,7 +157,7 @@ def main() -> int:
         "seed": args.seed,
         "reward_function": "sparse_finish_reward",
         "tensorboard_run_name": "reward_v1_sparse",
-        "simulation_speed": 6.0,
+        "simulation_speed": SIMULATION_SPEED,
         "step_period_ms": 100,
         "max_episode_ms": 45_000,
         "max_lateral_offset": 50.0,
@@ -175,7 +176,10 @@ def main() -> int:
     }
     write_json(MANIFEST_PATH, manifest)
 
-    config = EnvironmentConfig(port=args.port)
+    config = EnvironmentConfig(
+        port=args.port,
+        simulation_speed=SIMULATION_SPEED,
+    )
     base_env = TrackmaniaEnv(
         config=config,
         reward_function=sparse_finish_reward,

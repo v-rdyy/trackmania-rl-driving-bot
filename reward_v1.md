@@ -107,6 +107,21 @@ hashes:
 - action log: `69030B4ADC0294BD27B87AEC57128F10E797E8534BC5D1DE8284A059DF04295A`;
 - summary: `FF6329BED2C227F0B7D3CCDA82DD83E428AF5455208B2C0215078B2FBA0C5879`.
 
+## Interrupted 6x start and speed optimization
+
+A valid formal start at 6x was interrupted at TensorBoard step 10,240 solely to
+benchmark the owner's proposal to increase simulation speed. Its 221 episodes
+contained 214 vertical falls, seven timeouts, zero finishes, and reward fixed at
+zero. It is preserved under `reward_v1_interrupted_speed_benchmark` and excluded
+from the fresh formal budget; this is not an early-stopped reward result.
+
+End-to-end PPO benchmarking measured `56.35` steps/second at 6x and `240.81` at
+100x. A longer 8,192-step 100x soak sustained `313.92` steps/second, completed
+118 episode resets without a bridge failure, and validated every action. Per
+Decision 0006, the formal run will restart from zero at 100x while retaining the
+same 100 ms game-time control interval and 500,000-step minimum. This is a
+wall-clock optimization, not a reward or sample-budget change.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.
@@ -122,4 +137,4 @@ hashes:
 ## Actual outcome
 
 Pending. The invalid preliminary run is excluded; formal reward-v1 training will
-restart from zero with the verified vertical fall boundary.
+restart from zero at the verified 100x speed with the vertical fall boundary.

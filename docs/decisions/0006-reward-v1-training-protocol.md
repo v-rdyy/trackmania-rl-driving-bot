@@ -11,10 +11,11 @@ Reward v1 tests the pre-registered sparse finish-only hypothesis in
 redefined after observing results, and should avoid changing unrelated policy or
 environment choices at the same time as the reward.
 
-The Phase 1 smoke run sustained approximately 59 environment steps per wall-clock
-second. A 500,000-step run therefore plans for roughly 2.35 hours, subject to
-training and machine variability. At the 450-step timeout, that budget could
-contain about 1,111 complete episodes before shorter off-track truncations.
+The Phase 1 smoke run at 6x sustained approximately 59 environment steps per
+wall-clock second. The original 500,000-step plan therefore allowed roughly 2.35
+hours, subject to training and machine variability. At the 450-step timeout,
+that budget could contain about 1,111 complete episodes before shorter invalid-
+state truncations.
 
 ## Decision
 
@@ -32,7 +33,7 @@ Run reward v1 with this protocol:
 - gamma: `0.99`;
 - GAE lambda: `0.95`;
 - PPO clip range: `0.2`;
-- environment: 6x simulation, 100 ms control period, 45-second timeout, and
+- environment: 100x simulation, 100 ms control period, 45-second timeout, and
   50-unit lateral off-track boundary;
 - vertical fall boundary: 10 units below the local reference-path height;
 - checkpoint interval: every `50,000` callback steps, plus a final checkpoint;
@@ -59,6 +60,36 @@ or a new custom distribution. That keeps actions bounded and transparent and
 holds policy architecture constant across reward comparisons. Its exploration
 behavior may affect learning, so the eventual analysis must name it rather than
 claiming the reward is the only conceivable cause of the result.
+
+## Pre-run amendment: wall-clock simulation speed
+
+The first valid 6x start was interrupted at TensorBoard step 10,240 when the
+owner proposed increasing TMInterface speed instead of reducing the fixed
+500,000-step budget. The interruption was motivated by wall-clock cost, not by a
+change to the reward hypothesis or a post-hoc stopping rule. Its 221 completed
+episodes contained 214 falls, seven timeouts, zero finishes, and zero reward.
+The artifacts are preserved under `reward_v1_interrupted_speed_benchmark` and
+excluded from the fresh formal run.
+
+The existing accelerated-time probe verified finite telemetry and live input at
+20x, 50x, and 100x. A new end-to-end benchmark then ran the exact PPO settings
+for 2,048 steps at each speed. Throughput increased from `56.35` environment
+steps/second at 6x to `166.81` at 20x, `231.76` at 50x, and `240.81` at 100x.
+An 8,192-step 100x soak test improved to `313.92` steps/second after amortizing
+startup overhead and completed 118 episodes with 112 falls, six timeouts, no
+bridge/reset errors, and 8,192 finite, bounded, affine-consistent actions.
+
+Use 100x for the formal restart. This changes wall-clock scheduling only: the
+environment still advances by one 100 ms game-time control interval per agent
+step, retains the same episode timeout and boundaries, and trains for the same
+step budget. The sustained soak rate projects roughly 26.5 minutes for 500,000
+steps before checkpoint and reporting overhead. Ignored evidence hashes:
+
+- four-speed PPO benchmark: `21BB39779A974D6E719EEB4FC72F3DD421D9BCEA5B130A6B57DF40CB86AF2F19`;
+- 100x PPO soak: `24B34136C4AC7317E99DE8CE6C95A526F3D06CB50194D98EF01F916ED437154C`;
+- interrupted 6x manifest: `DCC08FE7908ED27414E4AD2F2C2C28A267F67CB991BDBD3EEFFDC402C0102A2F`;
+- interrupted 6x Monitor CSV: `33829ED2D1C209B437DCEE811B898F0747D63E378ADE4CC77A4F9BC8E96DC4E4`;
+- interrupted 6x TensorBoard event: `E31DF59DCBF8FCAE5D08D923BF5AEBB9CC33854518C8B638140C6A37CAFE389E`.
 
 ## Pre-run amendment: vertical fall detection
 
