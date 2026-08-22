@@ -23,6 +23,30 @@ be revised after observing training or evaluation results.
 The implementation must be an isolated reward function passed into
 `TrackmaniaEnv`, not a conditional hardcoded into the environment.
 
+## Corrective control-label interpretation
+
+After V1 and V2 were completed, an identical-snapshot live direction probe found
+that TMNF's signed `Gas` polarity is negative-forward and positive-backward. The
+original bridge used `(throttle - brake) * 65536`, so the two pedal labels were
+reversed throughout V2. The final policy's mean raw output was approximately
+`[steer=-0.1334, throttle=0.0425, brake=0.9749]`; under the legacy mapping, its
+large nominal brake value generated strong negative Gas and was physically
+forward acceleration. V2 therefore learned to drive through the mislabeled brake
+channel rather than by braking around the course.
+
+Finish rate, reward curves, route progress, oscillation, and hoop-contact
+observations remain empirically valid because evaluation reproduces the exact
+mapping used during training. V1 and V2 also shared the same mapping, so their
+reward-signal comparison remains meaningful. Historical V0/V1/V2 scripts now
+opt into an explicit compatibility mode; V3 and future models use corrected
+pedal semantics. That necessary control correction means V3 is not literally a
+reward-only change at the transport boundary, and the comparison will disclose
+it rather than hiding it.
+
+The four-trial direction evidence is recorded in Decision 0002; its ignored
+samples hash is
+`4CFB82A21827E7F2192E863A69E1DA2B23B7C6A99B8B1440892FA355BEDCA3E1`.
+
 ## Implementation verification
 
 `dense_speed_reward` is implemented in `src/trackmania_rl/rewards.py` as an

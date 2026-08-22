@@ -137,6 +137,10 @@ The first verification attempt did not reproduce the visible failure. Holding
 raw action `[0, 0, 1]` applied gas `-65536`, but the car progressed approximately
 115 path units over 100 steps instead of backing off the platform. Its minimum
 vertical offset was only `-0.203`, so it timed out and correctly failed the probe.
+The later signed-Gas direction gate explained this result: negative Gas is
+forward acceleration, so the nominal brake label used by this historical probe
+was reversed. This correction changes the action interpretation, not the
+recorded trajectory or the vertical-boundary validation that followed.
 The 10-unit threshold remains provisional; reproduce the stochastic PPO behavior
 or add an explicit behind-start boundary before restarting formal training.
 
@@ -156,3 +160,12 @@ eight were timeouts; there were zero horizontal off-track truncations and zero
 finishes. Minimum vertical offset was `-12.196`, while every action remained
 finite and in range. This clean reproduction verifies the 10-unit boundary for
 the observed A01 grass drop. Formal reward-v1 training may now restart from zero.
+
+## Post-run control-label correction
+
+Decision 0002 was amended after a repeated identical-snapshot direction probe
+proved that TMNF uses negative `Gas` for forward and positive `Gas` for backward.
+V1 trained with the opposite pedal labels. Its historical runner, evaluator, and
+checkpoint-replay paths use an explicit legacy compatibility mode so the model's
+behavior remains reproducible. Reward v1's zero-finish/flat-zero conclusion is
+unchanged; `reward_v1.md` records the corrected reverse-and-hard-left mechanism.

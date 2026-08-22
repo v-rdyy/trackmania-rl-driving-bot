@@ -49,6 +49,30 @@ finish rate, episode lengths, best/average progress, speeds, terminal causes, an
 a telemetry-based behavior description. Visible behavior during the run remains
 an explicit human observation rather than being invented from numbers alone.
 
+## Corrective control-label interpretation
+
+After V1 and V2 were completed, an identical-snapshot live direction probe found
+that TMNF's signed `Gas` polarity is negative-forward and positive-backward. The
+original bridge used `(throttle - brake) * 65536`, so the two pedal labels were
+reversed throughout this experiment. The reward, telemetry, termination counts,
+and observed trajectories remain valid, but earlier pedal-based causal language
+must be read with this correction.
+
+In particular, the fixed raw action `[steer=0, throttle=0, brake=1]` described
+below was nominally “brake,” but its applied Gas `-65536` was actually full
+forward acceleration. The final mean raw action
+`[steer=-0.8403, throttle=0.9192, brake=0.0070]` produced strong positive Gas,
+which is reverse, not forward throttle. The final policy therefore learned a
+repeatable reverse-and-hard-left fall. Historical V1 evaluation and replay
+scripts explicitly retain the legacy mapping so the checkpoint remains
+reproducible; future training uses corrected pedal semantics.
+
+This does not rescue or invalidate the sparse-reward result: V1 still had zero
+finishes and exactly flat zero reward. It changes the mechanism assigned to the
+failure, not the measured outcome. The four-trial direction evidence is recorded
+in Decision 0002; its ignored samples hash is
+`4CFB82A21827E7F2192E863A69E1DA2B23B7C6A99B8B1440892FA355BEDCA3E1`.
+
 ## Invalidated preliminary training attempt
 
 The first long run was deliberately stopped and excluded from the formal result
@@ -72,8 +96,10 @@ Ignored local artifact hashes:
 - TensorBoard event: `7D33E411F11F636761E104330BE9A3B8292F3689CB4CD89A6ED44664F03DD1CA`.
 
 A first fixed-action reproduction also failed honestly: `[steer=0, throttle=0,
-brake=1]` applied gas `-65536` but moved about 115 path units forward rather than
-backing off the start. Over 100 steps its minimum vertical offset was only
+brake=1]` applied gas `-65536` and moved about 115 path units forward rather than
+backing off the start. The later direction probe established that this nominal
+brake channel was physically full forward acceleration. Over 100 steps its
+minimum vertical offset was only
 `-0.203`, so the proposed 10-unit fall boundary did not fire. The ignored action
 log SHA-256 is
 `DCEE08E43643EBB4753F51CEB833A54BA5CDE995E4E6A17C72CDDDDC5ABD04A0`.
@@ -162,18 +188,20 @@ The 20-episode deterministic evaluation also produced zero finishes. Every
 episode followed the same 16-step (1.6 game-second) trajectory, reached displayed
 speed 63, made effectively zero forward path progress, and crossed the vertical
 fall boundary. Its mean normalized action was approximately
-`[steer=-0.8403, throttle=0.9192, brake=0.0070]`: the final policy accelerated
-while steering hard left, rotated to about 1.625 radians of heading error, and
-fell 11.166 units below the local path. This explains why accelerated training
-looked like a stationary rapid-reset loop on screen; the full crash occurred
-between rendered frames.
+`[steer=-0.8403, throttle=0.9192, brake=0.0070]`. Under the legacy reversed
+mapping, that nominal high-throttle output commanded strong positive Gas—reverse
+in TMNF—while steering hard left. The car rotated to about 1.625 radians of
+heading error and fell 11.166 units below the local path. This explains why 100x
+simulation looked like a stationary rapid-reset loop on screen; the full crash
+occurred between rendered frames.
 
 The hypothesis is partially supported. Its central prediction held: sparse PPO
 never discovered a finish, received no gradient signal from the external reward,
 and produced a perfectly flat reward curve. The prediction of "no meaningful
 behavior change" did not hold. Episode length collapsed and the deterministic
-policy developed a repeatable full-throttle, hard-left fall. This is a harmful
-rather than useful behavior change and is documented as an unexpected result.
+policy developed a repeatable reverse-and-hard-left fall through the mislabeled
+nominal throttle channel. This is a harmful rather than useful behavior change
+and is documented as an unexpected result.
 
 The experiment does not isolate why PPO settled on this particular zero-return
 action pattern; initialization, critic transients, and optimization dynamics are

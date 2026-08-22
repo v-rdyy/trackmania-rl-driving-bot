@@ -15,7 +15,14 @@ Last updated: 2026-08-22
 
 ## Action contract
 
-The action space is `Box(low=[-1, 0, 0], high=[1, 1, 1], dtype=float32)` in `[steer, throttle, brake]` order. The bridge maps steer directly to signed analog `Steer` and maps `throttle - brake` to signed analog `Gas`, both scaled by `65536`. Invalid or nonfinite values fail before transport.
+The action space is `Box(low=[-1, 0, 0], high=[1, 1, 1], dtype=float32)` in
+`[steer, throttle, brake]` order. The bridge maps steer directly to signed analog
+`Steer` and maps `brake - throttle` to signed analog `Gas`, both scaled by
+`65536`; TMNF uses negative Gas for forward acceleration and positive Gas for
+reverse/braking. Invalid or nonfinite values fail before transport. V0/V1/V2
+checkpoints explicitly use the legacy reversed-pedal compatibility mode because
+they were trained before the Gas direction was verified; new training uses the
+corrected default.
 
 ## Observation contract
 

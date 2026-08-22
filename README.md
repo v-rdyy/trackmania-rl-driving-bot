@@ -19,7 +19,10 @@ Development history follows the rules in
 - Full-lap A01 telemetry is verified with finite, changing position, velocity, orientation, and speed data.
 - Scripted acceleration and steering are verified from resulting motion telemetry.
 - The exact 6x target is verified with telemetry and scripted acceleration active; the measured effective rate was 6.400x.
-- Decision 0002's normalized continuous controls are verified end to end against TMInterface's analog steer/gas inputs.
+- Decision 0002's normalized continuous controls are verified end to end. A
+  repeated direction probe corrected TMNF Gas polarity to negative-forward and
+  positive-backward; V0/V1/V2 retain their original behavior through an explicit
+  legacy compatibility mode.
 - The A01 driven reference line is provenance-pinned and resampled into 443 fixed-spacing points per Decision 0003.
 - The documented 26-value engineered observation is finite and progress-consistent across the full manual lap.
 - TMInterface snapshot rewind is live-verified as the reliable Phase 1 episode-reset primitive.
@@ -29,7 +32,7 @@ Development history follows the rules in
   second, wrote verified TensorBoard reward/episode-length metrics, and audited
   every policy and environment action without hidden clipping per Decision 0005.
 - Reward v1 completed 501,200 PPO timesteps at 100x simulation speed with zero
-  finishes. Its 20-episode deterministic evaluation repeatedly accelerated hard
+  finishes. Its 20-episode deterministic evaluation repeatedly reversed hard
   left and fell from the A01 start, partially supporting the sparse-reward
   hypothesis while exposing an unexpected harmful behavior change.
 - Reward v2 completed 1,001,120 PPO timesteps at 100x. Its 20-episode
