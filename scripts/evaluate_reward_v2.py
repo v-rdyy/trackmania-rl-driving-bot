@@ -17,6 +17,11 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
+from trackmania_rl.evaluation_metrics import (
+    evaluation_metric_protocol,
+    steering_precision_metrics,
+    trajectory_precision_metrics,
+)
 from trackmania_rl.rewards import dense_speed_reward
 from trackmania_rl.tmi_bridge import ProtocolError
 
@@ -80,6 +85,14 @@ def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     )
     sign_changes = steering_sign_changes(actions[:, 0])
     average_speed = float(speeds.mean())
+    steering_samples = [
+        (float(record["race_time_ms"]) / 1000.0, float(record["raw_action"][0]))
+        for record in records
+    ]
+    precision = {
+        "steering": steering_precision_metrics(steering_samples),
+        **trajectory_precision_metrics(records),
+    }
 
     sustained_motion = world_distance >= 100.0 and average_speed >= 40.0
     poor_progress = progress_efficiency < 0.25
@@ -111,6 +124,7 @@ def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
         "loop_candidate": loop_candidate,
         "oscillation_candidate": oscillation_candidate,
         "speed_farming_candidate": speed_farming_candidate,
+        "precision": precision,
     }
 
 
@@ -119,6 +133,18 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     exploit_candidates = sum(
         bool(episode["trajectory"]["speed_farming_candidate"])
         for episode in episodes
+    )
+    oscillation_episodes = sum(
+        bool(episode["trajectory"]["precision"]["steering"]["oscillation_detected"])
+        for episode in episode_records
+    )
+    upside_down_episodes = sum(
+        bool(episode["trajectory"]["precision"]["upside_down"]["upside_down_detected"])
+        for episode in episode_records
+    )
+    stuck_episodes = sum(
+        bool(episode["trajectory"]["precision"]["stuck"]["stuck_detected"])
+        for episode in episode_records
     )
     falls = sum(bool(episode["fallen"]) for episode in episodes)
     timeouts = sum(bool(episode["timeout"]) for episode in episodes)
@@ -266,6 +292,10 @@ def main() -> int:
         "off_tracks": off_tracks,
         "falls": falls,
         "speed_farming_candidate_episodes": exploit_candidates,
+        "precision_metric_protocol": evaluation_metric_protocol(),
+        "oscillation_detected_episodes": oscillation_episodes,
+        "upside_down_detected_episodes": upside_down_episodes,
+        "stuck_detected_episodes": stuck_episodes,
         "average_episode_steps": statistics.fmean(
             int(episode["steps"]) for episode in episode_records
         ),

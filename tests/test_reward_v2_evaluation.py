@@ -20,12 +20,16 @@ def record(
     progress: float,
     steer: float,
     speed: int = 100,
+    race_time_ms: int = 0,
 ) -> dict[str, object]:
     return {
         "position": [x, 0.0, z],
         "progress": progress,
         "display_speed": speed,
         "raw_action": [steer, 1.0, 0.0],
+        "race_time_ms": race_time_ms,
+        "lateral_offset": z,
+        "upright_cosine": 1.0,
     }
 
 
@@ -39,8 +43,14 @@ class RewardV2EvaluationTests(unittest.TestCase):
             (0.0, 0.0),
         ] * 2
         records = [
-            record(x=x, z=z, progress=5.0, steer=0.8)
-            for x, z in points
+            record(
+                x=x,
+                z=z,
+                progress=5.0,
+                steer=0.8,
+                race_time_ms=index * 100,
+            )
+            for index, (x, z) in enumerate(points)
         ]
 
         metrics = MODULE.trajectory_metrics(records)
@@ -56,6 +66,7 @@ class RewardV2EvaluationTests(unittest.TestCase):
                 z=20.0 if index % 2 else -20.0,
                 progress=2.0,
                 steer=1.0 if index % 2 else -1.0,
+                race_time_ms=index * 100,
             )
             for index in range(12)
         ]
@@ -73,6 +84,7 @@ class RewardV2EvaluationTests(unittest.TestCase):
                 z=0.0,
                 progress=float(index * 20),
                 steer=0.0,
+                race_time_ms=index * 100,
             )
             for index in range(12)
         ]

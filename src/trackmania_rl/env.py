@@ -435,6 +435,12 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                         result.state.position,
                         dtype=np.float64,
                     ).tolist(),
+                    "upright_cosine": float(
+                        np.asarray(
+                            result.state.rotation_matrix,
+                            dtype=np.float64,
+                        )[1, 1]
+                    ),
                     "reward": reward,
                     "reward_function": self.reward_name,
                     "terminated": terminated,

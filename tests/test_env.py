@@ -147,6 +147,7 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertEqual(info["applied_gas"], -32768)
             record = json.loads(log_path.read_text(encoding="utf-8"))
             self.assertEqual(record["raw_action"], [0.5, 0.75, 0.25])
+            self.assertEqual(record["upright_cosine"], 1.0)
             self.assertTrue(record["finite"])
             self.assertTrue(record["within_range"])
             self.assertFalse(record["timeout"])
