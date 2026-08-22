@@ -5,6 +5,7 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). Work is currentl
 ## Current status
 
 - TrackMania Nations Forever is installed through Steam.
+- The official TMNF 2.11.26 compatibility update is applied with a verified rollback backup.
 - TrackMania ModLoader is installed.
 - TMInterface 2.2.1 is installed and pinned in the active ModLoader profile.
 - Python 3.11.9 and the pinned Phase 0 dependencies are installed in `.venv`.
