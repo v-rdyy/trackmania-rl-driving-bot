@@ -14,6 +14,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
+from trackmania_rl.rewards import phase1_smoke_reward, sparse_finish_reward
 from trackmania_rl.tmi_bridge import ProtocolError
 
 
@@ -24,6 +25,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--episode-ms", type=int, default=500)
     parser.add_argument("--port", type=int, default=8478)
+    parser.add_argument(
+        "--reward",
+        choices=("phase1", "sparse-finish"),
+        default="phase1",
+    )
     parser.add_argument(
         "--action-log",
         type=Path,
@@ -59,11 +65,21 @@ def main() -> int:
         raise SystemExit("--episode-ms must be a positive 10 ms multiple")
 
     config = EnvironmentConfig(port=args.port, max_episode_ms=args.episode_ms)
-    env = TrackmaniaEnv(config=config, action_log_path=args.action_log)
+    reward_function = (
+        sparse_finish_reward
+        if args.reward == "sparse-finish"
+        else phase1_smoke_reward
+    )
+    env = TrackmaniaEnv(
+        config=config,
+        action_log_path=args.action_log,
+        reward_function=reward_function,
+    )
     action = np.asarray([0.0, 0.35, 0.0], dtype=np.float32)
     reset_observations: list[np.ndarray] = []
     episode_records: list[dict[str, object]] = []
     total_steps = 0
+    rewards: list[float] = []
 
     try:
         for episode in range(args.episodes):
@@ -91,6 +107,7 @@ def main() -> int:
                     )
                 steps += 1
                 total_steps += 1
+                rewards.append(float(reward))
                 if steps > args.episode_ms // config.step_period_ms + 1:
                     raise ProtocolError(f"episode {episode} did not truncate on time")
 
@@ -128,6 +145,8 @@ def main() -> int:
         for record in audit_records
     ):
         raise ProtocolError("action audit contains an invalid raw action")
+    if args.reward == "sparse-finish" and any(reward != 0.0 for reward in rewards):
+        raise ProtocolError("sparse finish reward fired without a finished race")
 
     repeatable_resets = np.stack(reset_observations)
     max_repeat_reset_delta = float(
@@ -146,6 +165,9 @@ def main() -> int:
         "step_period_ms": config.step_period_ms,
         "episode_timeout_ms": config.max_episode_ms,
         "raw_action": action.tolist(),
+        "reward_function": reward_function.__name__,
+        "reward_minimum": min(rewards),
+        "reward_maximum": max(rewards),
         "all_actions_finite_and_in_range": True,
         "max_repeat_reset_observation_delta": max_repeat_reset_delta,
         "episodes_detail": episode_records,

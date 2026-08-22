@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -15,6 +16,11 @@ from trackmania_rl.observations import (
     ObservationDiagnostics,
     ReferencePath,
     build_observation,
+)
+from trackmania_rl.rewards import (
+    RewardFunction,
+    RewardTransition,
+    phase1_smoke_reward,
 )
 from trackmania_rl.tmi_bridge import MessageType, ProtocolError, TmiBridgeClient
 
@@ -261,6 +267,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         reference_path: ReferencePath | None = None,
         session: EpisodeSession | None = None,
         action_log_path: Path | None = None,
+        reward_function: RewardFunction = phase1_smoke_reward,
     ) -> None:
         super().__init__()
         self.config = config or EnvironmentConfig()
@@ -268,6 +275,12 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             DEFAULT_REFERENCE_PATH
         )
         self.session = session or LiveTmiSession(self.config)
+        self.reward_function = reward_function
+        self.reward_name = getattr(
+            reward_function,
+            "__name__",
+            type(reward_function).__name__,
+        )
         self.action_space = gym.spaces.Box(
             low=np.asarray([-1.0, 0.0, 0.0], dtype=np.float32),
             high=np.asarray([1.0, 1.0, 1.0], dtype=np.float32),
@@ -347,9 +360,21 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
         terminated = bool(result.race_finished)
         truncated = bool(not terminated and (timed_out or off_track))
-        reward = float(result.state.display_speed) / 1000.0
-        if truncated:
-            reward -= 1.0
+        if self._last_diagnostics is None:
+            raise RuntimeError("step requires reset diagnostics")
+        transition = RewardTransition(
+            previous_diagnostics=self._last_diagnostics,
+            diagnostics=diagnostics,
+            display_speed=int(result.state.display_speed),
+            elapsed_ms=elapsed_ms,
+            terminated=terminated,
+            truncated=truncated,
+            timed_out=timed_out,
+            off_track=off_track,
+        )
+        reward = float(self.reward_function(transition))
+        if not math.isfinite(reward):
+            raise ValueError(f"reward function {self.reward_name} returned {reward}")
 
         info = self._info(result.state, diagnostics)
         info.update(
@@ -359,6 +384,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "applied_gas": result.applied_gas,
                 "timeout": timed_out,
                 "off_track": off_track,
+                "reward_function": self.reward_name,
             }
         )
         if self._logger is not None:
@@ -374,6 +400,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "applied_steer": result.applied_steer,
                     "applied_gas": result.applied_gas,
                     "reward": reward,
+                    "reward_function": self.reward_name,
                     "terminated": terminated,
                     "truncated": truncated,
                     "progress": diagnostics.progress,

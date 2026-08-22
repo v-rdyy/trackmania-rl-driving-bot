@@ -1,6 +1,6 @@
 # Reward v1: Sparse finish-only
 
-Status: Hypothesis pre-registered; implementation and training not started
+Status: Hypothesis pre-registered; reward implementation verified; training not started
 
 Date pre-registered: 2026-08-22
 
@@ -22,6 +22,21 @@ be revised after observing training or evaluation results.
 The implementation will be an isolated reward function passed into the
 environment, not a conditional hardcoded into `TrackmaniaEnv`.
 
+## Implementation verification
+
+`sparse_finish_reward` is implemented in `src/trackmania_rl/rewards.py` as a
+callable over an immutable transition record. `TrackmaniaEnv` accepts a
+`reward_function` argument; its default remains the separate Phase 1 smoke
+reward. Nonfinite reward outputs fail before Gymnasium returns the step.
+
+The reward-v1 wiring check completed 20 live timeout-truncated episodes and 100
+steps. Every reward was exactly `0.0`, every action was finite and in range, and
+all reset observations were identical. The `+1.0` finish branch is covered by an
+isolated unit test. Ignored local evidence hashes:
+
+- action log: `71C2A4A7685A590D23138AD50CAC69B1A70B054C89ACA752A6A52655F904D513`;
+- summary: `08FDF010A1A996BBBD2BC95E0207D817FA19B287DB6374443111CFA0BAA86A88`.
+
 ## Evaluation plan
 
 - Use a distinct reward-v1 TensorBoard run name and checkpoint namespace.
@@ -35,4 +50,4 @@ environment, not a conditional hardcoded into `TrackmaniaEnv`.
 
 ## Actual outcome
 
-Pending. No reward-v1 training has started as of this pre-registration commit.
+Pending. No reward-v1 training has started.

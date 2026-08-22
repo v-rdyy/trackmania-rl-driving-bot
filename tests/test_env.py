@@ -19,6 +19,7 @@ from trackmania_rl.env import (
     TrackmaniaEnv,
 )
 from trackmania_rl.observations import ReferencePath
+from trackmania_rl.rewards import sparse_finish_reward
 from trackmania_rl.tmi_bridge import MessageType
 
 
@@ -36,8 +37,14 @@ def state(*, x: float, z: float, speed: int, race_time: int) -> SimpleNamespace:
 
 
 class FakeSession:
-    def __init__(self, states: list[SimpleNamespace]) -> None:
+    def __init__(
+        self,
+        states: list[SimpleNamespace],
+        *,
+        race_finished: bool = False,
+    ) -> None:
         self.states = states
+        self.race_finished = race_finished
         self.index = 0
         self.actions: list[np.ndarray] = []
         self.closed = False
@@ -56,7 +63,7 @@ class FakeSession:
         return SessionStep(
             state=self.states[self.index],
             race_time_ms=self.states[self.index].race_time,
-            race_finished=False,
+            race_finished=self.race_finished,
             applied_steer=round(float(action[0]) * 65536),
             applied_gas=round(float(action[1] - action[2]) * 65536),
         )
@@ -185,6 +192,53 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertFalse(terminated)
         self.assertTrue(truncated)
         self.assertTrue(info["timeout"])
+
+    def test_reward_function_is_injected_and_named_in_info(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, z=0, speed=100, race_time=100),
+            ],
+            race_finished=True,
+        )
+        env = TrackmaniaEnv(
+            reference_path=self.path,
+            session=session,
+            reward_function=sparse_finish_reward,
+        )
+        env.reset()
+
+        _, reward, terminated, truncated, info = env.step(
+            np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertEqual(reward, 1.0)
+        self.assertTrue(terminated)
+        self.assertFalse(truncated)
+        self.assertEqual(info["reward_function"], "sparse_finish_reward")
+
+    def test_nonfinite_injected_reward_fails_fast(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, z=0, speed=100, race_time=100),
+            ]
+        )
+
+        def invalid_reward(_transition):
+            return np.nan
+
+        env = TrackmaniaEnv(
+            reference_path=self.path,
+            session=session,
+            reward_function=invalid_reward,
+        )
+        env.reset()
+
+        with self.assertRaisesRegex(ValueError, "invalid_reward returned nan"):
+            env.step(np.asarray([0.0, 0.0, 0.0], dtype=np.float32))
+        env.close()
 
 
 class LiveTmiSessionTests(unittest.TestCase):
