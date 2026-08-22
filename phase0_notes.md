@@ -9,8 +9,8 @@ Last updated: 2026-08-22
 | TrackMania Nations Forever installed | Confirmed | Steam app `11020`, build `9531569`, installed at `C:\Program Files (x86)\Steam\steamapps\common\TrackMania Nations Forever` |
 | Game launches and runs | Confirmed | The patched Steam installation launches through the pinned TMLoader profile in windowed mode |
 | TrackMania ModLoader installed | Confirmed | TMLoader `1.0.1` at `C:\Users\Vardhan\AppData\Local\TMLoader\TMLoader.exe` |
-| TMInterface installed/enabled | Confirmed statically | Active `default` profile pins `2.2.1`; installed `TMInterface.dll` SHA-256 is `C986CA9BC1F8FD208FCD59DA7A1BECE8386BA0ACD7E3FF20D3E2F4F9404D027B`. Runtime title/version still needs a live launch check |
-| TMInterface Python bridge present | Confirmed | Installed at `C:\Users\Vardhan\Documents\TMInterface\Plugins\python_link.as`; SHA-256 matches the vendored bridge |
+| TMInterface installed/enabled | Confirmed live | Runtime title is `TrackMania Modded Forever (2.12.0) [default]: TMInterface (2.2.1), CoreMod (1.0.11)`; installed `TMInterface.dll` SHA-256 is `C986CA9BC1F8FD208FCD59DA7A1BECE8386BA0ACD7E3FF20D3E2F4F9404D027B` |
+| TMInterface Python bridge present | Confirmed live | Installed at `C:\Users\Vardhan\Documents\TMInterface\Plugins\python_link.as`; it listens only on `127.0.0.1:8478`, accepts the Python client, completes the connect handshake, executes commands, and accepts a clean reconnect |
 | Python 3.10/3.11 available | Confirmed | Official Python install manager `26.3` installed Python `3.11.9`; project `.venv` imports all pinned Phase 0 packages successfully |
 
 ## Compatibility research
@@ -34,9 +34,19 @@ Last updated: 2026-08-22
 - Source repository: `dersiwi/trackmania-gym`.
 - Source commit: `1d066ee742e736f6388818df2e07a4a89329f598`.
 - Upstream `python_link.as` SHA-256: `63305AB927B0D199DA1DB7D011F7720C5F6397BF93C2EE2102C5AEC1CD224365`.
-- Vendored SHA-256: `A47CCE075B3020BE9234C95135A170A58C1B950811B69963D63831813DC6366E`; it differs only by one final LF byte added by repository line-ending normalization.
+- Initial vendored SHA-256: `A47CCE075B3020BE9234C95135A170A58C1B950811B69963D63831813DC6366E`; at that point it differed only by one final LF byte added by repository line-ending normalization.
+- Hardened vendored SHA-256: `17FEFF21FEC2E9578AAB59C0C5D2C7EAFBC3313462FCAB2BFC18B29A08408083`.
+- TMInterface 2.2.1 runtime hardening binds the default loopback port during plugin startup, reports listener failures, avoids accepting a second client while one is active, services graceful shutdown messages from menus, and executes Python-supplied console commands immediately through `CommandList`.
 - License: GNU GPL v3.0, preserved in `vendor/tminterface/LICENSE`.
 - Network exposure: the audited bridge binds to `127.0.0.1`; Phase 0 uses port `8478`.
+
+## Live bridge verification
+
+- TrackMania was launched through the pinned `default` profile in 640x480 windowed mode, and the TMInterface safety prompt was kept offline.
+- The runtime loaded TMInterface `2.2.1`, CoreMod `1.0.11`, and the hardened `python_link.as` plugin without a bind failure.
+- The plugin log recorded a Python client connecting from `127.0.0.1`, receiving its connect callback, executing configuration and map commands, disconnecting cleanly, and reconnecting.
+- `A01-Race.Challenge.Gbx` was copied from the built-in Nations campaign to the user's local `Tracks\Challenges` directory with matching SHA-256 `F0A870809BE99DA2CB36AD5DF43A2CF63D8F74FE4AC3470ECAC68B9E97625DC3`. TMInterface now accepts and queues that map command.
+- The global main menu does not transition into Solo mode in response to the bridge's queued map command. Phase 0 telemetry therefore still requires one manual `Play Solo` transition before the lap capture can run; the command channel itself is verified.
 
 ## Python environment
 
@@ -58,13 +68,13 @@ The owner approved the modern integration on 2026-08-21. The decision and versio
 
 ## Next hands-on checks
 
-1. Launch the pinned TMLoader `default` profile with TMInterface `custom_port` set to `8478`.
-2. Confirm the running TMInterface title reports `2.2.1` and record the game version shown at runtime.
-3. Run separate telemetry and scripted-input probes.
+1. From the already-running global menu, manually choose `Play Solo` and load the local `A01-Race` challenge.
+2. Run the telemetry probe for a complete manual lap and review its finite position, velocity, orientation, and speed ranges.
+3. Run separate scripted-input and accelerated-time probes.
 
 ## Track choice
 
-Pending human selection. No track has been chosen silently.
+`A01-Race` is the provisional Phase 0 track because it is short, flat, built into the Nations campaign, and simple enough to diagnose telemetry and input independently of difficult driving. Finalize it after the first manual drive confirms that the local copy loads correctly.
 
 ## Gotchas
 
@@ -72,3 +82,5 @@ Pending human selection. No track has been chosen silently.
 - `Nadeo.ini` still reports `2.11.16` after the official compatibility update, so it is not a reliable patch-level check.
 - The ModLoader catalog and the standalone TMInterface download do not expose the same latest version; this project should use one recorded, reproducible ModLoader profile.
 - TMLoader needed a one-time game-location setting and its official install control before the command-line profile launch would work. The original profile is preserved as `default.before-tminterface.yaml` in TMLoader's profile directory.
+- The TMInterface safety prompt appears on startup; Phase 0 uses `Stay offline` and does not authorize online play or leaderboard submission.
+- The plugin registers `custom_port` after TMLoader processes its startup config string, so setting that variable in the profile produced a harmless `Unknown variable` warning. The Phase 0 profile now relies on the audited bridge's pinned default `8478` instead.

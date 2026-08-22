@@ -25,7 +25,7 @@ Before vendoring the bridge, confirm its source and license permit the intended 
 
 ## Version verification
 
-On 2026-08-21, the official TMInterface changelog listed `2.2.1` (released 2026-01-05) as the latest release. The local TMLoader catalog independently contains the same version. This confirms `2.2.1` as the installation target, but not yet as the active runtime version; the latter must be verified after enabling the mod and launching the game.
+On 2026-08-21, the official TMInterface changelog listed `2.2.1` (released 2026-01-05) as the latest release. The local TMLoader catalog independently contains the same version. On 2026-08-22, the launched game confirmed the active runtime as `TrackMania Modded Forever (2.12.0) [default]: TMInterface (2.2.1), CoreMod (1.0.11)`, so Decision 0001 now reflects the version actually installed and running rather than only the catalog target.
 
 Sources:
 

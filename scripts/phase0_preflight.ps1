@@ -25,7 +25,9 @@ $expectedPatchedGameSha256 = '4B6A7B31D86766409E94101F1256CD61DFFECB23EA497A40B6
 $tmLoaderPath = Join-Path $env:LOCALAPPDATA 'TMLoader\TMLoader.exe'
 $tmLoaderProfile = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\profiles\default.yaml'
 $tmInterfaceDll = Join-Path $env:LOCALAPPDATA 'TMLoader\database\TmForever\products\TMInterface\2.2.1\TMInterface.dll'
+$expectedTmInterfaceSha256 = 'C986CA9BC1F8FD208FCD59DA7A1BECE8386BA0ACD7E3FF20D3E2F4F9404D027B'
 $pluginPath = Join-Path $env:USERPROFILE 'Documents\TMInterface\Plugins\python_link.as'
+$expectedPluginSha256 = '17FEFF21FEC2E9578AAB59C0C5D2C7EAFBC3313462FCAB2BFC18B29A08408083'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $projectPython = Join-Path $workspaceRoot '.venv\Scripts\python.exe'
 
@@ -41,11 +43,25 @@ $profile = if (Test-Path -LiteralPath $tmLoaderProfile) {
     ''
 }
 $tmInterfacePinned = $profile -match '(?ms)^\s*-\s*id:\s*TMInterface\s*\r?\n\s*version:\s*2\.2\.1\s*$'
+$profileRuntimeSettings = $profile -match 'set unfocused_fps_limit false' -and $profile -match 'set auto_reload_plugins true'
 $gameExecutableHash = if (Test-Path -LiteralPath $gameExecutable) {
     (Get-FileHash -LiteralPath $gameExecutable -Algorithm SHA256).Hash
 } else {
     ''
 }
+$tmInterfaceHash = if (Test-Path -LiteralPath $tmInterfaceDll) {
+    (Get-FileHash -LiteralPath $tmInterfaceDll -Algorithm SHA256).Hash
+} else {
+    ''
+}
+$pluginHash = if (Test-Path -LiteralPath $pluginPath) {
+    (Get-FileHash -LiteralPath $pluginPath -Algorithm SHA256).Hash
+} else {
+    ''
+}
+$bridgeListener = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() |
+    Where-Object { $_.Address.ToString() -eq '127.0.0.1' -and $_.Port -eq 8478 } |
+    Select-Object -First 1
 
 $pythonCommand = if (Test-Path -LiteralPath $projectPython) {
     Get-Item -LiteralPath $projectPython
@@ -73,8 +89,10 @@ $checks = @(
     New-Check -Name 'TMNF running' -Passed ([bool](Get-Process TmForever -ErrorAction SilentlyContinue)) -Detail 'Launch through the approved TMLoader profile for live checks.'
     New-Check -Name 'TMLoader installed' -Passed (Test-Path -LiteralPath $tmLoaderPath) -Detail $tmLoaderPath
     New-Check -Name 'TMInterface 2.2.1 in profile' -Passed $tmInterfacePinned -Detail $tmLoaderProfile
-    New-Check -Name 'TMInterface 2.2.1 payload' -Passed (Test-Path -LiteralPath $tmInterfaceDll) -Detail $tmInterfaceDll
-    New-Check -Name 'python_link.as bridge' -Passed (Test-Path -LiteralPath $pluginPath) -Detail $pluginPath
+    New-Check -Name 'TMLoader runtime settings' -Passed $profileRuntimeSettings -Detail 'Window-friendly FPS and plugin auto-reload settings are pinned.'
+    New-Check -Name 'TMInterface 2.2.1 payload' -Passed ($tmInterfaceHash -eq $expectedTmInterfaceSha256) -Detail "TMInterface.dll SHA-256: $tmInterfaceHash"
+    New-Check -Name 'python_link.as bridge' -Passed ($pluginHash -eq $expectedPluginSha256) -Detail "python_link.as SHA-256: $pluginHash"
+    New-Check -Name 'python_link.as loopback listener' -Passed ([bool]$bridgeListener) -Detail 'Expected 127.0.0.1:8478 while TrackMania is running.'
     New-Check -Name 'Python runtime' -Passed $pythonReady -Detail $pythonDetail.Trim()
 )
 

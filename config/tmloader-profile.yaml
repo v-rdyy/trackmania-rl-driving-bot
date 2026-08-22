@@ -1,6 +1,7 @@
 program:
   id: TmForever
   version: 2.12.0
+args: '/configstring="set unfocused_fps_limit false; set auto_reload_plugins true"'
 mods:
   - id: TMInterface
     version: 2.2.1

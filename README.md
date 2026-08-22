@@ -9,7 +9,8 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). Work is currentl
 - TrackMania ModLoader is installed.
 - TMInterface 2.2.1 is installed and pinned in the active ModLoader profile.
 - Python 3.11.9 and the pinned Phase 0 dependencies are installed in `.venv`.
-- The audited `python_link.as` loopback bridge and Python protocol client are installed; live game, telemetry, input, and accelerated-time verification are next.
+- The audited `python_link.as` bridge is live on `127.0.0.1:8478`; its Python handshake, immediate command path, graceful disconnect, and reconnect are verified.
+- Full-lap telemetry, scripted input, and accelerated-time verification remain Phase 0 exit checks.
 
 Run the non-mutating local audit from PowerShell:
 

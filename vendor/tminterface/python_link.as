@@ -29,7 +29,8 @@ enum MessageType {
 
 const bool debug = false;
 const string HOST = "127.0.0.1";
-uint16 PORT;
+const uint16 DEFAULT_PORT = 8478;
+uint16 PORT = DEFAULT_PORT;
 uint RESPONSE_TIMEOUT = 2000;
 int next_frame_requested_H = -1;
 int next_frame_requested_W = -1;
@@ -38,10 +39,18 @@ bool on_connect_queued = false;
 auto@ simManager = GetSimulationManager();
 
 void Init_Socket(){
+    if (PORT == 0) {
+        PORT = DEFAULT_PORT;
+    }
     if (@sock is null) {
         @sock = Net::Socket();
-        log("Port set to "+PORT);
-        sock.Listen(HOST, PORT);
+        if (sock.Listen(HOST, PORT)) {
+            log("Python Link listening on " + HOST + ":" + PORT, Severity::Success);
+        }
+        else {
+            log("Python Link failed to listen on " + HOST + ":" + PORT, Severity::Error);
+            @sock = null;
+        }
     }
 }
 
@@ -196,7 +205,9 @@ int HandleMessage()
             if(debug){
                 print("Server: command "+command+" received");
             }
-            ExecuteCommand(command);
+            CommandList commandList;
+            commandList.Content = command;
+            commandList.Process(CommandListProcessOption::ExecuteImmediately);
             break;
         }
 
@@ -321,14 +332,23 @@ void OnConnect(){
 
 void OnQueueProcessed(int fromTime, int toTime, const string&in commandLine, const array<string>&in args)
 {
-    PORT = uint16(GetVariableDouble("custom_port"));
-    log("Port donadigo" + GetVariableDouble("custom_port"));
+    uint16 configuredPort = uint16(GetVariableDouble("custom_port"));
+    if (configuredPort == 0) {
+        configuredPort = DEFAULT_PORT;
+    }
+    if (configuredPort != PORT && @sock !is null) {
+        @clientSock = null;
+        @sock = null;
+    }
+    PORT = configuredPort;
     Init_Socket();
 }
 
 void Main()
 {
-    RegisterVariable("custom_port", 0);
+    RegisterVariable("custom_port", DEFAULT_PORT);
+    PORT = uint16(GetVariableDouble("custom_port"));
+    Init_Socket();
     RegisterCustomCommand("queue_processed", "Internal command", OnQueueProcessed);
 
     CommandList cmdList;
@@ -355,17 +375,25 @@ void OnGameStateChanged(TM::GameState state){
 
 void Render(){
     //Bluescreens if you print every Render()
-    auto @newSock = sock.Accept(0);
-    if (@newSock !is null) {
-        @clientSock = @newSock;
-        newSock.NoDelay = true;
-        log("Client connected (IP: " + clientSock.RemoteIP + ")");
-        if(GetCurrentGameState() != TM::GameState::StartUp){
-            OnConnect();
+    if (@sock is null) {
+        return;
+    }
+    if (@clientSock is null) {
+        auto @newSock = sock.Accept(100);
+        if (@newSock !is null) {
+            @clientSock = @newSock;
+            newSock.NoDelay = true;
+            log("Client connected (IP: " + clientSock.RemoteIP + ")");
+            if(GetCurrentGameState() != TM::GameState::StartUp){
+                OnConnect();
+            }
+            else{
+                on_connect_queued = true;
+            }
         }
-        else{
-            on_connect_queued = true;
-        }
+    }
+    else if (clientSock.Available > 0) {
+        HandleMessage();
     }
     if(next_frame_requested_H>=0){
         const auto@ frame = Graphics::CaptureScreenshot(vec2(next_frame_requested_W,next_frame_requested_H));
