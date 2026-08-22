@@ -1,6 +1,7 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Phases 0 and 1 complete. Phase 2 has not started.
+**Status:** Phases 0 and 1 complete. Phase 2 is in progress: reward v1 is
+complete and reward v2's hypothesis is pre-registered.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Target end state (from projected resume, this is what "done" looks like):**
