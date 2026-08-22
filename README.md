@@ -68,6 +68,10 @@ original outcomes:
 The fixed matrix and replay/video evidence protocol are documented in
 [`docs/video-evidence.md`](docs/video-evidence.md).
 
+The checksum-pinned V2 evidence/source bundle required before V3 is documented
+in [`docs/pre-v3-backup.md`](docs/pre-v3-backup.md). V3 remains gated on explicit
+owner approval of its pre-registered hypothesis and thresholds.
+
 Run the non-mutating local audit from PowerShell:
 
 ```powershell
