@@ -13,3 +13,19 @@ The Git history is part of the project's evidence. It must show the real sequenc
 
 Do not combine a session's unrelated completed units into a single catch-all commit.
 
+## Progress reporting discipline
+
+Every progress report to the project owner includes a concise **Notable moments**
+section. It may say that nothing qualifies, but it must not be silently omitted.
+Capture enough specifics to reconstruct the project narrative later:
+
+1. Debugging stories with the observed failure, its actual cause, the diagnostic
+   evidence that identified it, and the fix.
+2. Design decisions that weighed reasonable alternatives, including why the
+   selected tradeoff fit this project.
+3. Behavior that differed from expectations, whether helpful or harmful.
+4. Uncertainty or judgment calls that could benefit from another perspective,
+   with one sentence explaining why.
+
+Commit messages still describe the code or documentation change. Notable moments
+record why the work took its eventual shape and what was learned along the way.
