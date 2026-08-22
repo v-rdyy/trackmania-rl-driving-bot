@@ -8,7 +8,13 @@ Date: 2026-08-22
 
 Phase 1 observations require heading error, lateral offset, and ten look-ahead path points. The project scope permits either extracting track geometry or recording a clean manual lap.
 
-The verified Phase 0 A01 lap contains 361 finite samples over a completed `33.280`-second run. Its 360 consecutive segments are continuous: the largest is `12.355` units, the median is `7.182`, and there are no respawn or teleport jumps. The source JSON Lines file SHA-256 is `C8469209C0A91A1421F052DBF055A900C9A092E27AA8561C230D2A650CBDB0CC`.
+The verified Phase 0 A01 lap contains 361 finite samples over a completed
+`33.280`-second run. It was intentionally driven slowly and cautiously for clean
+telemetry, not as a PB attempt; the owner's actual A01 PB is `24.5s`. Its 360
+consecutive segments are continuous: the largest is `12.355` units, the median
+is `7.182`, and there are no respawn or teleport jumps. The source JSON Lines
+file SHA-256 is
+`C8469209C0A91A1421F052DBF055A900C9A092E27AA8561C230D2A650CBDB0CC`.
 
 ## Decision
 

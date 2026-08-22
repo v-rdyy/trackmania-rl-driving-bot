@@ -6,9 +6,17 @@ complete and reward v2's hypothesis is pre-registered.
 
 **Target end state (from projected resume, this is what "done" looks like):**
 
-> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state (speed, car-frame velocity, heading error, lateral offset, 10 look-ahead centerline points) instead of pixels. Iterated the reward through 3 documented versions with pre-registered hypotheses and failure analysis: a sparse finish-only reward never learned; a dense speed reward was exploited (agent looped and oscillated to farm speed without finishing); a clamped progress-along-centerline reward with stuck detection trained a finishing agent. Final agent: 92% finish rate over a 20-episode deterministic eval, best lap 35.2s vs. 34.1s human personal best; trained 6M steps at 6x accelerated game speed (~14h wall-clock), with reproducible results from tagged checkpoints.
+> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state (speed, car-frame velocity, heading error, lateral offset, 10 look-ahead centerline points) instead of pixels. Iterated the reward through 3 documented versions with pre-registered hypotheses and failure analysis: a sparse finish-only reward never learned; a dense speed reward was exploited (agent looped and oscillated to farm speed without finishing); a clamped progress-along-centerline reward with stuck detection trained a finishing agent. Final agent: 92% finish rate over a 20-episode deterministic eval, best lap 35.2s vs. 24.5s human personal best; trained 6M steps at 6x accelerated game speed (~14h wall-clock), with reproducible results from tagged checkpoints.
 
-Every phase below exists to get honestly to that paragraph. Numbers in the target (92%, 35.2s, 6M steps, 14h) are targets to hit, not numbers to fabricate. If actual results differ, the actual results are what go on the resume.
+Every phase below exists to get honestly to that paragraph. Numbers in the target
+(92%, 35.2s, 6M steps, 14h) are targets to hit, not numbers to fabricate. The
+`24.5s` human PB is a real measured comparison baseline, not a projected target.
+If actual agent results differ, the actual results are what go on the resume.
+
+The approximately 33-second manual lap used to capture the Phase 0 reference
+path was intentionally driven slowly and cautiously for clean telemetry. It was
+not a PB attempt and must never be used to claim that an agent nearly matched
+human performance.
 
 ---
 
@@ -129,7 +137,9 @@ Document the exact shape/normalization of this observation vector in code commen
 1. Full training run at target scale: aim for ~6M steps at 6x accelerated game speed per the target scope. Treat 6M/6x/~14h as a planning target, not a hard requirement, actual numbers depend on hardware and how training goes. If it converges earlier or needs more, that's fine, just document what actually happened.
 2. Checkpoint regularly during training (not just at the end) and tag checkpoints so any result is reproducible from a specific saved model.
 3. Run a deterministic evaluation: target scope uses a 20-episode deterministic eval for finish rate. Also record best lap time achieved.
-4. Get a human personal best lap time on the same track for comparison (this needs an actual human lap, not an assumed number).
+4. Compare against the owner's actual `24.5s` A01 personal best. Do not use the
+   intentionally cautious approximately 33-second telemetry lap as a performance
+   benchmark.
 5. Write up final real results: finish rate, best lap vs human PB, total training steps, wall-clock time, hardware used.
 6. Confirm reproducibility: from a tagged checkpoint, can you reload the model and get consistent eval results? Document the process for doing so.
 

@@ -26,6 +26,9 @@ Development history follows the rules in
   legacy compatibility mode.
 - The A01 driven reference line is provenance-pinned and resampled into 443 fixed-spacing points per Decision 0003.
 - The documented 26-value engineered observation is finite and progress-consistent across the full manual lap.
+- The owner's actual A01 human PB is `24.5s`. The `33.280s` manual telemetry lap
+  was intentionally slow and cautious for reference-path capture, not a
+  performance attempt or evidence that an agent is near human pace.
 - TMInterface snapshot rewind is live-verified as the reliable Phase 1 episode-reset primitive.
 - The Gymnasium wrapper completed 20 consecutive live episodes and 100 finite
   steps with deterministic resets and per-step raw-action auditing.

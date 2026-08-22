@@ -53,6 +53,9 @@ Last updated: 2026-08-22
 
 - The first full A01 manual lap produced 361 JSON Lines records in `artifacts/telemetry/phase0_manual_lap.jsonl`; the ignored local evidence file SHA-256 is `C8469209C0A91A1421F052DBF055A900C9A092E27AA8561C230D2A650CBDB0CC`.
 - All position, velocity, rotation-matrix, and yaw/pitch/roll values are finite. Race times are monotonic from `-2600` through `33280` ms, with 360 unique timestamps across 361 samples.
+- The `33.280s` finish was an intentionally slow, cautious instrumentation lap
+  for clean reference-path telemetry, not a PB attempt. The owner's actual A01
+  human PB is `24.5s`; agent performance comparisons must use that value.
 - Position spans are approximately `[967.077, 104.026, 554.008]`, traced path length is `2206.540`, velocity magnitude ranges from `0.000` to `123.046`, and displayed speed ranges from `0` to `442`.
 - Yaw/pitch/roll spans are approximately `[6.257191, 1.078489, 0.353209]`, and the maximum rotation-matrix change from the starting orientation is `2.828427`.
 - A live post-lap bridge query returned `race_finished=True`, confirming the sample reaches a completed race rather than only a partial drive.
