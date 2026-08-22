@@ -194,6 +194,7 @@ class LiveTmiSessionTests(unittest.TestCase):
         initial_state = state(x=20, z=0, speed=100, race_time=1000)
         countdown_states = iter(
             [
+                state(x=0, z=0, speed=0, race_time=1000),
                 state(x=0, z=0, speed=0, race_time=-200),
                 state(x=0, z=0, speed=0, race_time=-100),
                 state(x=0, z=0, speed=0, race_time=0),
@@ -225,6 +226,8 @@ class LiveTmiSessionTests(unittest.TestCase):
                 ("respond", MessageType.SC_RUN_STEP_SYNC),
                 ("input", 0.0, 0.0, 0.0),
                 ("respond", MessageType.SC_RUN_STEP_SYNC),
+                ("input", 0.0, 0.0, 0.0),
+                ("respond", MessageType.SC_RUN_STEP_SYNC),
             ],
         )
 
@@ -249,7 +252,7 @@ class LiveTmiSessionTests(unittest.TestCase):
 
         session._wait_for_run_step = stalled_countdown_step
 
-        with self.assertRaisesRegex(RuntimeError, "countdown did not finish"):
+        with self.assertRaisesRegex(RuntimeError, "countdown transition"):
             session.prepare()
 
     def test_prepare_can_preserve_current_state_when_auto_respawn_disabled(self) -> None:

@@ -104,6 +104,18 @@ The next implementation must observe the negative countdown transition before
 accepting a later nonnegative callback, rather than merely testing `>= 0` or
 weakening the determinism threshold.
 
+The transition-aware implementation passed the same 20-episode live test without
+a manual Delete press. It ignored the stale positive callback, observed negative
+race time, held neutral input until a later callback reached zero, and captured
+the snapshot there. Every reset then began at race time `100`, speed `0`, and
+effectively zero progress/lateral offset. All 100 actions were finite and valid,
+and the maximum reset observation delta was `0.000000000`. The ignored evidence
+hashes are
+`4724F8676263B9FC982B8B53D717794EF112C13F3BA77ADB23E47CFBB3D4B87D`
+for the action log and
+`905BAC759BD0BC6B0F167BEDDFD196A36A0870264197BBF124BBF5658BB124C3`
+for the summary. Manual Delete-key setup is no longer required once A01 is loaded.
+
 The reliability smoke test ran 20 consecutive live episodes with a deliberately
 short 500 ms timeout, producing 100 finite `reset()`/`step()` interactions. All
 100 raw `[steer, throttle, brake]` actions were finite and in range before the

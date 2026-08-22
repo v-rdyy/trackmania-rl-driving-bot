@@ -109,6 +109,7 @@ class LiveTmiSession:
             self.client.give_up()
             if self.config.max_initial_respawn_steps <= 0:
                 raise ValueError("max_initial_respawn_steps must be positive")
+            countdown_observed = False
             for _ in range(self.config.max_initial_respawn_steps):
                 self.client.set_continuous_input(
                     steer=0.0,
@@ -120,11 +121,14 @@ class LiveTmiSession:
                 self._wait_for_run_step()
                 if self._current_race_time is None:
                     raise RuntimeError("respawn callback did not include race time")
-                if self._current_race_time >= 0:
+                if self._current_race_time < 0:
+                    countdown_observed = True
+                elif countdown_observed:
                     break
             else:
                 raise RuntimeError(
-                    "initial respawn countdown did not finish within "
+                    "initial respawn did not complete a negative-to-nonnegative "
+                    "countdown transition within "
                     f"{self.config.max_initial_respawn_steps} steps"
                 )
         return self._current_state
