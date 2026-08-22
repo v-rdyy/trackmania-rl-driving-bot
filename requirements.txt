@@ -1,7 +1,7 @@
-# Phase 0 base environment. The TMInterface transport dependency is deliberately
-# omitted until docs/decisions/0001-tminterface-bridge.md is approved.
+# Phase 0 environment. The legacy Python package is used only as the wire-protocol
+# client behind the approved TMInterface 2.2.1 AngelScript loopback bridge.
 stable-baselines3[extra]==2.9.0
 gymnasium==1.3.0
 numpy==2.4.6
 tensorboard==2.21.0
-
+tminterface==1.0.2
