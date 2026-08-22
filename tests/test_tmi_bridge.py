@@ -204,6 +204,20 @@ class TmiBridgeClientTests(unittest.TestCase):
             server.recv(4), struct.pack("<i", MessageType.C_GIVE_UP)
         )
 
+    def test_prevent_simulation_finish_sends_protocol_request(self) -> None:
+        server, client_socket = socket.socketpair()
+        self.addCleanup(server.close)
+        client = TmiBridgeClient()
+        client._socket = client_socket
+        self.addCleanup(client_socket.close)
+
+        client.prevent_simulation_finish()
+
+        self.assertEqual(
+            server.recv(4),
+            struct.pack("<i", MessageType.C_PREVENT_SIMULATION_FINISH),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

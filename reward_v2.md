@@ -127,6 +127,24 @@ reward, termination, action, policy, seed, or training-budget setting. The
 - attempt-five TensorBoard event:
   `7D2656E33EE8DD00D5CAD51DEF700D6F771A92A8A712E72BDEB6B456167D4F68`.
 
+Attempt six proved the 30-second response timeout across four complete PPO
+rollouts, then collected `8,564` interactions and another finish before timing
+out at model timestep `108,564`. The visible game state supplied the real cause:
+TrackMania had left the active simulation for its post-race results screen. The
+environment detected and logged the finish but did not invoke the bridge's
+existing `C_PREVENT_SIMULATION_FINISH` command before its next snapshot rewind.
+Finishes now still terminate the RL episode, but the session explicitly prevents
+the game transition so `reset()` can rewind within the active simulation. This
+fix changes neither reward nor terminal classification. The `8,564` unsaved
+interactions will also be replayed from the 100k checkpoint.
+
+- finish-results-screen manifest:
+  `FE65A8EB60363B32C808506D8BBAFBC9EE787EB27A449A9B81D46D815625ED06`;
+- cumulative Monitor through attempt six:
+  `3193A1237CBA4AB2A0B87F3386CE34215A2F6461001A62B9F71ADC8BF374D1BB`;
+- attempt-six TensorBoard event:
+  `9A6301CF2ACAFC4CEAE44C7CE36A0B4DFB6E62B6C17BABDF764E7DA154B4BEC8`.
+
 ## Actual outcome
 
 Pending. Formal training will resume from the preserved 100,000-step checkpoint.

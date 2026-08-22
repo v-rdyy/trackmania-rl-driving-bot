@@ -114,3 +114,13 @@ long the plugin waits for Python between callbacks; the fixed 45-second episode
 timeout and every experimental parameter above remain unchanged. Replay the
 6,144 unsaved attempt-five interactions from the same 100,000-step checkpoint
 and include them in discarded-step accounting.
+
+Attempt six crossed four rollout boundaries with the longer response timeout,
+then exposed a separate success-path defect after its first retained-window
+finish: TrackMania eventually entered the post-race results screen, where no
+simulation callbacks exist. On every positive `race_finished` query, invoke
+TMInterface's `PreventSimulationFinish` before returning the terminal transition
+to Gymnasium. PPO still observes an ordinary terminated episode and the reward
+contract remains exact; only the game-side menu transition is suppressed so the
+next environment reset can rewind the start snapshot. Replay the 8,564 unsaved
+attempt-six interactions and retain its finish as discarded-window evidence.
