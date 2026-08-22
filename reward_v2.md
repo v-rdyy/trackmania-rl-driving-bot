@@ -145,6 +145,26 @@ interactions will also be replayed from the 100k checkpoint.
 - attempt-six TensorBoard event:
   `9A6301CF2ACAFC4CEAE44C7CE36A0B4DFB6E62B6C17BABDF764E7DA154B4BEC8`.
 
+Attempt seven live-verified the finish protection: it logged two finishes and
+continued training after both without entering the results screen. It later
+timed out inside `reset()` at model timestep `106,308`, after `6,308` unsaved
+interactions. TMInterface's log showed lap-count messages during snapshot
+rewinds. The bridge was opening those as nested synchronous exchanges while an
+outer run-step acknowledgement was already pending; the nested wait can consume
+that outer acknowledgement, leaving Python and the plugin waiting on different
+message types. Checkpoint and lap counts already exist in every full simulation
+snapshot and are not used as separate environment observations, so the bridge
+now suppresses those redundant callback exchanges. Run-step and connect
+callbacks remain synchronous. Attempt seven's unsaved interactions will be
+replayed and included in final accounting.
+
+- nested-callback reset manifest:
+  `052F90C0FA08B86055D8DC72D7354A8BC6CD9771E1C032205BDC397DF67B418B`;
+- cumulative Monitor through attempt seven:
+  `AC5372442FA46A05A05783B9DA38C7EC49027C7F90E6AEB65BF9355D5DAAAC49`;
+- attempt-seven TensorBoard event:
+  `E6398F5D01B284B0192ECF70E10039DF9A090EF6C42F119BC9D37100569DD1F2`.
+
 ## Actual outcome
 
 Pending. Formal training will resume from the preserved 100,000-step checkpoint.

@@ -124,3 +124,13 @@ to Gymnasium. PPO still observes an ordinary terminated episode and the reward
 contract remains exact; only the game-side menu transition is suppressed so the
 next environment reset can rewind the start snapshot. Replay the 8,564 unsaved
 attempt-six interactions and retain its finish as discarded-window evidence.
+
+Attempt seven confirmed the finish protection by continuing after two finishes,
+then exposed a nested callback deadlock during a later snapshot reset. TMInterface
+can invoke checkpoint/lap callbacks from inside `RewindToState` while the plugin
+is already synchronously waiting for the outer run-step acknowledgement. The
+nested wait can consume that outer acknowledgement and leave each side waiting
+for a different response. Suppress the plugin's redundant checkpoint/lap socket
+callbacks; their state remains available in every simulation snapshot and the
+environment does not use them as separate observations. Preserve and replay the
+6,308 unsaved attempt-seven interactions without changing the experiment.

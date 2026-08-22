@@ -342,31 +342,15 @@ void OnRunStep(SimulationManager@ simManager){
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int current, int target){
-    if (@clientSock is null) {
-        return;
-    }
-    if(debug){
-        print("Server: OnCheckpointCountChanged");
-    }
-
-    clientSock.Write(MessageType::SCCheckpointCountChangedSync);
-    clientSock.Write(current);
-    clientSock.Write(target);
-    WaitForResponse(MessageType::SCCheckpointCountChangedSync);
+    // A snapshot rewind can trigger this callback while OnRunStep is already
+    // synchronously waiting for Python. A second synchronous exchange can
+    // consume the outer run-step acknowledgement and deadlock both sides.
+    // Python reads checkpoint state from each simulation snapshot instead.
 }
 
 void OnLapCountChanged(SimulationManager@ simManager, int current, int target){
-    if (@clientSock is null) {
-        return;
-    }
-    if(debug){
-        print("Server: OnLapCountChanged");
-    }
-
-    clientSock.Write(MessageType::SCLapCountChangedSync);
-    clientSock.Write(current);
-    clientSock.Write(target);
-    WaitForResponse(MessageType::SCLapCountChangedSync);
+    // See OnCheckpointCountChanged. Lap state is also present in snapshots,
+    // so suppressing this redundant nested callback loses no RL observation.
 }
 
 void OnConnect(){
