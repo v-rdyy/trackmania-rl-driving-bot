@@ -1,6 +1,9 @@
 # Trackmania RL Driving Bot
 
-This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: environment and tooling verification is complete.** Phase 1 has started with the owner-approved continuous action contract in [`Decision 0002`](docs/decisions/0002-continuous-action-space.md). Development history follows the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phases 0 and 1
+are complete.** The live Gymnasium loop and bounded PPO/TensorBoard smoke test
+have passed; Phase 2 reward experiments have not started. Development history
+follows the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Current status
 
@@ -19,6 +22,15 @@ This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phase 0: envir
 - TMInterface snapshot rewind is live-verified as the reliable Phase 1 episode-reset primitive.
 - The Gymnasium wrapper completed 20 consecutive live episodes and 100 finite
   steps with deterministic resets and per-step raw-action auditing.
+- A 2,048-step PPO smoke run completed at roughly 59 environment steps per
+  second, wrote verified TensorBoard reward/episode-length metrics, and audited
+  every policy and environment action without hidden clipping per Decision 0005.
+
+Run the Phase 1 PPO smoke test from a clean, stationary A01 start:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\train_phase1_smoke.py
+```
 
 Run the non-mutating local audit from PowerShell:
 
