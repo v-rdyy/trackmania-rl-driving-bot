@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from bisect import bisect_left
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -43,6 +44,10 @@ class EnvironmentConfig:
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
     max_initial_respawn_steps: int = 100
+    # Disabled for V0-V2. V3 enables this with its pre-registered 2,000 ms window.
+    stuck_window_ms: int | None = None
+    stuck_progress_gain_units: float = 1.0
+    stuck_world_distance_units: float = 2.0
     # Compatibility only for models trained before the signed Gas direction was
     # verified. New training must use the corrected default (False).
     legacy_reversed_pedal_mapping: bool = False
@@ -322,6 +327,21 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
     ) -> None:
         super().__init__()
         self.config = config or EnvironmentConfig()
+        if self.config.stuck_window_ms is not None:
+            if self.config.stuck_window_ms <= 0:
+                raise ValueError("stuck_window_ms must be positive when enabled")
+            if (
+                not math.isfinite(self.config.stuck_progress_gain_units)
+                or self.config.stuck_progress_gain_units <= 0.0
+            ):
+                raise ValueError("stuck_progress_gain_units must be finite and positive")
+            if (
+                not math.isfinite(self.config.stuck_world_distance_units)
+                or self.config.stuck_world_distance_units <= 0.0
+            ):
+                raise ValueError(
+                    "stuck_world_distance_units must be finite and positive"
+                )
         self.reference_path = reference_path or ReferencePath.from_csv(
             DEFAULT_REFERENCE_PATH
         )
@@ -348,6 +368,8 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._step = 0
         self._episode_start_race_time = 0
         self._last_diagnostics: ObservationDiagnostics | None = None
+        self._last_position: np.ndarray | None = None
+        self._stuck_history: list[tuple[int, float, float]] = []
 
     def _observation(
         self, state: object
@@ -380,7 +402,45 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._step = 0
         self._episode_start_race_time = int(state.race_time)
         self._last_diagnostics = diagnostics
+        self._last_position = np.asarray(state.position, dtype=np.float64).copy()
+        self._stuck_history = [(0, diagnostics.progress, 0.0)]
         return observation, self._info(state, diagnostics)
+
+    def _stuck_status(
+        self,
+        *,
+        elapsed_ms: int,
+        state: object,
+        diagnostics: ObservationDiagnostics,
+    ) -> tuple[bool, float | None, float | None]:
+        """Evaluate V3's frozen rolling-window truncation without shaping reward."""
+        position = np.asarray(state.position, dtype=np.float64)
+        if self._last_position is None or not self._stuck_history:
+            raise RuntimeError("stuck detection requires reset position history")
+        cumulative_distance = self._stuck_history[-1][2] + float(
+            np.linalg.norm(position - self._last_position)
+        )
+        self._last_position = position.copy()
+        self._stuck_history.append(
+            (elapsed_ms, diagnostics.progress, cumulative_distance)
+        )
+
+        window_ms = self.config.stuck_window_ms
+        if window_ms is None:
+            return False, None, None
+        target_ms = elapsed_ms - window_ms
+        history_times = [sample[0] for sample in self._stuck_history]
+        start = bisect_left(history_times, target_ms)
+        start_time, start_progress, start_distance = self._stuck_history[start]
+        if elapsed_ms - start_time < window_ms:
+            return False, None, None
+        progress_gain = diagnostics.progress - start_progress
+        world_distance = cumulative_distance - start_distance
+        stuck = bool(
+            progress_gain < self.config.stuck_progress_gain_units
+            and world_distance < self.config.stuck_world_distance_units
+        )
+        return stuck, progress_gain, world_distance
 
     def _validated_action(self, action: np.ndarray) -> np.ndarray:
         raw = np.asarray(action)
@@ -411,7 +471,17 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
         fallen = diagnostics.vertical_offset < -self.config.max_vertical_drop
         terminated = bool(result.race_finished)
-        truncated = bool(not terminated and (timed_out or off_track or fallen))
+        stuck_candidate, stuck_progress_gain, stuck_world_distance = (
+            self._stuck_status(
+                elapsed_ms=elapsed_ms,
+                state=result.state,
+                diagnostics=diagnostics,
+            )
+        )
+        stuck = bool(not terminated and stuck_candidate)
+        truncated = bool(
+            not terminated and (timed_out or off_track or fallen or stuck)
+        )
         if self._last_diagnostics is None:
             raise RuntimeError("step requires reset diagnostics")
         transition = RewardTransition(
@@ -438,6 +508,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "timeout": timed_out,
                 "off_track": off_track,
                 "fallen": fallen,
+                "stuck": stuck,
+                "stuck_window_progress_gain": stuck_progress_gain,
+                "stuck_window_world_distance": stuck_world_distance,
                 "race_finished": terminated,
                 "reward_function": self.reward_name,
             }
@@ -472,6 +545,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "timeout": timed_out,
                     "off_track": off_track,
                     "fallen": fallen,
+                    "stuck": stuck,
+                    "stuck_window_progress_gain": stuck_progress_gain,
+                    "stuck_window_world_distance": stuck_world_distance,
                     "race_finished": terminated,
                     "progress": diagnostics.progress,
                     "lateral_offset": diagnostics.lateral_offset,

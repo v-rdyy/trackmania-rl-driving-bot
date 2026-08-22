@@ -19,7 +19,10 @@ from trackmania_rl.env import (
     TrackmaniaEnv,
 )
 from trackmania_rl.observations import ReferencePath
-from trackmania_rl.rewards import sparse_finish_reward
+from trackmania_rl.rewards import (
+    clamped_forward_progress_reward,
+    sparse_finish_reward,
+)
 from trackmania_rl.tmi_bridge import MessageType
 
 
@@ -294,6 +297,141 @@ class TrackmaniaEnvTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid_reward returned nan"):
             env.step(np.asarray([0.0, 0.0, 0.0], dtype=np.float32))
         env.close()
+
+    def test_v3_stuck_window_truncates_stationary_episode_at_two_seconds(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=time_ms)
+                for time_ms in range(0, 2100, 100)
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(stuck_window_ms=2_000),
+            reference_path=self.path,
+            session=session,
+            reward_function=clamped_forward_progress_reward,
+        )
+        env.reset()
+
+        final_result = None
+        for _ in range(20):
+            final_result = env.step(
+                np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+            )
+        env.close()
+
+        assert final_result is not None
+        _, reward, terminated, truncated, info = final_result
+        self.assertEqual(reward, 0.0)
+        self.assertFalse(terminated)
+        self.assertTrue(truncated)
+        self.assertTrue(info["stuck"])
+        self.assertEqual(info["elapsed_ms"], 2_000)
+        self.assertEqual(info["stuck_window_progress_gain"], 0.0)
+        self.assertEqual(info["stuck_window_world_distance"], 0.0)
+
+    def test_v3_world_motion_prevents_false_stuck_truncation(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=index * 0.2, speed=0, race_time=index * 100)
+                for index in range(21)
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(stuck_window_ms=2_000),
+            reference_path=self.path,
+            session=session,
+            reward_function=clamped_forward_progress_reward,
+        )
+        env.reset()
+
+        final_result = None
+        for _ in range(20):
+            final_result = env.step(
+                np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+            )
+        env.close()
+
+        assert final_result is not None
+        _, _, terminated, truncated, info = final_result
+        self.assertFalse(terminated)
+        self.assertFalse(truncated)
+        self.assertFalse(info["stuck"])
+        self.assertAlmostEqual(info["stuck_window_progress_gain"], 0.0)
+        self.assertAlmostEqual(info["stuck_window_world_distance"], 4.0)
+
+    def test_v3_progress_prevents_false_stuck_truncation(self) -> None:
+        session = FakeSession(
+            [
+                state(x=index * 0.075, z=0, speed=0, race_time=index * 100)
+                for index in range(21)
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(stuck_window_ms=2_000),
+            reference_path=self.path,
+            session=session,
+            reward_function=clamped_forward_progress_reward,
+        )
+        env.reset()
+
+        final_result = None
+        for _ in range(20):
+            final_result = env.step(
+                np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+            )
+        env.close()
+
+        assert final_result is not None
+        _, _, terminated, truncated, info = final_result
+        self.assertFalse(terminated)
+        self.assertFalse(truncated)
+        self.assertFalse(info["stuck"])
+        self.assertAlmostEqual(info["stuck_window_progress_gain"], 1.5)
+        self.assertAlmostEqual(info["stuck_window_world_distance"], 1.5)
+
+    def test_v3_finish_takes_precedence_over_stuck_candidate(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=0, z=0, speed=0, race_time=2_000),
+            ],
+            race_finished=True,
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(stuck_window_ms=2_000),
+            reference_path=self.path,
+            session=session,
+            reward_function=clamped_forward_progress_reward,
+        )
+        env.reset()
+
+        _, _, terminated, truncated, info = env.step(
+            np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertTrue(terminated)
+        self.assertFalse(truncated)
+        self.assertFalse(info["stuck"])
+
+    def test_stuck_thresholds_are_validated_when_enabled(self) -> None:
+        session = FakeSession([state(x=0, z=0, speed=0, race_time=0)])
+        with self.assertRaisesRegex(ValueError, "stuck_window_ms"):
+            TrackmaniaEnv(
+                config=EnvironmentConfig(stuck_window_ms=0),
+                reference_path=self.path,
+                session=session,
+            )
+        with self.assertRaisesRegex(ValueError, "stuck_progress_gain_units"):
+            TrackmaniaEnv(
+                config=EnvironmentConfig(
+                    stuck_window_ms=2_000,
+                    stuck_progress_gain_units=float("nan"),
+                ),
+                reference_path=self.path,
+                session=session,
+            )
 
 
 class LiveTmiSessionTests(unittest.TestCase):
