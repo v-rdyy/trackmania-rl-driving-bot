@@ -131,6 +131,10 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertEqual(record["raw_action"], [0.5, 0.75, 0.25])
             self.assertTrue(record["finite"])
             self.assertTrue(record["within_range"])
+            self.assertFalse(record["timeout"])
+            self.assertFalse(record["off_track"])
+            self.assertFalse(record["fallen"])
+            self.assertFalse(record["race_finished"])
 
     def test_invalid_action_is_logged_and_rejected_before_session(self) -> None:
         session = FakeSession([state(x=0, z=0, speed=0, race_time=0)])

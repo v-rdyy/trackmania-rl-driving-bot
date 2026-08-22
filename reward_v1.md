@@ -89,8 +89,23 @@ Post-processing failed after collection with `KeyError: 'timeout'` because the
 action log recorded generic truncation plus telemetry but omitted explicit
 terminal-reason fields. The full 8,192-record log is intact with SHA-256
 `490B73E375FF52F800C107B74234F55C6DDC5108082E6FEAF006823468C7E3B7`.
-This is a reporting-schema bug, not a lost trajectory; formal training remains
-stopped until the schema is fixed and the probe reruns cleanly.
+This is a reporting-schema bug, not a lost trajectory.
+
+After adding explicit `timeout`, `off_track`, `fallen`, and `race_finished`
+fields to every action record, the same seed-42 stochastic PPO probe reran
+cleanly for 8,192 steps. It produced 118 episode boundaries: 110 vertical falls,
+eight timeouts, zero horizontal off-track truncations, and zero finishes. The
+minimum vertical offset was `-12.196`; maximum path progress was `119.072`, and
+maximum displayed speed was `102`. Every action was finite, in range, and
+affine-consistent, with no hidden clipping.
+
+This clean reproduction validates the 10-unit local vertical boundary for the
+A01 start drop. Falling remains a zero-reward truncation, so this is an
+environment validity fix rather than reward shaping. Ignored local evidence
+hashes:
+
+- action log: `69030B4ADC0294BD27B87AEC57128F10E797E8534BC5D1DE8284A059DF04295A`;
+- summary: `FF6329BED2C227F0B7D3CCDA82DD83E428AF5455208B2C0215078B2FBA0C5879`.
 
 ## Evaluation plan
 
@@ -106,4 +121,5 @@ stopped until the schema is fixed and the probe reruns cleanly.
 
 ## Actual outcome
 
-Pending. No reward-v1 training has started.
+Pending. The invalid preliminary run is excluded; formal reward-v1 training will
+restart from zero with the verified vertical fall boundary.

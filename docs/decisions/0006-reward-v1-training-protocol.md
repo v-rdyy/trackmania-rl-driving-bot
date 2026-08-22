@@ -90,3 +90,10 @@ failure without classifying normal on-track motion from the fixed-action probe.
 Its final summary initially failed because detailed action records lacked the
 specific terminal-reason fields; preserve that schema failure and rerun the probe
 after adding those fields before formal training.
+
+The corrected probe reran the same 8,192-step seed-42 stochastic PPO path and
+completed successfully. Of 118 episode boundaries, 110 were vertical falls and
+eight were timeouts; there were zero horizontal off-track truncations and zero
+finishes. Minimum vertical offset was `-12.196`, while every action remained
+finite and in range. This clean reproduction verifies the 10-unit boundary for
+the observed A01 grass drop. Formal reward-v1 training may now restart from zero.
