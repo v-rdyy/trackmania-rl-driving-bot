@@ -132,6 +132,19 @@ def focus_window(target: WindowTarget) -> None:
     user32.SetForegroundWindow(target.handle)
 
 
+def restart_trackmania_race() -> WindowTarget:
+    """Send TrackMania's Delete restart key before a checkpoint stage."""
+    target = find_trackmania_window()
+    focus_window(target)
+    user32 = ctypes.windll.user32
+    if not user32.PostMessageW(target.handle, 0x0100, 0x2E, 0):  # WM_KEYDOWN
+        raise VideoCaptureError("could not send the TrackMania restart key down")
+    if not user32.PostMessageW(target.handle, 0x0101, 0x2E, 0):  # WM_KEYUP
+        raise VideoCaptureError("could not send the TrackMania restart key up")
+    time.sleep(0.75)
+    return target
+
+
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     filename = "segoeuib.ttf" if bold else "segoeui.ttf"
     path = Path("C:/Windows/Fonts") / filename

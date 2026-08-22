@@ -50,6 +50,11 @@ With A01 Race loaded and TMInterface enabled:
 The resulting `.txt` files are TMInterface input replays. Keeping them is faster
 and smaller than recording every checkpoint directly to video, and they can be
 loaded later through TMInterface's `load` command for consistent rendering.
+Before every checkpoint stage, the collector focuses the verified `TmForever`
+window and sends TrackMania's Delete restart key. This avoids an intermittent
+handoff where a new bridge client could not start the pre-race countdown after
+the preceding stage's intercepted finish. Snapshot rewind remains responsible
+for repeated episodes within one stage.
 
 ## Optional direct video capture
 

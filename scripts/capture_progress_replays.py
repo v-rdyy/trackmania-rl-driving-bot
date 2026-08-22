@@ -27,7 +27,7 @@ from capture_progress_videos import (
 )
 from trackmania_rl.env import EnvironmentConfig, LiveTmiSession, TrackmaniaEnv
 from trackmania_rl.tmi_bridge import ProtocolError
-from trackmania_rl.video_capture import sha256
+from trackmania_rl.video_capture import restart_trackmania_race, sha256
 
 DEFAULT_PLAN = WORKSPACE_ROOT / "config" / "video_progression.json"
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "artifacts" / "replays" / "progression"
@@ -77,6 +77,7 @@ def capture_stage(
 ) -> dict[str, Any]:
     stage_id = str(stage["id"])
     take_dir = next_take_directory(output_root, stage_id)
+    restart_trackmania_race()
     action_log = take_dir / "actions.jsonl"
     reward_function = REWARDS[str(stage["reward"])]
     env = TrackmaniaEnv(
