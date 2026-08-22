@@ -74,3 +74,19 @@ Immediately before training, re-query the active Windows plan and confirm that
 automatic sleep and hibernation remain disabled on AC and battery. Do not start
 if either timer is nonzero. Manual sleep can still suspend the host and must be
 avoided for the duration of the run.
+
+## Mid-run amendment: checkpointed callback-timeout recovery
+
+Attempt one reached model timestep `117,423`, then timed out after 30 seconds
+without a new TMInterface simulation callback. This was not a socket-aborted
+sleep failure: automatic sleep/hibernate remained disabled, Windows recorded no
+power transition or TrackMania application fault, and the game process remained
+responsive. Preserve the failed segment and resume from the valid 100,000-step
+checkpoint without changing the reward, environment, policy, seed, timeout, or
+training budget.
+
+The 17,423 interactions after the checkpoint must be reported as replayed. The
+attempt-one Monitor includes one finish after the checkpoint; preserve it as
+observed discarded-window evidence, but do not claim that the resumed checkpoint
+contains that behavior. Combine numbered TensorBoard segments and retain the
+appended Monitor history in the final quantitative report.

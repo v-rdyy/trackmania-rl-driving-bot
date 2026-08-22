@@ -1,6 +1,6 @@
 # Reward v2: Dense speed
 
-Status: Hypothesis pre-registered; reward implementation verified; training not started
+Status: Hypothesis pre-registered; training resumes from a preserved 100k checkpoint
 
 Date pre-registered: 2026-08-22
 
@@ -64,6 +64,28 @@ episode lengths, reward curve shape, path progress, world distance/displacement,
 speed, steering changes, and terminal causes. Review the visible behavior for
 looping or oscillation rather than inferring it from reward alone.
 
+## Checkpointed callback-timeout interruption
+
+The first formal attempt stopped at model timestep `117,423` when the bridge
+socket remained open but delivered no new synchronous simulation callback for 30
+seconds. Automatic sleep and hibernation were still disabled, Windows logged no
+suspend/resume or TrackMania application fault, and `TmForever` remained alive
+and responsive afterward. The exact cause is unresolved and is recorded as a
+transient callback stall rather than attributed to 100x without evidence.
+
+Resume unchanged from the valid 100,000-step checkpoint, replaying 17,423 model
+interactions. The preserved attempt-one Monitor contains 357 episodes: one
+finish, 151 timeouts, 197 falls, and eight horizontal off-tracks. The finish
+occurred after the saved checkpoint, so it is evidence from a discarded training
+window and does not establish that the resumed 100k model retains a finishing
+policy. Final accounting must disclose the replay and include both TensorBoard
+segments. Ignored evidence hashes:
+
+- attempt-one failure manifest: `F7E0865B9EE4843CB54E149FA117CBC06BC6DAF69D7A685504DFE6A0807850A4`;
+- attempt-one Monitor copy: `83E4020424E5718AFB9842E39FDB2DAB02E55F4C26BD111B35E0F7E62D16F99D`;
+- 100,000-step checkpoint: `F9606CA5F114E48D98BFC47A02A68E69C13B97F301C5B5C6B143CFCDEF6BFF46`;
+- attempt-one TensorBoard event: `BF8C2E7BA2E56E1CD5288341AD876E1D4736CD33FE164A7E42B89034CD70D220`.
+
 ## Actual outcome
 
-Pending. No reward-v2 training has started.
+Pending. Formal training will resume from the preserved 100,000-step checkpoint.
