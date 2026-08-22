@@ -37,6 +37,7 @@ int next_frame_requested_H = -1;
 int next_frame_requested_W = -1;
 int on_step_period = 10;
 bool on_connect_queued = false;
+bool race_finished_pending = false;
 uint64 last_client_activity = 0;
 auto@ simManager = GetSimulationManager();
 
@@ -147,6 +148,7 @@ int HandleMessage()
             if(debug){
                 print("Server: Give up");
             }
+            race_finished_pending = false;
             if (simManager.InRace) {
                 simManager.GiveUp();
             }
@@ -169,6 +171,7 @@ int HandleMessage()
             if(debug){
                 print("Server: rewind message");
             }
+            race_finished_pending = false;
             if (simManager.InRace) {
                 SimulationState state(stateData);
                 simManager.RewindToState(state);
@@ -265,7 +268,10 @@ int HandleMessage()
         }
 
         case MessageType::CRaceFinished: {
-            const int is_race_finished = ((simManager.PlayerInfo.RaceFinished || simManager.TickTime>simManager.RaceTime)?1:0);
+            const int is_race_finished = ((race_finished_pending || simManager.PlayerInfo.RaceFinished || simManager.TickTime>simManager.RaceTime)?1:0);
+            if (is_race_finished > 0) {
+                race_finished_pending = false;
+            }
             if(debug){
                 print("Server: Answering race_finished with "+is_race_finished);
             }
@@ -342,10 +348,13 @@ void OnRunStep(SimulationManager@ simManager){
 }
 
 void OnCheckpointCountChanged(SimulationManager@ simManager, int current, int target){
-    // A snapshot rewind can trigger this callback while OnRunStep is already
-    // synchronously waiting for Python. A second synchronous exchange can
-    // consume the outer run-step acknowledgement and deadlock both sides.
-    // Python reads checkpoint state from each simulation snapshot instead.
+    // Prevent the game transition before it creates a result/record dialog.
+    // The one-shot flag preserves the terminal event for Python even though
+    // PreventSimulationFinish invalidates the game's last checkpoint time.
+    if (target > 0 && current >= target) {
+        race_finished_pending = true;
+        simManager.PreventSimulationFinish();
+    }
 }
 
 void OnLapCountChanged(SimulationManager@ simManager, int current, int target){

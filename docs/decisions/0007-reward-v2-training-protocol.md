@@ -118,12 +118,12 @@ and include them in discarded-step accounting.
 Attempt six crossed four rollout boundaries with the longer response timeout,
 then exposed a separate success-path defect after its first retained-window
 finish: TrackMania eventually entered the post-race results screen, where no
-simulation callbacks exist. On every positive `race_finished` query, invoke
-TMInterface's `PreventSimulationFinish` before returning the terminal transition
-to Gymnasium. PPO still observes an ordinary terminated episode and the reward
-contract remains exact; only the game-side menu transition is suppressed so the
-next environment reset can rewind the start snapshot. Replay the 8,564 unsaved
-attempt-six interactions and retain its finish as discarded-window evidence.
+simulation callbacks exist. The initial mitigation invoked
+`PreventSimulationFinish` after Python's positive `race_finished` query. PPO
+still observed an ordinary terminated episode and the reward contract remained
+exact, but later attempts showed that the command could arrive too late to stop
+all finish UI. Replay the 8,564 unsaved attempt-six interactions and retain its
+finish as discarded-window evidence.
 
 Attempt seven confirmed the finish protection by continuing after two finishes,
 then exposed a nested callback deadlock during a later snapshot reset. TMInterface
@@ -134,3 +134,14 @@ for a different response. Suppress the plugin's redundant checkpoint/lap socket
 callbacks; their state remains available in every simulation snapshot and the
 environment does not use them as separate observations. Preserve and replay the
 6,308 unsaved attempt-seven interactions without changing the experiment.
+
+Attempt eight was a zero-step setup failure: the no-opponent choice was
+highlighted but not confirmed, so A01 never entered active simulation. Attempt
+nine used the installed nested-callback fix, collected 3,042 interactions and a
+finish, then visibly stopped on the "new personal record" modal. Per
+TMInterface's API contract, move `PreventSimulationFinish` into the plugin's
+`OnCheckpointCountChanged` callback, before the game creates finish UI. Store a
+one-shot finish flag before invalidating the checkpoint and consume it from the
+next `race_finished` request. This retains Gymnasium termination semantics while
+keeping TrackMania in active simulation. Replay attempt nine and preserve both
+failed manifests.

@@ -133,10 +133,11 @@ out at model timestep `108,564`. The visible game state supplied the real cause:
 TrackMania had left the active simulation for its post-race results screen. The
 environment detected and logged the finish but did not invoke the bridge's
 existing `C_PREVENT_SIMULATION_FINISH` command before its next snapshot rewind.
-Finishes now still terminate the RL episode, but the session explicitly prevents
-the game transition so `reset()` can rewind within the active simulation. This
-fix changes neither reward nor terminal classification. The `8,564` unsaved
-interactions will also be replayed from the 100k checkpoint.
+The first corrective attempt invoked that command after Python observed a
+finish. This preserved the terminal classification and reward contract, but
+later evidence showed that this placement was too late to prevent every game UI
+transition. The `8,564` unsaved interactions will also be replayed from the 100k
+checkpoint.
 
 - finish-results-screen manifest:
   `FE65A8EB60363B32C808506D8BBAFBC9EE787EB27A449A9B81D46D815625ED06`;
@@ -145,8 +146,8 @@ interactions will also be replayed from the 100k checkpoint.
 - attempt-six TensorBoard event:
   `9A6301CF2ACAFC4CEAE44C7CE36A0B4DFB6E62B6C17BABDF764E7DA154B4BEC8`.
 
-Attempt seven live-verified the finish protection: it logged two finishes and
-continued training after both without entering the results screen. It later
+Attempt seven initially appeared to validate the late finish protection: it
+logged two finishes and continued training after both. It later
 timed out inside `reset()` at model timestep `106,308`, after `6,308` unsaved
 interactions. TMInterface's log showed lap-count messages during snapshot
 rewinds. The bridge was opening those as nested synchronous exchanges while an
@@ -164,6 +165,27 @@ replayed and included in final accounting.
   `AC5372442FA46A05A05783B9DA38C7EC49027C7F90E6AEB65BF9355D5DAAAC49`;
 - attempt-seven TensorBoard event:
   `E6398F5D01B284B0192ECF70E10039DF9A090EF6C42F119BC9D37100569DD1F2`.
+
+Attempt eight connected while the no-opponent dialog was only highlighted, not
+confirmed, and collected zero steps. Attempt nine began from a genuinely active
+A01 race with the nested callbacks suppressed, collected `3,042` unsaved
+interactions, and logged another finish. It then stalled with a visible "new
+personal record" modal. This disproved the assumption that a
+post-`race_finished` Python command was early enough. TMInterface's API requires
+`PreventSimulationFinish` inside `OnCheckpointCountChanged`, where it invalidates
+the last checkpoint time before the game stops simulation. The plugin now calls
+it there and stores a one-shot finish flag for Python, so Gymnasium still receives
+the terminal event while TrackMania never creates results/record UI. Lap and
+checkpoint callbacks remain free of nested socket exchanges.
+
+- opponent-dialog manifest:
+  `5B69B79B7F7E72D4CB7752CCA77244CF8760A1D986EE822CD8992F06B7A0E678`;
+- late-finish-prevention manifest:
+  `F349323C757A90AFD0621402D0CFC143E5F6739632A3258EBDB44034606EC19A`;
+- cumulative Monitor through attempt nine:
+  `5BD2B3F7A8F7D3578DCF8F0DE03A055930D9DA81459867F014D968D9E4FA5181`;
+- attempt-nine TensorBoard event:
+  `AEB931A694277E3D93177E2F5E3123180C1219447DC2BB3E0B9D8182539E2885`.
 
 ## Actual outcome
 

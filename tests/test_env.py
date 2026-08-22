@@ -103,9 +103,6 @@ class RecordingBridgeClient:
         self.calls.append("race_finished")
         return self.race_is_finished
 
-    def prevent_simulation_finish(self) -> None:
-        self.calls.append("prevent_simulation_finish")
-
     def set_continuous_input(self, *, steer, throttle, brake):
         self.calls.append(("input", steer, throttle, brake))
         return round(steer * 65536), round((throttle - brake) * 65536)
@@ -299,34 +296,6 @@ class TrackmaniaEnvTests(unittest.TestCase):
 
 
 class LiveTmiSessionTests(unittest.TestCase):
-    def test_advance_keeps_finished_race_in_simulation_for_reset(self) -> None:
-        session = LiveTmiSession(EnvironmentConfig())
-        client = RecordingBridgeClient()
-        client.race_is_finished = True
-        finished_state = state(x=100, z=0, speed=200, race_time=10_000)
-        session.client = client
-        session._connected = True
-        session._pending_step = True
-        session._current_state = finished_state
-        session._current_race_time = finished_state.race_time
-
-        def next_step() -> None:
-            session._pending_step = True
-            session._current_state = finished_state
-            session._current_race_time = finished_state.race_time
-
-        session._wait_for_run_step = next_step
-
-        result = session.advance(
-            np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
-        )
-
-        self.assertTrue(result.race_finished)
-        self.assertEqual(
-            client.calls[-2:],
-            ["race_finished", "prevent_simulation_finish"],
-        )
-
     def test_connect_callback_extends_timeout_before_training_work(self) -> None:
         config = EnvironmentConfig(
             simulation_speed=100.0,

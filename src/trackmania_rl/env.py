@@ -204,8 +204,6 @@ class LiveTmiSession:
         self._pending_step = False
         self._wait_for_run_step()
         race_finished = self.client.race_finished()
-        if race_finished:
-            self.client.prevent_simulation_finish()
         return SessionStep(
             state=self._current_state,
             race_time_ms=int(self._current_race_time),

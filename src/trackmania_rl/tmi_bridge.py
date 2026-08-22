@@ -181,11 +181,6 @@ class TmiBridgeClient:
 
         self._send_int32(MessageType.C_GIVE_UP)
 
-    def prevent_simulation_finish(self) -> None:
-        """Keep a finished run in simulation so the environment can rewind it."""
-
-        self._send_int32(MessageType.C_PREVENT_SIMULATION_FINISH)
-
     def rewind_to_state(self, state: SimStateData | bytes | bytearray) -> None:
         """Rewind to a simulation snapshot captured by ``get_simulation_state``."""
 

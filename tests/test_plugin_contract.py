@@ -24,6 +24,14 @@ class PythonLinkPluginContractTests(unittest.TestCase):
             self.assertNotIn("clientSock.Write", body)
             self.assertNotIn("WaitForResponse", body)
 
+        checkpoint_body = re.search(
+            r"void OnCheckpointCountChanged\([^)]*\)\{(?P<body>.*?)\n\}",
+            source,
+            re.DOTALL,
+        ).group("body")
+        self.assertIn("simManager.PreventSimulationFinish()", checkpoint_body)
+        self.assertIn("race_finished_pending = true", checkpoint_body)
+
 
 if __name__ == "__main__":
     unittest.main()
