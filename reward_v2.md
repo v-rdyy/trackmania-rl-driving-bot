@@ -1,6 +1,6 @@
 # Reward v2: Dense speed
 
-Status: Hypothesis pre-registered; implementation and training not started
+Status: Hypothesis pre-registered; reward implementation verified; training not started
 
 Date pre-registered: 2026-08-22
 
@@ -22,6 +22,22 @@ be revised after observing training or evaluation results.
 
 The implementation must be an isolated reward function passed into
 `TrackmaniaEnv`, not a conditional hardcoded into the environment.
+
+## Implementation verification
+
+`dense_speed_reward` is implemented in `src/trackmania_rl/rewards.py` as an
+isolated callable over `RewardTransition`. Unit coverage verifies that normal,
+finished, and truncated transitions all return exactly `display_speed / 1000`
+with no terminal adjustment.
+
+The live wiring check completed 20 timeout-truncated episodes and 100 steps.
+Every returned reward matched the same step's logged displayed speed divided by
+1000. Rewards ranged from `0.005` to `0.036`; terminal timeout steps retained
+their positive speed reward. All actions were finite/in range and reset
+observations were identical. Ignored local evidence hashes:
+
+- action log: `A3FF2542A2C9570824AEDA87F7F501F87D4475C1380EFD575441B9324F6D5FB6`;
+- summary: `51DE7425B47298247C2A7E395458C10670E0D2BF1138E755740F6E27E7E5CE57`.
 
 ## Host power preflight
 

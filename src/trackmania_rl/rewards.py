@@ -37,3 +37,8 @@ def phase1_smoke_reward(transition: RewardTransition) -> float:
 def sparse_finish_reward(transition: RewardTransition) -> float:
     """Reward v1: one on a finished race and zero for every other outcome."""
     return 1.0 if transition.terminated else 0.0
+
+
+def dense_speed_reward(transition: RewardTransition) -> float:
+    """Reward v2: normalized displayed speed with no terminal shaping."""
+    return transition.display_speed / 1000.0

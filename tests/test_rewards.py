@@ -10,6 +10,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 from trackmania_rl.observations import ObservationDiagnostics
 from trackmania_rl.rewards import (
     RewardTransition,
+    dense_speed_reward,
     phase1_smoke_reward,
     sparse_finish_reward,
 )
@@ -56,6 +57,17 @@ class RewardTests(unittest.TestCase):
         self.assertEqual(
             sparse_finish_reward(transition(terminated=True)),
             1.0,
+        )
+
+    def test_dense_speed_reward_has_no_terminal_shaping(self) -> None:
+        self.assertEqual(dense_speed_reward(transition(display_speed=123)), 0.123)
+        self.assertEqual(
+            dense_speed_reward(transition(display_speed=123, truncated=True)),
+            0.123,
+        )
+        self.assertEqual(
+            dense_speed_reward(transition(display_speed=123, terminated=True)),
+            0.123,
         )
 
 

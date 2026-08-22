@@ -14,7 +14,11 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
-from trackmania_rl.rewards import phase1_smoke_reward, sparse_finish_reward
+from trackmania_rl.rewards import (
+    dense_speed_reward,
+    phase1_smoke_reward,
+    sparse_finish_reward,
+)
 from trackmania_rl.tmi_bridge import ProtocolError
 
 
@@ -27,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument(
         "--reward",
-        choices=("phase1", "sparse-finish"),
+        choices=("phase1", "sparse-finish", "dense-speed"),
         default="phase1",
     )
     parser.add_argument(
@@ -65,11 +69,12 @@ def main() -> int:
         raise SystemExit("--episode-ms must be a positive 10 ms multiple")
 
     config = EnvironmentConfig(port=args.port, max_episode_ms=args.episode_ms)
-    reward_function = (
-        sparse_finish_reward
-        if args.reward == "sparse-finish"
-        else phase1_smoke_reward
-    )
+    reward_functions = {
+        "phase1": phase1_smoke_reward,
+        "sparse-finish": sparse_finish_reward,
+        "dense-speed": dense_speed_reward,
+    }
+    reward_function = reward_functions[args.reward]
     env = TrackmaniaEnv(
         config=config,
         action_log_path=args.action_log,
@@ -147,6 +152,11 @@ def main() -> int:
         raise ProtocolError("action audit contains an invalid raw action")
     if args.reward == "sparse-finish" and any(reward != 0.0 for reward in rewards):
         raise ProtocolError("sparse finish reward fired without a finished race")
+    if args.reward == "dense-speed" and any(
+        not np.isclose(reward, int(record["display_speed"]) / 1000.0)
+        for reward, record in zip(rewards, audit_records, strict=True)
+    ):
+        raise ProtocolError("dense speed reward diverged from displayed_speed / 1000")
 
     repeatable_resets = np.stack(reset_observations)
     max_repeat_reset_delta = float(
