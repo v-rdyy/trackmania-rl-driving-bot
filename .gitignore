@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local machine and game integration configuration
+.env
+config/local.toml
+config/platforms.yaml
+
+# Phase 0 telemetry and later training artifacts
+artifacts/telemetry/*.csv
+artifacts/telemetry/*.jsonl
+artifacts/logs/
+checkpoints/
+runs/
+tensorboard/
+
