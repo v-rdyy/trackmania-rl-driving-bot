@@ -1,7 +1,8 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Phases 0 and 1 complete. Phase 2 is in progress: reward v1 is
-complete and reward v2's hypothesis is pre-registered.
+**Status:** Phases 0 and 1 complete. Phase 2 is in progress: reward v1 and v2 are
+complete, and reward v3's reliability-only protocol is pre-registered and
+approved but not yet trained.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Target end state (from projected resume, this is what "done" looks like):**
@@ -107,6 +108,9 @@ Document the exact shape/normalization of this observation vector in code commen
 
 - Hypothesis: rewarding progress along the track's centerline (not raw speed) directly targets what you actually want (progress toward finishing) and clamping prevents exploiting large single-tick jumps; stuck detection (penalize/terminate if no forward progress for N ticks) prevents the v2 failure mode of oscillating in place.
 - Train it. Target outcome: this is the version that actually produces a finishing agent.
+- V3 is explicitly reliability-only. It has no speed or time term and is not
+  expected to approach the `24.5s` human PB yet. First determine whether it can
+  finish without flipping or remaining stuck; pace is a separate later problem.
 - Document actual outcome.
 
 **Tasks per version:**
@@ -125,6 +129,17 @@ Document the exact shape/normalization of this observation vector in code commen
 - [ ] The actual failure modes are documented with specifics (numbers, behavior descriptions), not vague summaries
 
 **Deliverable:** `reward_v1.md`, `reward_v2.md`, `reward_v3.md`, reward function code for each version, tensorboard logs per run, and a short comparison summary once all 3 are done.
+
+### Deferred direction after reliable finishing
+
+Do not begin this work during V3. Once a reward reliably finishes A01, test a V4
+that reintroduces time efficiency or speed on top of the winning reliability
+reward. After that, investigate which advanced techniques can emerge through
+reward shaping rather than scripted controls: begin with optimizing the first
+drop to minimize airtime and maximize acceleration time, then consider a harder
+speed-slide experiment. Record which behaviors emerge unaided, which require
+stronger shaping or curriculum, and which are not discovered; that comparison is
+a project result even if some techniques never emerge.
 
 ---
 

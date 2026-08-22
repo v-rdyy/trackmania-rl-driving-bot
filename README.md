@@ -45,6 +45,9 @@ Development history follows the rules in
   after the first major turn and a right-edge hoop collision after the second.
   A distinct fixed-metric 20-episode retrospective finished six times; all 20
   runs oscillated, 19 went upside down, and all 14 timeouts became stuck.
+- Reward v3 is pre-registered as a reliability-only experiment: clamped positive
+  centerline progress plus dual-condition stuck truncation, with no speed or time
+  reward. Training has not started.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,
