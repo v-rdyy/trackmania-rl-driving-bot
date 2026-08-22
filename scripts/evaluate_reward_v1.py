@@ -48,6 +48,7 @@ def sha256(path: Path) -> str:
 
 def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     finishes = sum(bool(episode["finished"]) for episode in episodes)
+    falls = sum(bool(episode.get("fallen", False)) for episode in episodes)
     best_progress = max(float(episode["max_progress"]) for episode in episodes)
     moving_episodes = sum(
         float(episode["max_progress"]) >= 10.0
@@ -59,7 +60,12 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
         f"Meaningful motion threshold was reached in {moving_episodes} episodes.",
         f"Best projected path progress was {best_progress:.3f} units.",
     ]
-    if finishes == 0 and moving_episodes == 0:
+    if finishes == 0 and falls == len(episodes) and best_progress < 1.0:
+        descriptions.append(
+            "Telemetry indicates the deterministic policy made no forward path "
+            "progress and fell in every episode."
+        )
+    elif finishes == 0 and moving_episodes == 0:
         descriptions.append(
             "Telemetry indicates the deterministic policy remained effectively "
             "stationary in every episode."

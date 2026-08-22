@@ -1,6 +1,6 @@
 # Reward v1: Sparse finish-only
 
-Status: Hypothesis pre-registered; reward implementation verified; training not started
+Status: Experiment complete; hypothesis partially supported
 
 Date pre-registered: 2026-08-22
 
@@ -147,5 +147,46 @@ segments and disclose cumulative time and replayed steps.
 
 ## Actual outcome
 
-Pending. The invalid preliminary run is excluded; formal reward-v1 training will
-restart from zero at the verified 100x speed with the vertical fall boundary.
+The fixed formal model completed `501,200` PPO timesteps against the 500,000-step
+minimum. Including 560 interactions replayed after host sleep, the environment
+processed `501,760` interactions over a cumulative `1,758.399` wall-clock
+seconds (29.31 minutes).
+
+Training completed 29,917 episodes with zero finishes, 29,900 vertical falls,
+17 timeouts, and zero horizontal off-track truncations. Episode reward was
+exactly `0.0` throughout. TensorBoard's 245 reward points were flat at zero.
+Mean episode length fell from `240.375` at the first rollout report to `16.0` at
+the last, with observed report extrema of `16.0` and `240.375`.
+
+The 20-episode deterministic evaluation also produced zero finishes. Every
+episode followed the same 16-step (1.6 game-second) trajectory, reached displayed
+speed 63, made effectively zero forward path progress, and crossed the vertical
+fall boundary. Its mean normalized action was approximately
+`[steer=-0.8403, throttle=0.9192, brake=0.0070]`: the final policy accelerated
+while steering hard left, rotated to about 1.625 radians of heading error, and
+fell 11.166 units below the local path. This explains why accelerated training
+looked like a stationary rapid-reset loop on screen; the full crash occurred
+between rendered frames.
+
+The hypothesis is partially supported. Its central prediction held: sparse PPO
+never discovered a finish, received no gradient signal from the external reward,
+and produced a perfectly flat reward curve. The prediction of "no meaningful
+behavior change" did not hold. Episode length collapsed and the deterministic
+policy developed a repeatable full-throttle, hard-left fall. This is a harmful
+rather than useful behavior change and is documented as an unexpected result.
+
+The experiment does not isolate why PPO settled on this particular zero-return
+action pattern; initialization, critic transients, and optimization dynamics are
+plausible contributors. Root-causing that drift is deferred because reward v1
+provides no preference among zero-return behaviors and the pre-registered sparse-
+signal question is answered. Reward v2 should pre-register dense forward-progress
+feedback and an explicit cost for falls before its implementation begins.
+
+Ignored local result hashes:
+
+- completed run manifest: `6B30F4662C37B4166DBFDC924B310EB61D6D5F35801A87BD27B9018779D60131`;
+- training summary: `C4A9A209512FC73FB4CD62E04E7C5723E4219EE66E0B7592468122DACF73FF9B`;
+- Monitor CSV: `9B5FFCEE5EFA212A4089B9E5B6FF2B15B817345ED53C3F5211E7A4A23BD1D827`;
+- final model: `E19E7009E2CB94FEE309DA20AA201EA23EA852A435FB2648E91C2FD26D1C7D08`;
+- evaluation action log: `4AE09AF842929DE3D094EE26A33F08FFB5E3117709341620255E43827FD45268`;
+- evaluation summary: `72E1D0989CFA3E0DF37C1CF33D74F178DDF3015EB8212DB09CAC6BACFDE18737`.

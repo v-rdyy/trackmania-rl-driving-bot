@@ -44,6 +44,22 @@ class RewardV1EvaluationTests(unittest.TestCase):
         self.assertIn("Finished 1 of 20 deterministic episodes.", description)
         self.assertFalse(any("stationary" in line for line in description))
 
+    def test_behavior_description_calls_out_repeated_fall_without_progress(self) -> None:
+        episodes = [
+            {
+                "finished": False,
+                "fallen": True,
+                "max_progress": 0.0,
+                "max_display_speed": 63,
+            }
+            for _ in range(20)
+        ]
+
+        description = MODULE.describe_behavior(episodes)
+
+        self.assertTrue(any("fell in every episode" in line for line in description))
+        self.assertFalse(any("stationary" in line for line in description))
+
 
 if __name__ == "__main__":
     unittest.main()

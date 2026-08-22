@@ -1,6 +1,6 @@
 # Decision 0006: Reward-v1 training protocol
 
-Status: Fixed before training
+Status: Completed with checkpointed host-sleep resume
 
 Date: 2026-08-22
 
@@ -111,6 +111,13 @@ the first segment. Ignored evidence hashes:
 - attempt-one failure manifest: `178DD024296A81E88096DAB210C12CC4407CA229C4B436FB4E60647DBE0C3FD7`;
 - 450,000-step checkpoint: `0C44268EFCA5445AEF796EBDC911CAC10D4A997037DA193C965381EB5D353528`;
 - attempt-one TensorBoard event: `1F826C743FC7C77C2F8FED12C1208B6E6B16138F434A65F79740E212839EEE63`.
+
+## Result
+
+The resumed model completed at 501,200 timesteps. `reward_v1.md` records the
+quantitative results, deterministic behavior, artifact hashes, and the partially
+supported hypothesis verdict. No protocol or reward parameter changed across
+the checkpoint boundary.
 
 ## Pre-run amendment: vertical fall detection
 
