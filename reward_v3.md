@@ -1,6 +1,7 @@
 # Reward v3: Clamped forward centerline progress
 
-Status: Pre-registered and approved; training not started
+Status: Complete; trained and evaluated, including an unchanged-model
+fall-detector correction study
 
 Date pre-registered: 2026-08-22
 
@@ -141,5 +142,102 @@ None of that work begins during V3.
 
 ## Actual outcome
 
-Pending. This section must be completed from the real training and evaluation
-artifacts without modifying the hypothesis or fixed thresholds above.
+### Training
+
+The final seed-42 run completed `1,001,472` PPO timesteps in `3,266.40s`
+(`54m 26s`) at 100x, with no resume or discarded training interactions. The
+TensorBoard mean episode reward rose from `1.539` to `189.427` and peaked at
+`202.039`; mean episode length rose from `59.824` to `250.990` steps and peaked
+at `332.990`. That is real learning signal and strongly differs from V1's flat
+sparse result.
+
+Training recorded 1,086 finishes across 3,787 episodes, but its terminal-cause
+counts used the original immediate vertical-drop detector. The detector issue
+found below means the 2,281 recorded training "falls" are not a trustworthy
+measure of physical failure. The checkpoint itself was not modified:
+
+- final model: `checkpoints/reward_v3/final_model.zip`;
+- SHA-256:
+  `C9791B6ECF3E83146299376F2180D3132250061C8B33DAF294CF295F1996FE38`.
+
+### Original pre-registered evaluation
+
+The original 20-episode deterministic evaluation at 6x finished 12/20 runs
+(`60%`) and stopped the other eight as vertical falls at the final jump. The 12
+recorded finishes ranged from `27.730s` to `28.210s`, averaging `27.958s`.
+Steering oscillation was detected in 20/20 episodes; no inversion or stuck
+period was observed before the early fall cutoffs.
+
+This remains the immutable result of the pre-registered evaluator as it existed
+when the run began. Its summary is `runs/reward_v3/evaluation_summary.json`,
+SHA-256
+`F8B90E9CC417D625D06C2CA2ACD2DBAD21DCEB6336E3B4C358EFA9C41C95E9B8`.
+
+### Fall-detector diagnosis and one corrected re-evaluation
+
+Replay inspection showed that crossing 10 units below the reference path was
+not by itself proof of a fall on A01's final jump. A nominally failed replay was
+still moving and gaining progress after the cutoff, landed on the lower course,
+and only later stopped at a pillar. A corrected successful replay likewise
+reached `-13.366` vertical offset, recovered onto the final straight, and
+finished. The original detector therefore confused a low but recoverable final
+jump trajectory with terminal failure.
+
+The detector was corrected to require both conditions before declaring a fall:
+
+1. the car is more than 10 vertical units below the reference path; and
+2. the existing frozen 2.0-second V3 stuck window also confirms less than 1.0
+   unit of progress and less than 2.0 units of world motion.
+
+The same checkpoint was then evaluated once for 20 deterministic episodes at
+6x. It finished 20/20 (`100%`) with zero falls, stuck truncations, timeouts,
+off-track truncations, or inversions. Finish times were:
+
+- best: `27.930s`, which is `3.430s` slower than the real `24.5s` human PB;
+- mean: `28.016s`;
+- worst: `28.560s`.
+
+The completed live run produced all 20 replays and 5,659 raw action records.
+The first summary pass then exposed a restarted-countdown prefix in episode 0.
+The summary was rebuilt from the preserved completed log and replays instead of
+rerunning the model: 45 startup records were disclosed and removed, leaving
+5,614 evaluated actions. All evaluated actions were finite and in range.
+
+Corrected summary: `runs/reward_v3/corrected_detector_final_summary.json`,
+SHA-256
+`DAA7C6FBB2DACF14D29017F3BC99DBF44B1850CF92456A39D24AACCEBB78853D`.
+
+### Precision result and remaining reward flaw
+
+The corrected result establishes reliable finishing, not clean driving:
+
+- steering oscillation was still detected in 20/20 episodes;
+- mean per-episode p95 absolute lateral offset was `9.571` units;
+- maximum absolute lateral offset was `13.568` units;
+- the widest run visibly took an awkward low final-hoop exit, became yawed and
+  airborne, dropped below the old cutoff, recovered, and finished.
+
+V3's clamp is a separate incentive problem from V2's raw-speed reward. In the
+original 5,261-step evaluation, 1,640 steps (`31.17%`) exceeded the 10-unit
+positive-progress cap. No evaluated step moved backward in projected progress,
+and the maximum single-step delta was `13.469` units. The cap discarded `7.33%`
+of otherwise valid progress value. Once a step earns the maximum reward, V3 has
+no immediate preference for cleaner progress beyond 10 units, so oscillating or
+taking a wider line can be equally rewarded. This is evidence of a flat reward
+region that can support imprecision, not proof that the policy consciously
+"chose" to exploit it. PPO's `gamma=0.99` also creates a mild implicit preference
+for earlier progress even though V3 has no explicit time term.
+
+The pre-registered hypothesis is therefore supported on reliability and dense
+learning signal, while its stated oscillation/checkpoint-risk caveat also
+materialized. No reward or threshold was changed during training. V3 is a
+reliable foundation for V4, but it is not yet a precise or human-PB-level agent.
+
+Qualitative evidence is preserved in:
+
+- `artifacts/videos/reward_v3_final_jump/` for the original early-cutoff
+  success/failure comparison;
+- `artifacts/videos/reward_v3_corrected_detector/` for the widest corrected
+  finish and contact sheets;
+- `artifacts/replays/reward_v3_corrected_detector_final/` for all 20 corrected
+  input replays.

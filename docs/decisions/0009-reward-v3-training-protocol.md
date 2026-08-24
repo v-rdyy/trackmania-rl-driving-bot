@@ -1,6 +1,6 @@
 # Decision 0009: Reward V3 reliability-only training protocol
 
-Status: Accepted before implementation and training
+Status: Accepted and completed
 
 Date: 2026-08-22
 
@@ -53,3 +53,24 @@ The pre-V3 source/evidence archive and checksum in `docs/pre-v3-backup.md` must
 remain present. Verify host sleep and hibernation are disabled immediately before
 training. Preserve failures, resume only from real checkpoints, and disclose all
 discarded/replayed interactions as in V2.
+
+## Outcome
+
+V3 trained for `1,001,472` timesteps and produced the checkpoint with SHA-256
+`C9791B6ECF3E83146299376F2180D3132250061C8B33DAF294CF295F1996FE38`.
+The original frozen evaluation finished 12/20 episodes and classified eight low
+final-jump trajectories as falls.
+
+Live replay inspection established that vertical offset alone was not a valid
+terminal condition: the car could pass below `-10` units while still moving,
+recover onto the final straight, and finish. The detector was corrected after
+training to require the same 2.0-second no-progress/no-motion confirmation used
+by the V3 stuck rule. A single re-evaluation of the unchanged checkpoint then
+finished 20/20, with a best time of `27.930s` and a mean of `28.016s`.
+
+This correction changes the reliability measurement, not the learned policy.
+The original 12/20 result remains preserved as the result under the original
+detector. The corrected 20/20 result establishes V3 as the reliability base for
+the next experiment, while oscillation in 20/20 corrected episodes and maximum
+absolute lateral deviation of `13.568` units show that precision remains
+unsolved. See `reward_v3.md` for hashes, replay evidence, and interpretation.

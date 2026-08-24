@@ -5,7 +5,9 @@ are complete.** The live Gymnasium loop and bounded PPO/TensorBoard smoke test
 have passed. Phase 2 reward v1 and v2 are complete: sparse finish-only reward
 produced zero finishes and a flat curve, while dense speed reward produced a
 30-35% deterministic finish rate but an oscillatory line and unreliable final
-checkpoint/hoop approach.
+checkpoint/hoop approach. Reward v3 trained a reliability-focused progress
+policy; after correcting a false vertical-fall detector, the unchanged model
+finished 20/20 deterministic runs.
 Development history follows the rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -45,9 +47,14 @@ Development history follows the rules in
   after the first major turn and a right-edge hoop collision after the second.
   A distinct fixed-metric 20-episode retrospective finished six times; all 20
   runs oscillated, 19 went upside down, and all 14 timeouts became stuck.
-- Reward v3 is pre-registered as a reliability-only experiment: clamped positive
-  centerline progress plus dual-condition stuck truncation, with no speed or time
-  reward. Training has not started.
+- Reward v3 completed `1,001,472` timesteps. Its original evaluator reported
+  12/20 finishes because a low but recoverable final-jump path crossed an
+  immediate vertical cutoff. After requiring stalled-motion confirmation, one
+  unchanged-checkpoint re-evaluation finished 20/20 with zero terminal failures:
+  best `27.930s`, mean `28.016s`, versus the owner's `24.5s` PB.
+- V3 is reliable but not precise. All 20 corrected runs still met the fixed
+  steering-oscillation threshold, and maximum absolute lateral deviation was
+  `13.568` units. V4 reward design is the next gate; V4 training has not begun.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,
@@ -74,9 +81,14 @@ original outcomes:
 The fixed matrix and replay/video evidence protocol are documented in
 [`docs/video-evidence.md`](docs/video-evidence.md).
 
-The checksum-pinned V2 evidence/source bundle required before V3 is documented
-in [`docs/pre-v3-backup.md`](docs/pre-v3-backup.md). V3 remains gated on explicit
-owner approval of its pre-registered hypothesis and thresholds.
+The checksum-pinned V2 evidence/source bundle used before V3 is documented in
+[`docs/pre-v3-backup.md`](docs/pre-v3-backup.md). The completed V3 protocol,
+results, detector correction, and hashes are in [`reward_v3.md`](reward_v3.md).
+
+Live V3 evaluation and replay-inspection entry points now start the configured
+`TmForever/default` ModLoader profile and load A01 themselves. Manual game/menu
+setup is no longer required; `--reuse-game` is an explicit opt-in for attaching
+to an already-running session.
 
 Run the non-mutating local audit from PowerShell:
 

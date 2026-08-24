@@ -1,18 +1,18 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Phases 0 and 1 complete. Phase 2 is in progress: reward v1 and v2 are
-complete, and reward v3's reliability-only protocol is pre-registered and
-approved but not yet trained.
+**Status:** Phases 0 and 1 complete. Phase 2 reward v1-v3 experiments are
+complete. V3 established reliable finishing under the corrected detector; V4
+reward design is the next approval gate and V4 training has not begun.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
-**Target end state (from projected resume, this is what "done" looks like):**
+**Current evidenced project narrative:**
 
-> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state (speed, car-frame velocity, heading error, lateral offset, 10 look-ahead centerline points) instead of pixels. Iterated the reward through 3 documented versions with pre-registered hypotheses and failure analysis: a sparse finish-only reward never learned; a dense speed reward was exploited (agent looped and oscillated to farm speed without finishing); a clamped progress-along-centerline reward with stuck detection trained a finishing agent. Final agent: 92% finish rate over a 20-episode deterministic eval, best lap 35.2s vs. 24.5s human personal best; trained 6M steps at 6x accelerated game speed (~14h wall-clock), with reproducible results from tagged checkpoints.
+> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state (speed, car-frame velocity, heading error, lateral offset, 10 look-ahead centerline points) instead of pixels. Iterated through 3 pre-registered rewards: sparse finish-only produced zero finishes; dense speed reached the final hoop but drove imprecisely; clamped centerline progress trained a reliable finisher. The unchanged V3 checkpoint finished 20/20 deterministic episodes after correcting a false vertical-fall detector, with a 27.930s best lap versus a 24.5s human PB after 1,001,472 training steps at 100x. V3 still oscillates, so precision and speed remain active work rather than being hidden by the finish rate.
 
-Every phase below exists to get honestly to that paragraph. Numbers in the target
-(92%, 35.2s, 6M steps, 14h) are targets to hit, not numbers to fabricate. The
-`24.5s` human PB is a real measured comparison baseline, not a projected target.
-If actual agent results differ, the actual results are what go on the resume.
+The paragraph above uses observed artifacts, not projected resume numbers. The
+`24.5s` human PB is a real measured comparison baseline. Future training totals
+and performance claims must continue to use actual results even when they differ
+from earlier planning targets.
 
 The approximately 33-second manual lap used to capture the Phase 0 reference
 path was intentionally driven slowly and cautiously for clean telemetry. It was
@@ -111,7 +111,12 @@ Document the exact shape/normalization of this observation vector in code commen
 - V3 is explicitly reliability-only. It has no speed or time term and is not
   expected to approach the `24.5s` human PB yet. First determine whether it can
   finish without flipping or remaining stuck; pace is a separate later problem.
-- Document actual outcome.
+- Actual outcome: the original detector reported 12/20 finishes and eight final
+  jump falls. Replay inspection proved that the immediate vertical cutoff also
+  stopped moving, recoverable trajectories. One corrected re-evaluation of the
+  unchanged checkpoint finished 20/20 (best `27.930s`, mean `28.016s`) with no
+  falls, stuck periods, timeouts, or inversions. Steering oscillation remained
+  in 20/20 runs, so V3 solved reliability but not precision.
 
 **Tasks per version:**
 
@@ -123,10 +128,10 @@ Document the exact shape/normalization of this observation vector in code commen
 
 **Exit criteria:**
 
-- [ ] All 3 reward versions implemented as swappable, isolated functions
-- [ ] All 3 trained with logged runs
-- [ ] All 3 have a pre-registered hypothesis doc and a post-hoc analysis doc
-- [ ] The actual failure modes are documented with specifics (numbers, behavior descriptions), not vague summaries
+- [x] All 3 reward versions implemented as swappable, isolated functions
+- [x] All 3 trained with logged runs
+- [x] All 3 have a pre-registered hypothesis doc and a post-hoc analysis doc
+- [x] The actual failure modes are documented with specifics (numbers, behavior descriptions), not vague summaries
 
 **Deliverable:** `reward_v1.md`, `reward_v2.md`, `reward_v3.md`, reward function code for each version, tensorboard logs per run, and a short comparison summary once all 3 are done.
 
