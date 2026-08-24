@@ -1,6 +1,6 @@
 # Decision 0010: Validate V4 reliability over 100 episodes
 
-**Status:** Approved; not started  
+**Status:** Complete
 **Date:** 2026-08-24
 
 ## Context
@@ -51,3 +51,25 @@ episodes as proof of robustness to every possible starting condition.
 
 Do not begin V5 after this validation. The next reward direction remains a user
 decision after reviewing the 100-episode result and the V1-V4 comparison.
+
+## Outcome
+
+The unchanged checkpoint finished `98/100` episodes. Its 95% Wilson finish-rate
+interval was `93.00%` to `99.45%`. There were two stuck terminations and zero
+falls, timeouts, off-track terminations, or inversions. The 98 finish times were
+`24.900s` best, `24.930510s` mean, and `24.980s` worst on TMNF's race clock.
+
+All 100 input replays were retained. Replay review found two distinct late
+failures: episode 31 braked to a stop about eight progress units short of the
+finish, while episode 61 hit the left-side final-approach structure at high
+speed and remained wedged upright. Oscillation was detected in `100/100`
+episodes.
+
+The first summary pass exposed a bookkeeping bug when a clean-launch countdown
+restart contributed 45 disclosed startup action records. The live evaluation
+itself was complete. The count invariant was corrected and regression-tested,
+then the summary was rebuilt from the preserved log and replays without
+rerunning any episode.
+
+Full interpretation and cross-version context are in
+[`docs/reward-comparison-v1-v4.md`](../reward-comparison-v1-v4.md).

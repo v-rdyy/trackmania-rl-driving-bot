@@ -1,6 +1,7 @@
 # Reward v4: Signed progress with time and terminal outcomes
 
-Status: Complete; trained, quantitatively evaluated, and visually reviewed
+Status: Complete; trained, visually reviewed, and scale-validated over 100
+additional deterministic episodes
 
 Date pre-registered: 2026-08-24
 
@@ -183,6 +184,63 @@ On the same TMNF race-clock basis, corrected V3 was `28.030s` best, `28.106s`
 mean, and `28.660s` worst. V4 therefore improved best time by `3.130s`, mean by
 `3.177s`, and worst by `3.710s` while retaining the 20/20 finish rate.
 
+### 100-episode reliability scale validation
+
+Decision 0010 froze a second evaluation of the unchanged final checkpoint at
+exactly 100 deterministic episodes, 6x simulation speed, the corrected detector,
+and the same action and precision metrics. The original 20-run artifacts were
+not overwritten. Host sleep and hibernation were confirmed disabled on AC and
+battery immediately before the run.
+
+The checkpoint finished `98/100` episodes (`98.0%`). The 95% Wilson confidence
+interval is `93.00%` to `99.45%`, compared with the much wider `83.89%` to
+`100%` interval implied by the earlier `20/20`. Terminal causes were two stuck
+truncations, zero falls, zero timeouts, zero off-track truncations, and zero
+inversions. Among 98 finishes, TMNF race-clock times were:
+
+- best: `24.900s`, still `0.400s` behind the owner's PB;
+- mean: `24.930510s`;
+- worst: `24.980s`;
+- 95th percentile: `24.950s`;
+- population standard deviation: `0.013s`.
+
+The best time exactly matched the 20-run result, and the 100-run mean was only
+about `0.002s` slower. Pace therefore held up at the larger scale, while the two
+failures correct the reliability claim from an observed 100% to an observed 98%.
+
+Both failures were preserved and replayed at watchable speed. Episode 31 stayed
+upright and gradually braked from displayed speed `80` to zero, stopping at
+progress `2198.6/2206.5`, about eight progress units short of the finish.
+Episode 61 struck the left-side final-approach structure at displayed speed
+approximately `363`, dropped to speed `1` in one 100 ms transition, and remained
+wedged upright at progress `2162.3/2206.5`. Neither reproduced V2's lower-right
+hoop flip, but episode 61 is a rare late-course precision collision and episode
+31 shows a separate premature-braking failure.
+
+The fixed precision metrics detected oscillation in `100/100` episodes, with
+mean peak two-second sign crossings `5.01` and a maximum of `6`. Mean
+per-episode p95 absolute lateral offset was `11.127` units and maximum absolute
+lateral offset was `18.642` units. Two episodes contained a `2.1s` stuck period;
+no episode went upside down. The larger sample therefore confirms that V4's
+oscillation is systematic rather than a small-sample artifact.
+
+All 24,963 evaluated actions were finite, in range, and valid. The raw log had
+25,008 records because episode 1 included 45 pre-race records from a restarted
+countdown. The first summary pass correctly filtered those records for metrics
+but incorrectly counted them twice in its validation invariant. The invariant
+was fixed to require `raw = evaluated + disclosed startup`, covered by regression
+tests, and the summary was rebuilt from the preserved completed action log and
+100 replays without rerunning any episode.
+
+- summary: `runs/reward_v4/evaluation_100_summary.json`, SHA-256
+  `0A97C8E5B0E91F6A0256D3A1CFBD24575E86E1A7833F412CF46F0EEF75A17CB8`;
+- action log: `runs/reward_v4/evaluation_100_actions.jsonl`, SHA-256
+  `2E96B85A9CAA30688C64B8DE7287485C907D3434AF3EFDFC8C2BC680B20EBF05`;
+- all 100 input replays:
+  `artifacts/replays/reward_v4_evaluation_100/`;
+- failure videos, telemetry, manifest, and contact sheets:
+  `artifacts/videos/reward_v4_scale100_failures/`.
+
 ### Precision and oscillation result
 
 The open oscillation question resolved negatively: the fixed detector still
@@ -238,10 +296,17 @@ replay was recaptured without changing the policy or evaluation:
 
 ### Hypothesis assessment
 
-The pre-registered hypothesis was supported on its primary claims: V4 preserved
-V3's 20/20 deterministic reliability, substantially improved lap time, and had
-no near-finish collision in 20 reviewed terminal outcomes. The clean final
-section accounted for most of the measured speed gain. The stated open question
-also produced a clear result: oscillation did not disappear, and severe lateral
-excursions worsened despite the raised clamp never activating. No reward term,
-threshold, initialization, or checkpoint-selection rule changed during the run.
+The initial 20-run result supported the pre-registered primary claims: V4
+preserved V3's observed reliability, substantially improved lap time, and had no
+near-finish collision in those 20 terminal outcomes. The 100-run scale
+validation strengthens the pace claim and narrows the reliability estimate, but
+qualifies absolute language: the unchanged policy finished 98%, including one
+rare left-side final-approach collision and one premature-braking stall. The
+clean final section still accounted for most of the typical measured speed gain.
+
+The stated open question also produced a clear result: oscillation did not
+disappear, and severe lateral excursions worsened despite the raised clamp never
+activating. No reward term, threshold, initialization, or checkpoint-selection
+rule changed during training or either evaluation. V5 remains on hold pending
+the owner's decision between a precision experiment and finalizing V1-V4 as the
+resume result.
