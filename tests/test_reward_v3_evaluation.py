@@ -37,6 +37,27 @@ def record(
 
 
 class RewardV3EvaluationTests(unittest.TestCase):
+    def test_lap_time_comparison_uses_the_displayed_race_clock(self) -> None:
+        metrics = MODULE.lap_time_metrics(
+            [
+                {
+                    "finished": True,
+                    "elapsed_ms": 24_800,
+                    "terminal_race_time_ms": 24_900,
+                },
+                {
+                    "finished": True,
+                    "elapsed_ms": 24_820,
+                    "terminal_race_time_ms": 24_920,
+                },
+            ]
+        )
+
+        self.assertEqual(metrics["best_finish_time_ms"], 24_900)
+        self.assertEqual(metrics["average_finish_time_ms"], 24_910)
+        self.assertEqual(metrics["best_finish_gap_to_human_pb_ms"], 400)
+        self.assertEqual(metrics["best_controlled_elapsed_ms"], 24_800)
+
     def test_race_record_filter_discloses_a_restarted_countdown_prefix(self) -> None:
         records = [
             {"race_time_ms": 200},

@@ -179,6 +179,42 @@ def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def lap_time_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
+    finished = [episode for episode in episodes if episode["finished"]]
+    race_clock_times = [
+        int(episode["terminal_race_time_ms"]) for episode in finished
+    ]
+    controlled_elapsed_times = [int(episode["elapsed_ms"]) for episode in finished]
+    return {
+        "lap_time_basis": (
+            "TMNF terminal race clock; directly comparable to the displayed human PB"
+        ),
+        "best_finish_time_ms": min(race_clock_times) if race_clock_times else None,
+        "average_finish_time_ms": (
+            statistics.fmean(race_clock_times) if race_clock_times else None
+        ),
+        "worst_finish_time_ms": max(race_clock_times) if race_clock_times else None,
+        "human_pb_ms": HUMAN_PB_MS,
+        "best_finish_gap_to_human_pb_ms": (
+            min(race_clock_times) - HUMAN_PB_MS if race_clock_times else None
+        ),
+        "controlled_elapsed_time_basis": (
+            "terminal race clock minus the environment's captured reset state"
+        ),
+        "best_controlled_elapsed_ms": (
+            min(controlled_elapsed_times) if controlled_elapsed_times else None
+        ),
+        "average_controlled_elapsed_ms": (
+            statistics.fmean(controlled_elapsed_times)
+            if controlled_elapsed_times
+            else None
+        ),
+        "worst_controlled_elapsed_ms": (
+            max(controlled_elapsed_times) if controlled_elapsed_times else None
+        ),
+    }
+
+
 def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     finishes = sum(bool(episode["finished"]) for episode in episodes)
     oscillation_episodes = sum(
@@ -339,6 +375,7 @@ def main() -> int:
                         "episode": episode,
                         "steps": steps,
                         "elapsed_ms": int(final_info["elapsed_ms"]),
+                        "terminal_race_time_ms": int(final_info["race_time_ms"]),
                         "total_reward": total_reward,
                         "finished": bool(finished),
                         "timeout": bool(final_info["timeout"]),
@@ -399,6 +436,7 @@ def main() -> int:
                         0,
                         int(final["race_time_ms"]) - start_race_time,
                     ),
+                    "terminal_race_time_ms": int(final["race_time_ms"]),
                     "total_reward": sum(float(record["reward"]) for record in records),
                     "finished": bool(final["race_finished"]),
                     "timeout": bool(final["timeout"]),
@@ -449,11 +487,7 @@ def main() -> int:
     precision_summary = aggregate_precision_metrics(
         [episode["trajectory"]["precision"] for episode in episode_records]
     )
-    finish_times_ms = [
-        int(episode["elapsed_ms"])
-        for episode in episode_records
-        if episode["finished"]
-    ]
+    time_metrics = lap_time_metrics(episode_records)
     summary = {
         "episodes": args.episodes,
         "deterministic": True,
@@ -510,15 +544,7 @@ def main() -> int:
             float(episode["trajectory"]["maximum_progress"])
             for episode in episode_records
         ),
-        "best_finish_time_ms": min(finish_times_ms) if finish_times_ms else None,
-        "average_finish_time_ms": (
-            statistics.fmean(finish_times_ms) if finish_times_ms else None
-        ),
-        "worst_finish_time_ms": max(finish_times_ms) if finish_times_ms else None,
-        "human_pb_ms": HUMAN_PB_MS,
-        "best_finish_gap_to_human_pb_ms": (
-            min(finish_times_ms) - HUMAN_PB_MS if finish_times_ms else None
-        ),
+        **time_metrics,
         "action_records": len(evaluated_action_records),
         "raw_action_records": len(action_records),
         "discarded_startup_action_records": discarded_startup_records,
