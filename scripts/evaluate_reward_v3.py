@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import statistics
 import sys
@@ -19,6 +20,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
+from trackmania_rl.game_launch import close_trackmania, ensure_trackmania_running
 from trackmania_rl.evaluation_metrics import (
     aggregate_precision_metrics,
     evaluation_metric_protocol,
@@ -49,6 +51,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--summary", type=Path, default=DEFAULT_SUMMARY)
     parser.add_argument("--replay-dir", type=Path, default=DEFAULT_REPLAY_DIR)
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
+    parser.add_argument(
+        "--run-tag",
+        default=None,
+        help="optional identifier added to replay filenames and the summary",
+    )
+    parser.add_argument(
+        "--reuse-game",
+        action="store_true",
+        help="reuse an existing game instead of forcing a clean bridge lifecycle",
+    )
+    parser.add_argument(
+        "--postprocess-existing",
+        action="store_true",
+        help="build the summary from an already completed action log and replay set",
+    )
     return parser.parse_args()
 
 
@@ -67,6 +84,26 @@ def wait_for_replay(path: Path, timeout_seconds: float = 5.0) -> None:
             return
         time.sleep(0.05)
     raise ProtocolError(f"TMInterface did not create input replay: {path}")
+
+
+def evaluated_race_records(
+    records: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
+    """Drop a disclosed pre-race prefix when the raw clock restarts countdown."""
+    resets = [
+        index
+        for index in range(1, len(records))
+        if int(records[index]["race_time_ms"])
+        < int(records[index - 1]["race_time_ms"])
+    ]
+    if not resets:
+        return records, 0
+    start = resets[-1]
+    while start < len(records) and int(records[start]["race_time_ms"]) < 0:
+        start += 1
+    if start >= len(records):
+        raise ProtocolError("race clock restarted without reaching active race time")
+    return records[start:], start
 
 
 def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -100,12 +137,19 @@ def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     backward_progress = float(np.maximum(-progress_deltas, 0.0).sum())
     average_speed = float(speeds.mean())
     steering_samples = [
-        (float(record["race_time_ms"]) / 1000.0, float(record["raw_action"][0]))
-        for record in records
+        (
+            float(record.get("step", index)) / 10.0,
+            float(record["raw_action"][0]),
+        )
+        for index, record in enumerate(records)
+    ]
+    metric_records = [
+        {**record, "race_time_ms": int(record.get("step", index)) * 100}
+        for index, record in enumerate(records)
     ]
     precision = {
         "steering": steering_precision_metrics(steering_samples),
-        **trajectory_precision_metrics(records),
+        **trajectory_precision_metrics(metric_records),
     }
 
     return {
@@ -182,6 +226,14 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
 
 def main() -> int:
     args = parse_args()
+    for path_argument in (
+        "checkpoint",
+        "action_log",
+        "summary",
+        "replay_dir",
+        "tmi_scripts_dir",
+    ):
+        setattr(args, path_argument, getattr(args, path_argument).resolve())
     if args.episodes != 20:
         raise SystemExit("Decision 0009 fixes reward-v3 evaluation at 20 episodes")
     if not args.checkpoint.is_file():
@@ -190,97 +242,120 @@ def main() -> int:
         raise SystemExit(
             f"TMInterface Scripts directory does not exist: {args.tmi_scripts_dir}"
         )
+    if (
+        args.run_tag is not None
+        and re.fullmatch(r"[A-Za-z0-9_-]+", args.run_tag) is None
+    ):
+        raise SystemExit(
+            "--run-tag must contain only letters, numbers, underscores, or hyphens"
+        )
+
+    if not args.postprocess_existing:
+        if not args.reuse_game:
+            closed = close_trackmania()
+            if closed:
+                print("closed stale TrackMania session", flush=True)
+        _, launched = ensure_trackmania_running(
+            port=args.port,
+            confirm_existing=True,
+        )
+        print(f"TrackMania ready (launched={launched})", flush=True)
 
     checkpoint_hash = sha256(args.checkpoint)
     replay_prefix = f"reward_v3_final_{checkpoint_hash[:8].lower()}"
+    if args.run_tag is not None:
+        replay_prefix = f"{replay_prefix}_{args.run_tag}"
     args.replay_dir.mkdir(parents=True, exist_ok=True)
     replay_targets = []
     for episode in range(args.episodes):
         filename = f"{replay_prefix}_ep_{episode + 1:02d}.txt"
         local_path = args.replay_dir / filename
         external_path = args.tmi_scripts_dir / filename
-        if local_path.exists() or external_path.exists():
+        if args.postprocess_existing:
+            if not local_path.is_file():
+                raise SystemExit(f"missing completed V3 replay: {local_path}")
+        elif local_path.exists() or external_path.exists():
             raise SystemExit(
                 f"refusing to overwrite existing V3 evaluation replay: {filename}"
             )
         replay_targets.append((filename, local_path, external_path))
 
-    env = TrackmaniaEnv(
-        config=EnvironmentConfig(
-            port=args.port,
-            simulation_speed=6.0,
-            stuck_window_ms=2_000,
-            stuck_progress_gain_units=1.0,
-            stuck_world_distance_units=2.0,
-            legacy_reversed_pedal_mapping=False,
-        ),
-        reward_function=clamped_forward_progress_reward,
-        action_log_path=args.action_log,
-    )
-    model = PPO.load(args.checkpoint, device="cpu")
     episode_records: list[dict[str, Any]] = []
-    try:
-        for episode in range(args.episodes):
-            observation, reset_info = env.reset()
-            finished = False
-            truncated = False
-            steps = 0
-            total_reward = 0.0
-            final_info = reset_info
-            while not (finished or truncated):
-                action, _ = model.predict(observation, deterministic=True)
-                observation, reward, finished, truncated, final_info = env.step(action)
-                if not np.isfinite(observation).all() or not np.isfinite(reward):
-                    raise ProtocolError(
-                        f"evaluation episode {episode} produced nonfinite data"
+    if not args.postprocess_existing:
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(
+                port=args.port,
+                simulation_speed=6.0,
+                stuck_window_ms=2_000,
+                stuck_progress_gain_units=1.0,
+                stuck_world_distance_units=2.0,
+                legacy_reversed_pedal_mapping=False,
+                map_to_load="A01-Race.Challenge.Gbx",
+                auto_respawn_on_connect=False,
+                wait_for_race_start_on_connect=True,
+            ),
+            reward_function=clamped_forward_progress_reward,
+            action_log_path=args.action_log,
+        )
+        model = PPO.load(args.checkpoint, device="cpu")
+        try:
+            for episode in range(args.episodes):
+                observation, reset_info = env.reset()
+                finished = False
+                truncated = False
+                steps = 0
+                total_reward = 0.0
+                final_info = reset_info
+                while not (finished or truncated):
+                    action, _ = model.predict(observation, deterministic=True)
+                    observation, reward, finished, truncated, final_info = env.step(
+                        action
                     )
-                steps += 1
-                total_reward += float(reward)
-                if steps > 451:
-                    raise ProtocolError(
-                        f"evaluation episode {episode} exceeded its safety limit"
-                    )
-            replay_filename, local_replay, external_replay = replay_targets[episode]
-            env.session.recover_inputs(replay_filename)
-            wait_for_replay(external_replay)
-            shutil.copy2(external_replay, local_replay)
-            episode_records.append(
-                {
-                    "episode": episode,
-                    "steps": steps,
-                    "elapsed_ms": int(final_info["elapsed_ms"]),
-                    "total_reward": total_reward,
-                    "finished": bool(finished),
-                    "timeout": bool(final_info["timeout"]),
-                    "off_track": bool(final_info["off_track"]),
-                    "fallen": bool(final_info["fallen"]),
-                    "stuck": bool(final_info["stuck"]),
-                    "final_progress": float(final_info["progress"]),
-                    "final_vertical_offset": float(final_info["vertical_offset"]),
-                    "input_replay": str(local_replay.relative_to(WORKSPACE_ROOT)),
-                    "input_replay_bytes": local_replay.stat().st_size,
-                    "input_replay_sha256": sha256(local_replay),
-                }
-            )
-            print(
-                f"evaluation episode={episode + 1}/{args.episodes} "
-                f"finished={finished} steps={steps} reward={total_reward:.3f}",
-                flush=True,
-            )
-    finally:
-        env.close()
+                    if not np.isfinite(observation).all() or not np.isfinite(reward):
+                        raise ProtocolError(
+                            f"evaluation episode {episode} produced nonfinite data"
+                        )
+                    steps += 1
+                    total_reward += float(reward)
+                    if steps > 451:
+                        raise ProtocolError(
+                            f"evaluation episode {episode} exceeded its safety limit"
+                        )
+                replay_filename, local_replay, external_replay = replay_targets[episode]
+                env.session.recover_inputs(replay_filename)
+                wait_for_replay(external_replay)
+                shutil.copy2(external_replay, local_replay)
+                episode_records.append(
+                    {
+                        "episode": episode,
+                        "steps": steps,
+                        "elapsed_ms": int(final_info["elapsed_ms"]),
+                        "total_reward": total_reward,
+                        "finished": bool(finished),
+                        "timeout": bool(final_info["timeout"]),
+                        "off_track": bool(final_info["off_track"]),
+                        "fallen": bool(final_info["fallen"]),
+                        "stuck": bool(final_info["stuck"]),
+                        "final_progress": float(final_info["progress"]),
+                        "final_vertical_offset": float(final_info["vertical_offset"]),
+                        "input_replay": str(local_replay.relative_to(WORKSPACE_ROOT)),
+                        "input_replay_bytes": local_replay.stat().st_size,
+                        "input_replay_sha256": sha256(local_replay),
+                    }
+                )
+                print(
+                    f"evaluation episode={episode + 1}/{args.episodes} "
+                    f"finished={finished} steps={steps} reward={total_reward:.3f}",
+                    flush=True,
+                )
+        finally:
+            env.close()
 
     action_records = [
         json.loads(line)
         for line in args.action_log.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    expected_actions = sum(int(episode["steps"]) for episode in episode_records)
-    if len(action_records) != expected_actions:
-        raise ProtocolError(
-            f"evaluation action log has {len(action_records)} records for "
-            f"{expected_actions} steps"
-        )
     if not all(
         record.get("finite")
         and record.get("within_range")
@@ -294,13 +369,59 @@ def main() -> int:
     }
     for record in action_records:
         records_by_episode[int(record["episode"])].append(record)
+    evaluated_by_episode: dict[int, list[dict[str, Any]]] = {}
+    discarded_startup_records = 0
+    for episode, records in records_by_episode.items():
+        evaluated, discarded = evaluated_race_records(records)
+        evaluated_by_episode[episode] = evaluated
+        discarded_startup_records += discarded
+    if args.postprocess_existing:
+        for episode, (_, local_replay, _) in enumerate(replay_targets):
+            records = evaluated_by_episode[episode]
+            if not records:
+                raise ProtocolError(f"completed action log is missing episode {episode}")
+            final = records[-1]
+            start_race_time = int(records[0]["race_time_ms"]) - 100
+            episode_records.append(
+                {
+                    "episode": episode,
+                    "steps": len(records),
+                    "elapsed_ms": max(
+                        0,
+                        int(final["race_time_ms"]) - start_race_time,
+                    ),
+                    "total_reward": sum(float(record["reward"]) for record in records),
+                    "finished": bool(final["race_finished"]),
+                    "timeout": bool(final["timeout"]),
+                    "off_track": bool(final["off_track"]),
+                    "fallen": bool(final["fallen"]),
+                    "stuck": bool(final["stuck"]),
+                    "final_progress": float(final["progress"]),
+                    "final_vertical_offset": float(final["vertical_offset"]),
+                    "input_replay": str(local_replay.relative_to(WORKSPACE_ROOT)),
+                    "input_replay_bytes": local_replay.stat().st_size,
+                    "input_replay_sha256": sha256(local_replay),
+                }
+            )
+    expected_actions = sum(int(episode["steps"]) for episode in episode_records)
+    if len(action_records) != expected_actions + discarded_startup_records:
+        raise ProtocolError(
+            f"evaluation action log has {len(action_records)} records for "
+            f"{expected_actions} evaluated steps and {discarded_startup_records} "
+            "startup records"
+        )
     for episode in episode_records:
         episode["trajectory"] = trajectory_metrics(
-            records_by_episode[int(episode["episode"])]
+            evaluated_by_episode[int(episode["episode"])]
         )
 
+    evaluated_action_records = [
+        record
+        for episode in range(args.episodes)
+        for record in evaluated_by_episode[episode]
+    ]
     raw_actions = np.asarray(
-        [record["raw_action"] for record in action_records],
+        [record["raw_action"] for record in evaluated_action_records],
         dtype=np.float64,
     )
     finishes = sum(bool(episode["finished"]) for episode in episode_records)
@@ -330,6 +451,15 @@ def main() -> int:
         "simulation_speed": 6.0,
         "checkpoint": str(args.checkpoint.relative_to(WORKSPACE_ROOT)),
         "checkpoint_sha256": checkpoint_hash,
+        "run_tag": args.run_tag,
+        "postprocessed_existing_completed_run": args.postprocess_existing,
+        "fall_detector": {
+            "vertical_drop_units": 10.0,
+            "confirmation": "V3 stuck window must also report no progress and no motion",
+            "stuck_window_ms": 2_000,
+            "stuck_progress_gain_units": 1.0,
+            "stuck_world_distance_units": 2.0,
+        },
         "finishes": finishes,
         "finish_rate": finishes / args.episodes,
         "timeouts": timeouts,
@@ -378,7 +508,9 @@ def main() -> int:
         "best_finish_gap_to_human_pb_ms": (
             min(finish_times_ms) - HUMAN_PB_MS if finish_times_ms else None
         ),
-        "action_records": len(action_records),
+        "action_records": len(evaluated_action_records),
+        "raw_action_records": len(action_records),
+        "discarded_startup_action_records": discarded_startup_records,
         "action_minimum": raw_actions.min(axis=0).tolist(),
         "action_maximum": raw_actions.max(axis=0).tolist(),
         "action_mean": raw_actions.mean(axis=0).tolist(),

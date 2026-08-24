@@ -47,6 +47,7 @@ class EnvironmentConfig:
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
     max_initial_respawn_steps: int = 100
+    wait_for_race_start_on_connect: bool = False
     # Live entry points may load A01 after starting ModLoader so the owner never
     # has to navigate the game menus manually.
     map_to_load: str | None = None
@@ -165,6 +166,23 @@ class LiveTmiSession:
         self._connect()
         if not self._pending_step or self._current_state is None:
             raise RuntimeError("prepare requires a pending simulation step")
+        if self.config.wait_for_race_start_on_connect:
+            for _ in range(self.config.max_initial_respawn_steps):
+                if self._current_race_time is not None and self._current_race_time >= 0:
+                    break
+                self.client.set_continuous_input(
+                    steer=0.0,
+                    throttle=0.0,
+                    brake=0.0,
+                )
+                self.client.respond(MessageType.SC_RUN_STEP_SYNC)
+                self._pending_step = False
+                self._wait_for_run_step()
+            else:
+                raise RuntimeError(
+                    "fresh map did not reach nonnegative race time within "
+                    f"{self.config.max_initial_respawn_steps} steps"
+                )
         if self.config.auto_respawn_on_connect:
             self.client.give_up()
             if self.config.max_initial_respawn_steps <= 0:

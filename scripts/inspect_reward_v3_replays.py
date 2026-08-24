@@ -13,7 +13,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, LiveTmiSession
-from trackmania_rl.game_launch import ensure_trackmania_running
+from trackmania_rl.game_launch import close_trackmania, ensure_trackmania_running
 from trackmania_rl.observations import ReferencePath
 from trackmania_rl.tmi_bridge import ProtocolError
 from trackmania_rl.video_capture import ProgressVideoRecorder, restart_trackmania_race, sha256
@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-width", type=int, default=960)
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--reuse-game", action="store_true")
     return parser.parse_args()
 
 
@@ -152,11 +153,15 @@ def inspect_replay(
 
 def main() -> int:
     args = parse_args()
+    args.tmi_scripts_dir = args.tmi_scripts_dir.resolve()
+    args.output_dir = args.output_dir.resolve()
     if not math.isfinite(args.simulation_speed) or args.simulation_speed <= 0:
         raise SystemExit("--simulation-speed must be positive and finite")
     if args.max_race_ms <= 0:
         raise SystemExit("--max-race-ms must be positive")
     reference = ReferencePath.from_csv(REFERENCE_PATH)
+    if not args.reuse_game:
+        close_trackmania()
     _, launched = ensure_trackmania_running(port=args.port, confirm_existing=True)
     print(f"TrackMania ready (launched={launched})", flush=True)
     restart_trackmania_race()

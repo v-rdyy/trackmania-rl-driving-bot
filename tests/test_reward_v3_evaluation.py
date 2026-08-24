@@ -37,6 +37,21 @@ def record(
 
 
 class RewardV3EvaluationTests(unittest.TestCase):
+    def test_race_record_filter_discloses_a_restarted_countdown_prefix(self) -> None:
+        records = [
+            {"race_time_ms": 200},
+            {"race_time_ms": 300},
+            {"race_time_ms": -200},
+            {"race_time_ms": -100},
+            {"race_time_ms": 0},
+            {"race_time_ms": 100},
+        ]
+
+        evaluated, discarded = MODULE.evaluated_race_records(records)
+
+        self.assertEqual(discarded, 4)
+        self.assertEqual([row["race_time_ms"] for row in evaluated], [0, 100])
+
     def test_trajectory_preserves_terminal_vertical_and_upright_evidence(self) -> None:
         records = [
             record(

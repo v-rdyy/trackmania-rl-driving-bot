@@ -625,6 +625,39 @@ class LiveTmiSessionTests(unittest.TestCase):
             ],
         )
 
+    def test_prepare_can_wait_for_a_fresh_map_countdown_without_respawning(self) -> None:
+        session = LiveTmiSession(
+            EnvironmentConfig(
+                auto_respawn_on_connect=False,
+                wait_for_race_start_on_connect=True,
+            )
+        )
+        client = RecordingBridgeClient()
+        countdown_states = iter(
+            [
+                state(x=0, z=0, speed=0, race_time=-100),
+                state(x=0, z=0, speed=0, race_time=0),
+            ]
+        )
+        session.client = client
+        session._connected = True
+        session._pending_step = True
+        session._current_state = state(x=0, z=0, speed=0, race_time=-200)
+        session._current_race_time = -200
+
+        def complete_countdown_step() -> None:
+            current = next(countdown_states)
+            session._current_state = current
+            session._current_race_time = current.race_time
+            session._pending_step = True
+
+        session._wait_for_run_step = complete_countdown_step
+
+        prepared = session.prepare()
+
+        self.assertEqual(prepared.race_time, 0)
+        self.assertNotIn("give_up", client.calls)
+
     def test_prepare_fails_if_respawn_countdown_never_finishes(self) -> None:
         session = LiveTmiSession(
             EnvironmentConfig(

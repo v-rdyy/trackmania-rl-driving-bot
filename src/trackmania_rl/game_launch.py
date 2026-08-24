@@ -21,6 +21,8 @@ DEFAULT_TMLOADER = Path.home() / "AppData" / "Local" / "TMLoader" / "TMLoader.ex
 DEFAULT_GAME = "TmForever"
 DEFAULT_PROFILE = "default"
 VK_RETURN = 0x0D
+WM_CLOSE = 0x0010
+PROCESS_TERMINATE = 0x0001
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 
@@ -144,3 +146,51 @@ def ensure_trackmania_running(
     confirm_a01_solo(target)
     time.sleep(0.75)
     return target, True
+
+
+def close_trackmania(timeout_seconds: float = 10.0) -> bool:
+    """Close the verified game window, with an exact-process fallback."""
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
+    try:
+        target = find_trackmania_window()
+    except VideoCaptureError:
+        return False
+    if not ctypes.windll.user32.PostMessageW(target.handle, WM_CLOSE, 0, 0):
+        raise OSError("could not request TrackMania window closure")
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            find_trackmania_window()
+        except VideoCaptureError:
+            return True
+        time.sleep(0.1)
+
+    process_id = ctypes.c_ulong()
+    ctypes.windll.user32.GetWindowThreadProcessId(
+        target.handle,
+        ctypes.byref(process_id),
+    )
+    if process_id.value <= 0:
+        raise OSError("could not resolve the verified TrackMania window process")
+    process = ctypes.windll.kernel32.OpenProcess(
+        PROCESS_TERMINATE,
+        False,
+        process_id.value,
+    )
+    if not process:
+        raise OSError("could not open the verified TrackMania process for restart")
+    try:
+        if not ctypes.windll.kernel32.TerminateProcess(process, 1):
+            raise OSError("could not terminate the verified TrackMania process")
+    finally:
+        ctypes.windll.kernel32.CloseHandle(process)
+
+    forced_deadline = time.monotonic() + 5.0
+    while time.monotonic() < forced_deadline:
+        try:
+            find_trackmania_window()
+        except VideoCaptureError:
+            return True
+        time.sleep(0.1)
+    raise TimeoutError("verified TrackMania process remained visible after termination")

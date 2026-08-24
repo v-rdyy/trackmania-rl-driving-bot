@@ -8,11 +8,19 @@ from unittest.mock import Mock, patch
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.game_launch import ensure_trackmania_running, tmloader_command
+from trackmania_rl.game_launch import (
+    click_trackmania_client,
+    ensure_trackmania_running,
+    tmloader_command,
+)
 from trackmania_rl.video_capture import VideoCaptureError, WindowTarget
 
 
 class GameLaunchTests(unittest.TestCase):
+    def test_client_click_rejects_coordinates_outside_the_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "fractions"):
+            click_trackmania_client(1.1, 0.5)
+
     def test_profile_command_uses_modloader_run_mode(self) -> None:
         self.assertEqual(
             tmloader_command(
