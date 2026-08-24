@@ -30,6 +30,10 @@ from trackmania_rl.evaluation_metrics import (
 from trackmania_rl.rewards import clamped_forward_progress_reward
 from trackmania_rl.tmi_bridge import ProtocolError
 
+EXPERIMENT_LABEL = "reward-v3"
+EXPERIMENT_SLUG = "reward_v3"
+PROTOCOL_LABEL = "Decision 0009"
+REWARD_FUNCTION = clamped_forward_progress_reward
 RUN_DIR = WORKSPACE_ROOT / "runs" / "reward_v3"
 DEFAULT_CHECKPOINT = WORKSPACE_ROOT / "checkpoints" / "reward_v3" / "final_model.zip"
 DEFAULT_ACTION_LOG = RUN_DIR / "evaluation_actions.jsonl"
@@ -42,7 +46,7 @@ FINAL_JUMP_PROGRESS = 1_700.0
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate reward v3 for 20 deterministic episodes at 6x."
+        description=f"Evaluate {EXPERIMENT_LABEL} for 20 deterministic episodes at 6x."
     )
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--episodes", type=int, default=20)
@@ -235,7 +239,9 @@ def main() -> int:
     ):
         setattr(args, path_argument, getattr(args, path_argument).resolve())
     if args.episodes != 20:
-        raise SystemExit("Decision 0009 fixes reward-v3 evaluation at 20 episodes")
+        raise SystemExit(
+            f"{PROTOCOL_LABEL} fixes {EXPERIMENT_LABEL} evaluation at 20 episodes"
+        )
     if not args.checkpoint.is_file():
         raise SystemExit(f"checkpoint does not exist: {args.checkpoint}")
     if not args.tmi_scripts_dir.is_dir():
@@ -262,7 +268,7 @@ def main() -> int:
         print(f"TrackMania ready (launched={launched})", flush=True)
 
     checkpoint_hash = sha256(args.checkpoint)
-    replay_prefix = f"reward_v3_final_{checkpoint_hash[:8].lower()}"
+    replay_prefix = f"{EXPERIMENT_SLUG}_final_{checkpoint_hash[:8].lower()}"
     if args.run_tag is not None:
         replay_prefix = f"{replay_prefix}_{args.run_tag}"
     args.replay_dir.mkdir(parents=True, exist_ok=True)
@@ -273,10 +279,13 @@ def main() -> int:
         external_path = args.tmi_scripts_dir / filename
         if args.postprocess_existing:
             if not local_path.is_file():
-                raise SystemExit(f"missing completed V3 replay: {local_path}")
+                raise SystemExit(
+                    f"missing completed {EXPERIMENT_LABEL} replay: {local_path}"
+                )
         elif local_path.exists() or external_path.exists():
             raise SystemExit(
-                f"refusing to overwrite existing V3 evaluation replay: {filename}"
+                f"refusing to overwrite existing {EXPERIMENT_LABEL} "
+                f"evaluation replay: {filename}"
             )
         replay_targets.append((filename, local_path, external_path))
 
@@ -294,7 +303,7 @@ def main() -> int:
                 auto_respawn_on_connect=False,
                 wait_for_race_start_on_connect=True,
             ),
-            reward_function=clamped_forward_progress_reward,
+            reward_function=REWARD_FUNCTION,
             action_log_path=args.action_log,
         )
         model = PPO.load(args.checkpoint, device="cpu")
@@ -455,7 +464,9 @@ def main() -> int:
         "postprocessed_existing_completed_run": args.postprocess_existing,
         "fall_detector": {
             "vertical_drop_units": 10.0,
-            "confirmation": "V3 stuck window must also report no progress and no motion",
+            "confirmation": (
+                "frozen stuck window must also report no progress and no motion"
+            ),
             "stuck_window_ms": 2_000,
             "stuck_progress_gain_units": 1.0,
             "stuck_world_distance_units": 2.0,
@@ -531,7 +542,8 @@ def main() -> int:
         encoding="utf-8",
     )
     print(
-        f"reward-v3 evaluation complete: finishes={finishes}/{args.episodes}, "
+        f"{EXPERIMENT_LABEL} evaluation complete: "
+        f"finishes={finishes}/{args.episodes}, "
         f"falls={falls}, stuck={stuck_truncations}",
         flush=True,
     )
