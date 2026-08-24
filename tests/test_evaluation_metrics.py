@@ -153,6 +153,9 @@ class EvaluationMetricsTests(unittest.TestCase):
         self.assertEqual(summary["upside_down_detected_episodes"], 1)
         self.assertAlmostEqual(summary["total_upside_down_seconds"], 0.1)
         self.assertAlmostEqual(summary["maximum_absolute_lateral_offset"], 12.0)
+        self.assertAlmostEqual(summary["mean_steering_total_variation"], 0.5)
+        self.assertAlmostEqual(summary["maximum_steering_total_variation"], 1.0)
+        self.assertAlmostEqual(summary["mean_absolute_steering"], 0.25)
 
 
 if __name__ == "__main__":

@@ -249,6 +249,26 @@ def aggregate_precision_metrics(
             int(metrics["steering"]["peak_sign_crossings_in_2_seconds"])
             for metrics in episode_metrics
         ),
+        "mean_hysteresis_sign_crossings": statistics.fmean(
+            int(metrics["steering"]["hysteresis_sign_crossings"])
+            for metrics in episode_metrics
+        ),
+        "mean_significant_direction_reversals": statistics.fmean(
+            int(metrics["steering"]["significant_direction_reversals"])
+            for metrics in episode_metrics
+        ),
+        "mean_steering_total_variation": statistics.fmean(
+            float(metrics["steering"]["total_variation"])
+            for metrics in episode_metrics
+        ),
+        "maximum_steering_total_variation": max(
+            float(metrics["steering"]["total_variation"])
+            for metrics in episode_metrics
+        ),
+        "mean_absolute_steering": statistics.fmean(
+            float(metrics["steering"]["mean_absolute_steering"])
+            for metrics in episode_metrics
+        ),
         "mean_p95_absolute_lateral_offset": statistics.fmean(
             float(metrics["lateral_deviation"]["p95_absolute_offset"])
             for metrics in episode_metrics
