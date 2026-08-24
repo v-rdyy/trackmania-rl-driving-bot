@@ -44,6 +44,9 @@ class EnvironmentConfig:
     max_start_speed: int = 5
     auto_respawn_on_connect: bool = True
     max_initial_respawn_steps: int = 100
+    # Live entry points may load A01 after starting ModLoader so the owner never
+    # has to navigate the game menus manually.
+    map_to_load: str | None = None
     # Disabled for V0-V2. V3 enables this with its pre-registered 2,000 ms window.
     stuck_window_ms: int | None = None
     stuck_progress_gain_units: float = 1.0
@@ -107,6 +110,8 @@ class LiveTmiSession:
             self.client.execute_command("set disable_forced_camera true")
             self.client.set_speed(self.config.simulation_speed)
             self.client.set_on_step_period(self.config.step_period_ms)
+            if self.config.map_to_load is not None:
+                self.client.execute_command(f"map {self.config.map_to_load}")
         elif message_type is MessageType.SC_CHECKPOINT_COUNT_CHANGED_SYNC:
             self.client.read_int32()
             self.client.read_int32()

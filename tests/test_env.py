@@ -251,6 +251,11 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertTrue(info["fallen"])
         self.assertFalse(info["timeout"])
 
+    def test_live_config_can_request_a_map_without_changing_offline_sessions(self) -> None:
+        config = EnvironmentConfig(map_to_load="A01-Race.Challenge.Gbx")
+
+        self.assertEqual(config.map_to_load, "A01-Race.Challenge.Gbx")
+
     def test_reward_function_is_injected_and_named_in_info(self) -> None:
         session = FakeSession(
             [
