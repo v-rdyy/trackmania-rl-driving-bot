@@ -164,7 +164,9 @@ measure of physical failure. The checkpoint itself was not modified:
 
 The original 20-episode deterministic evaluation at 6x finished 12/20 runs
 (`60%`) and stopped the other eight as vertical falls at the final jump. The 12
-recorded finishes ranged from `27.730s` to `28.210s`, averaging `27.958s`.
+recorded finishes ranged from `27.830s` to `28.310s` on TMNF's displayed race
+clock, averaging `28.058s`. The original summary's environment-controlled
+elapsed values are 100 ms lower because they subtract the captured reset state.
 Steering oscillation was detected in 20/20 episodes; no inversion or stuck
 period was observed before the early fall cutoffs.
 
@@ -193,9 +195,13 @@ The same checkpoint was then evaluated once for 20 deterministic episodes at
 6x. It finished 20/20 (`100%`) with zero falls, stuck truncations, timeouts,
 off-track truncations, or inversions. Finish times were:
 
-- best: `27.930s`, which is `3.430s` slower than the real `24.5s` human PB;
-- mean: `28.016s`;
-- worst: `28.560s`.
+- best: `28.030s`, which is `3.530s` slower than the real `24.5s` human PB;
+- mean: `28.106s`;
+- worst: `28.660s`.
+
+The environment-controlled elapsed values were `27.930s` best, `28.016s` mean,
+and `28.560s` worst. Those values remain useful for internal control-loop
+comparison, but human-PB comparisons use the displayed TMNF race clock.
 
 The completed live run produced all 20 replays and 5,659 raw action records.
 The first summary pass then exposed a restarted-countdown prefix in episode 0.
@@ -205,6 +211,8 @@ rerunning the model: 45 startup records were disclosed and removed, leaving
 
 Corrected summary: `runs/reward_v3/corrected_detector_final_summary.json`,
 SHA-256
+`D4459F301BF966B0A87DF2262393C17FEE9FBBEEBA2FBD002DB99F79F453BB50`.
+The pre-race-clock-correction summary is preserved with SHA-256
 `DAA7C6FBB2DACF14D29017F3BC99DBF44B1850CF92456A39D24AACCEBB78853D`.
 
 ### Precision result and remaining reward flaw

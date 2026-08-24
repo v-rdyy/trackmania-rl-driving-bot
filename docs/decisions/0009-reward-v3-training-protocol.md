@@ -66,7 +66,10 @@ terminal condition: the car could pass below `-10` units while still moving,
 recover onto the final straight, and finish. The detector was corrected after
 training to require the same 2.0-second no-progress/no-motion confirmation used
 by the V3 stuck rule. A single re-evaluation of the unchanged checkpoint then
-finished 20/20, with a best time of `27.930s` and a mean of `28.016s`.
+finished 20/20, with a TMNF race-clock best of `28.030s` and mean of
+`28.106s`. The earlier `27.930s`/`28.016s` values were environment-controlled
+elapsed times that subtract the 100 ms captured reset state; displayed human-PB
+comparisons use the game race clock.
 
 This correction changes the reliability measurement, not the learned policy.
 The original 12/20 result remains preserved as the result under the original

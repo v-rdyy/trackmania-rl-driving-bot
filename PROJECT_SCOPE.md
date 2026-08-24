@@ -1,13 +1,14 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
-**Status:** Phases 0 and 1 complete. Phase 2 reward v1-v3 experiments are
-complete. V3 established reliable finishing under the corrected detector; V4
-reward design is the next approval gate and V4 training has not begun.
+**Status:** Phases 0 and 1 complete. Phase 2 reward v1-v4 experiments are
+complete. V4 retained V3's reliable finishing and nearly matched the human PB,
+but oscillation and severe lateral excursions remain; the next reward-design
+decision is not yet approved.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Current evidenced project narrative:**
 
-> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state (speed, car-frame velocity, heading error, lateral offset, 10 look-ahead centerline points) instead of pixels. Iterated through 3 pre-registered rewards: sparse finish-only produced zero finishes; dense speed reached the final hoop but drove imprecisely; clamped centerline progress trained a reliable finisher. The unchanged V3 checkpoint finished 20/20 deterministic episodes after correcting a false vertical-fall detector, with a 27.930s best lap versus a 24.5s human PB after 1,001,472 training steps at 100x. V3 still oscillates, so precision and speed remain active work rather than being hidden by the finish rate.
+> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state instead of pixels. Iterated through 4 pre-registered rewards: sparse finish-only produced zero finishes; dense speed reached the final hoop but drove imprecisely; clamped centerline progress trained a reliable finisher; signed progress with time and terminal shaping retained 20/20 deterministic reliability and improved the TMNF race-clock best from 28.030s to 24.900s versus a 24.5s human PB. V4 trained for 1,001,472 additional steps at 100x from the pinned V3 checkpoint. Oscillation still occurred in 20/20 runs and severe lateral deviation worsened, so precision remains active work rather than being hidden by the finish rate.
 
 The paragraph above uses observed artifacts, not projected resume numbers. The
 `24.5s` human PB is a real measured comparison baseline. Future training totals
@@ -114,9 +115,9 @@ Document the exact shape/normalization of this observation vector in code commen
 - Actual outcome: the original detector reported 12/20 finishes and eight final
   jump falls. Replay inspection proved that the immediate vertical cutoff also
   stopped moving, recoverable trajectories. One corrected re-evaluation of the
-  unchanged checkpoint finished 20/20 (best `27.930s`, mean `28.016s`) with no
-  falls, stuck periods, timeouts, or inversions. Steering oscillation remained
-  in 20/20 runs, so V3 solved reliability but not precision.
+  unchanged checkpoint finished 20/20 (race-clock best `28.030s`, mean
+  `28.106s`) with no falls, stuck periods, timeouts, or inversions. Steering
+  oscillation remained in 20/20 runs, so V3 solved reliability but not precision.
 
 **Tasks per version:**
 
@@ -146,11 +147,20 @@ speed-slide experiment. Record which behaviors emerge unaided, which require
 stronger shaping or curriculum, and which are not discovered; that comparison is
 a project result even if some techniques never emerge.
 
+Actual V4 outcome: signed progress, a per-step time cost, finish bonus, and
+decisive failure penalty retained 20/20 deterministic finishes and produced a
+`24.900s` race-clock best (`24.929s` mean), `0.400s` behind the human PB. It
+cleaned up the reviewed final-hoop approach but did not remove oscillation; fixed
+metrics still flagged 20/20 episodes and maximum lateral deviation rose to
+`17.833` units. The next precision experiment should be scoped from that evidence
+rather than treating V4 as a fully solved driver.
+
 ---
 
 ## Phase 3 — Full Training, Evaluation, Reproducibility
 
-**Goal:** Take the winning reward (v3, assuming it works) to a real full training run and produce honest final numbers.
+**Goal:** Take the best evidence-backed reward forward after the V4 precision
+decision and produce honest final numbers.
 
 **Tasks:**
 

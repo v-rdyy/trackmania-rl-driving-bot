@@ -2,12 +2,12 @@
 
 This repository follows [`PROJECT_SCOPE.md`](PROJECT_SCOPE.md). **Phases 0 and 1
 are complete.** The live Gymnasium loop and bounded PPO/TensorBoard smoke test
-have passed. Phase 2 reward v1 and v2 are complete: sparse finish-only reward
+have passed. Phase 2 reward v1-v4 experiments are complete: sparse finish-only reward
 produced zero finishes and a flat curve, while dense speed reward produced a
 30-35% deterministic finish rate but an oscillatory line and unreliable final
 checkpoint/hoop approach. Reward v3 trained a reliability-focused progress
-policy; after correcting a false vertical-fall detector, the unchanged model
-finished 20/20 deterministic runs.
+policy; reward v4 retained its 20/20 deterministic finish rate while improving
+the TMNF race-clock best from `28.030s` to `24.900s`.
 Development history follows the rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -51,10 +51,14 @@ Development history follows the rules in
   12/20 finishes because a low but recoverable final-jump path crossed an
   immediate vertical cutoff. After requiring stalled-motion confirmation, one
   unchanged-checkpoint re-evaluation finished 20/20 with zero terminal failures:
-  best `27.930s`, mean `28.016s`, versus the owner's `24.5s` PB.
-- V3 is reliable but not precise. All 20 corrected runs still met the fixed
-  steering-oscillation threshold, and maximum absolute lateral deviation was
-  `13.568` units. V4 reward design is the next gate; V4 training has not begun.
+  TMNF race-clock best `28.030s`, mean `28.106s`, versus the owner's `24.5s` PB.
+- Reward v4 continued from that pinned V3 model for `1,001,472` additional
+  timesteps. Its 20-episode deterministic evaluation also finished 20/20, with
+  best `24.900s`, mean `24.929s`, and worst `24.950s`: only `0.400s` off the PB.
+- V4 fixed the observed final-hoop collision in the reviewed runs but did not
+  solve precision. Oscillation remained 20/20, and maximum absolute lateral
+  deviation increased from V3's `13.568` to `17.833` units. A precision-focused
+  next reward is now evidence-backed but not yet approved.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,
@@ -84,8 +88,10 @@ The fixed matrix and replay/video evidence protocol are documented in
 The checksum-pinned V2 evidence/source bundle used before V3 is documented in
 [`docs/pre-v3-backup.md`](docs/pre-v3-backup.md). The completed V3 protocol,
 results, detector correction, and hashes are in [`reward_v3.md`](reward_v3.md).
+The completed V4 hypothesis, fixed formula, training result, V3 comparison, and
+qualitative evidence are in [`reward_v4.md`](reward_v4.md).
 
-Live V3 evaluation and replay-inspection entry points now start the configured
+Live V3/V4 evaluation and replay-inspection entry points now start the configured
 `TmForever/default` ModLoader profile and load A01 themselves. Manual game/menu
 setup is no longer required; `--reuse-game` is an explicit opt-in for attaching
 to an already-running session.

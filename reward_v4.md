@@ -1,6 +1,6 @@
 # Reward v4: Signed progress with time and terminal outcomes
 
-Status: Pre-registered and approved; training not started
+Status: Complete; trained, quantitatively evaluated, and visually reviewed
 
 Date pre-registered: 2026-08-24
 
@@ -123,5 +123,125 @@ smoothness or lateral term in V5; do not add such a term to V4 mid-run.
 
 ## Actual outcome
 
-Pending. Complete this section from preserved training and evaluation artifacts
-without modifying the hypothesis, coefficients, thresholds, or protocol above.
+### Training
+
+V4 loaded the pinned V3 checkpoint and completed `1,001,472` additional PPO
+interactions on its first attempt in `2,441.23s` (`40m 41s`) at 100x. No
+interactions were discarded or replayed. All `1,001,472` audited actions were
+finite, in range, and passed the exact affine mapping check without hidden
+clipping.
+
+The 3,806 stochastic training episodes contained 3,662 finishes (`96.22%`), 103
+stuck truncations, 24 confirmed falls, 12 timeouts, and 5 off-track truncations.
+The first and last 100 training episodes both finished 98 times, while mean time
+among their successful laps improved from `28.282s` to `25.840s`. Mean reward
+over those windows rose from `235.946` to `238.251`. The TensorBoard rolling
+reward started at `192.809`, ended at `238.251`, and peaked at `244.870`.
+
+Training pace and reliability fluctuated rather than improving monotonically.
+The TensorBoard mean episode length ended above its first value because
+occasional exploratory failures ran longer even while successful laps became
+faster. The final checkpoint remained the pre-registered selection; no earlier
+checkpoint was cherry-picked.
+
+- final model: `checkpoints/reward_v4/final_model.zip`;
+- final model SHA-256:
+  `6DF90018CEC877796F6865BB6CB8D1A86929D84B6826642D26001DC5871C63F2`;
+- training summary SHA-256:
+  `8EE823F93F554402896D666D61868B1C29C75B33AF95CDFF0EE8A9E13F9C963A`.
+
+### Deterministic evaluation
+
+The final V4 checkpoint finished all 20 deterministic 6x episodes with zero
+falls, stuck periods, timeouts, off-track truncations, or inversions. Every
+episode used 249 control steps. TMNF terminal race-clock times, which are the
+correct basis for comparison with the displayed human PB, were:
+
+- best: `24.900s`, `0.400s` slower than the owner's `24.5s` PB;
+- mean: `24.929s`;
+- worst: `24.950s`.
+
+The environment-controlled elapsed values were `24.800s` best, `24.829s` mean,
+and `24.850s` worst. They subtract the 100 ms captured reset state and remain
+useful for the exact V3/V4 control-loop comparison, but they are not used for the
+human-PB claim. The first generated V4 summary used those elapsed values for the
+PB comparison; replay terminal clocks exposed the mismatch. That summary was
+preserved rather than overwritten silently, and the corrected summary was
+rebuilt from the same completed log and 20 replays without rerunning an episode.
+
+- corrected evaluation summary SHA-256:
+  `36FBA22B9FD71C98EA9DFAC39859C215C31E27ED445FAAC5AE02A8DA4BEBB847`;
+- pre-correction summary SHA-256:
+  `D529B1A3BB3977FAD2838307B70466C4B7AD616DB5FE88640B5CEF4BD54DF247`;
+- action log SHA-256:
+  `EA8AAE76ED3EA946077191006993493C8C572BC2156F4CBE0918C9677307192D`;
+- all 4,980 evaluated actions were finite and in range;
+- all 20 input replays are preserved in
+  `artifacts/replays/reward_v4_evaluation/`.
+
+On the same TMNF race-clock basis, corrected V3 was `28.030s` best, `28.106s`
+mean, and `28.660s` worst. V4 therefore improved best time by `3.130s`, mean by
+`3.177s`, and worst by `3.710s` while retaining the 20/20 finish rate.
+
+### Precision and oscillation result
+
+The open oscillation question resolved negatively: the fixed detector still
+flagged oscillation in 20/20 V4 episodes, versus 20/20 for corrected V3. Mean
+peak sign crossings within two seconds changed only from `5.15` to `5.00`.
+
+Lateral precision was mixed rather than uniformly better or worse:
+
+| Metric | Corrected V3 | V4 |
+|---|---:|---:|
+| Mean absolute lateral offset | `3.846` | `3.749` |
+| Mean p95 absolute lateral offset | `9.571` | `10.628` |
+| Maximum absolute lateral offset | `13.568` | `17.833` |
+| Mean seconds above 5 units | `9.755` | `6.185` |
+| Mean seconds above 10 units | `1.245` | `1.640` |
+
+V4 spent less time moderately off the reference line but had worse severe-tail
+excursions. Mean absolute steering increased from `0.486` to `0.567`. Removing
+V3's flat clamp region was not sufficient to remove oscillation: none of V4's
+4,980 deterministic steps reached the raised +/-20 clamp, none moved backward
+in projected progress, and the largest progress delta was `17.603` units.
+Oscillation therefore cannot be attributed only to V3's active clamp. This is
+direct evidence for considering an explicit smoothness or lateral term in V5,
+not permission to add one retroactively to V4.
+
+### Qualitative result and where the time came from
+
+The widest V4 episode passed centrally through the final hoop without the
+lower-right clip, low recovery, or inversion seen earlier. Its minimum vertical
+offset was only `-2.251`, compared with a corrected V3 run that recovered after
+reaching `-13.366`. Progress splits show that V4 was `0.100s` behind V3 at
+progress 500, `0.415s` ahead at progress 1700, `0.770s` ahead at progress 1900,
+`2.560s` ahead at progress 2100, and `3.160s` ahead at progress 2200. The large
+gain therefore came mainly from the clean hoop/final section rather than the
+opening drop.
+
+The maximum `17.833` lateral excursion occurred around progress 545 after an
+aggressive right-edge opening-drop trajectory. Visual review did not establish
+that this line improved the early split, so it is documented as a precision risk
+rather than claimed as a discovered advanced technique.
+
+The first qualitative capture correctly replayed V4 but inherited a hard-coded
+"V3" overlay from the shared inspector. That mislabeled take is preserved in
+`artifacts/videos/reward_v4_evaluation/`. The inspector was fixed and the same
+replay was recaptured without changing the policy or evaluation:
+
+- labeled video:
+  `artifacts/videos/reward_v4_evaluation_labeled/reward_v4_final_6df90018_ep_12.mp4`;
+- video SHA-256:
+  `5AEB244AB6149CC1FDB01A159F23760FA1360464EC396E23683A7D0651EC1BEC`;
+- full-lap, opening-drop, and final-section contact sheets are preserved beside
+  the video.
+
+### Hypothesis assessment
+
+The pre-registered hypothesis was supported on its primary claims: V4 preserved
+V3's 20/20 deterministic reliability, substantially improved lap time, and had
+no near-finish collision in 20 reviewed terminal outcomes. The clean final
+section accounted for most of the measured speed gain. The stated open question
+also produced a clear result: oscillation did not disappear, and severe lateral
+excursions worsened despite the raised clamp never activating. No reward term,
+threshold, initialization, or checkpoint-selection rule changed during the run.
