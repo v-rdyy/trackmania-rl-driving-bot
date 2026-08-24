@@ -21,11 +21,17 @@ class RewardTransition:
     timed_out: bool
     off_track: bool
     fallen: bool = False
+    stuck: bool = False
 
 
 RewardFunction = Callable[[RewardTransition], float]
 
 V3_PROGRESS_CLAMP_UNITS = 10.0
+V4_PROGRESS_CLAMP_UNITS = 20.0
+V4_PROGRESS_NORMALIZATION_UNITS = 10.0
+V4_TIME_COST = 0.10
+V4_FINISH_BONUS = 50.0
+V4_FAILURE_PENALTY = 250.0
 
 
 def phase1_smoke_reward(transition: RewardTransition) -> float:
@@ -54,3 +60,21 @@ def clamped_forward_progress_reward(transition: RewardTransition) -> float:
         - transition.previous_diagnostics.progress,
     )
     return min(forward_progress, V3_PROGRESS_CLAMP_UNITS) / V3_PROGRESS_CLAMP_UNITS
+
+
+def signed_progress_efficiency_reward(transition: RewardTransition) -> float:
+    """Reward v4: signed progress, elapsed-step cost, and terminal outcomes."""
+    progress_delta = (
+        transition.diagnostics.progress
+        - transition.previous_diagnostics.progress
+    )
+    signed_progress = min(
+        max(progress_delta, -V4_PROGRESS_CLAMP_UNITS),
+        V4_PROGRESS_CLAMP_UNITS,
+    ) / V4_PROGRESS_NORMALIZATION_UNITS
+    reward = signed_progress - V4_TIME_COST
+    if transition.terminated:
+        reward += V4_FINISH_BONUS
+    elif transition.truncated:
+        reward -= V4_FAILURE_PENALTY
+    return reward

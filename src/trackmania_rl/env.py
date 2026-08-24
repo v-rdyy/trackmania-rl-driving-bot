@@ -552,6 +552,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             timed_out=timed_out,
             off_track=off_track,
             fallen=fallen,
+            stuck=stuck,
         )
         reward = float(self.reward_function(transition))
         if not math.isfinite(reward):

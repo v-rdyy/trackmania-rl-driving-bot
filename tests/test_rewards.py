@@ -13,6 +13,7 @@ from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     dense_speed_reward,
     phase1_smoke_reward,
+    signed_progress_efficiency_reward,
     sparse_finish_reward,
 )
 
@@ -24,6 +25,10 @@ def transition(
     progress: float = 10.0,
     terminated: bool = False,
     truncated: bool = False,
+    timed_out: bool | None = None,
+    off_track: bool = False,
+    fallen: bool = False,
+    stuck: bool = False,
 ) -> RewardTransition:
     previous_diagnostics = ObservationDiagnostics(
         progress=previous_progress,
@@ -44,8 +49,10 @@ def transition(
         elapsed_ms=100,
         terminated=terminated,
         truncated=truncated,
-        timed_out=truncated,
-        off_track=False,
+        timed_out=truncated if timed_out is None else timed_out,
+        off_track=off_track,
+        fallen=fallen,
+        stuck=stuck,
     )
 
 
@@ -115,6 +122,69 @@ class RewardTests(unittest.TestCase):
                 )
             ),
             0.4,
+        )
+
+    def test_v4_reward_uses_signed_progress_and_time_cost(self) -> None:
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(previous_progress=10.0, progress=14.0)
+            ),
+            0.3,
+        )
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(previous_progress=10.0, progress=7.0)
+            ),
+            -0.4,
+        )
+
+    def test_v4_reward_clips_signed_progress_to_twenty_units(self) -> None:
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(previous_progress=10.0, progress=50.0)
+            ),
+            1.9,
+        )
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(previous_progress=50.0, progress=10.0)
+            ),
+            -2.1,
+        )
+
+    def test_v4_reward_adds_finish_bonus_on_terminal_step(self) -> None:
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(
+                    previous_progress=10.0,
+                    progress=14.0,
+                    terminated=True,
+                )
+            ),
+            50.3,
+        )
+
+    def test_v4_reward_applies_failure_penalty_to_every_verified_truncation(self) -> None:
+        failure_transitions = (
+            transition(truncated=True, timed_out=True),
+            transition(truncated=True, timed_out=False, off_track=True),
+            transition(truncated=True, timed_out=False, fallen=True),
+            transition(truncated=True, timed_out=False, stuck=True),
+        )
+
+        for failure in failure_transitions:
+            with self.subTest(failure=failure):
+                self.assertAlmostEqual(
+                    signed_progress_efficiency_reward(failure),
+                    -250.1,
+                )
+
+    def test_v4_finish_takes_precedence_over_truncation_defensively(self) -> None:
+        self.assertAlmostEqual(
+            signed_progress_efficiency_reward(
+                transition(terminated=True, truncated=True)
+            ),
+            49.9,
         )
 
 
