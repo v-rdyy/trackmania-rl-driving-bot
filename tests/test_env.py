@@ -520,6 +520,23 @@ class LiveTmiSessionTests(unittest.TestCase):
             ],
         )
 
+    def test_connect_callback_can_load_and_confirm_a_map(self) -> None:
+        session = LiveTmiSession(
+            EnvironmentConfig(map_to_load="A01-Race.Challenge.Gbx")
+        )
+        client = RecordingBridgeClient()
+        session.client = client
+        confirmations: list[bool] = []
+        session._start_map_confirmation = lambda: confirmations.append(True)
+
+        session._handle_non_step(MessageType.SC_ON_CONNECT_SYNC)
+
+        self.assertIn(
+            ("command", "map A01-Race.Challenge.Gbx"),
+            client.calls,
+        )
+        self.assertEqual(confirmations, [True])
+
     def test_prepare_respawns_and_waits_neutral_through_countdown(self) -> None:
         session = LiveTmiSession(EnvironmentConfig(auto_respawn_on_connect=True))
         client = RecordingBridgeClient()

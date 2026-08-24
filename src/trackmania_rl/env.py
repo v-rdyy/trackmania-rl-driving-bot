@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+import threading
+import time
 from bisect import bisect_left
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +20,7 @@ from trackmania_rl.observations import (
     ReferencePath,
     build_observation,
 )
+from trackmania_rl.game_launch import confirm_a01_solo
 from trackmania_rl.rewards import (
     RewardFunction,
     RewardTransition,
@@ -93,6 +96,29 @@ class LiveTmiSession:
         self._current_state: object | None = None
         self._current_race_time: int | None = None
         self._initial_snapshot: bytes | None = None
+        self._map_confirmation_stop = threading.Event()
+        self._map_confirmation_thread: threading.Thread | None = None
+
+    def _start_map_confirmation(self) -> None:
+        """Confirm TMNF's post-map loading screen until callbacks resume."""
+        self._map_confirmation_stop.clear()
+
+        def confirm() -> None:
+            deadline = time.monotonic() + 30.0
+            while not self._map_confirmation_stop.wait(0.75):
+                if time.monotonic() >= deadline:
+                    return
+                try:
+                    confirm_a01_solo()
+                except (OSError, RuntimeError):
+                    continue
+
+        self._map_confirmation_thread = threading.Thread(
+            target=confirm,
+            name="trackmania-map-confirmation",
+            daemon=True,
+        )
+        self._map_confirmation_thread.start()
 
     def _connect(self) -> None:
         if self._connected:
@@ -112,6 +138,7 @@ class LiveTmiSession:
             self.client.set_on_step_period(self.config.step_period_ms)
             if self.config.map_to_load is not None:
                 self.client.execute_command(f"map {self.config.map_to_load}")
+                self._start_map_confirmation()
         elif message_type is MessageType.SC_CHECKPOINT_COUNT_CHANGED_SYNC:
             self.client.read_int32()
             self.client.read_int32()
@@ -129,6 +156,7 @@ class LiveTmiSession:
                 self._current_race_time = self.client.read_int32()
                 self._current_state = self.client.get_simulation_state()
                 self._pending_step = True
+                self._map_confirmation_stop.set()
                 return
             self._handle_non_step(message_type)
 
@@ -260,6 +288,7 @@ class LiveTmiSession:
         self.client.recover_inputs(filename)
 
     def close(self) -> None:
+        self._map_confirmation_stop.set()
         if not self._connected:
             return
         try:
