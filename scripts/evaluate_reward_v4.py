@@ -19,6 +19,8 @@ def configure_evaluator() -> None:
     evaluator.EXPERIMENT_SLUG = "reward_v4"
     evaluator.PROTOCOL_LABEL = "reward_v4.md"
     evaluator.REWARD_FUNCTION = signed_progress_efficiency_reward
+    evaluator.EXPECTED_EPISODES = 20
+    evaluator.DEFAULT_RUN_TAG = None
     evaluator.RUN_DIR = run_dir
     evaluator.DEFAULT_CHECKPOINT = (
         WORKSPACE_ROOT / "checkpoints" / "reward_v4" / "final_model.zip"

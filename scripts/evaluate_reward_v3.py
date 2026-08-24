@@ -39,6 +39,8 @@ DEFAULT_CHECKPOINT = WORKSPACE_ROOT / "checkpoints" / "reward_v3" / "final_model
 DEFAULT_ACTION_LOG = RUN_DIR / "evaluation_actions.jsonl"
 DEFAULT_SUMMARY = RUN_DIR / "evaluation_summary.json"
 DEFAULT_REPLAY_DIR = WORKSPACE_ROOT / "artifacts" / "replays" / "reward_v3_evaluation"
+EXPECTED_EPISODES = 20
+DEFAULT_RUN_TAG: str | None = None
 DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
 HUMAN_PB_MS = 24_500
 FINAL_JUMP_PROGRESS = 1_700.0
@@ -46,10 +48,13 @@ FINAL_JUMP_PROGRESS = 1_700.0
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=f"Evaluate {EXPERIMENT_LABEL} for 20 deterministic episodes at 6x."
+        description=(
+            f"Evaluate {EXPERIMENT_LABEL} for {EXPECTED_EPISODES} deterministic "
+            "episodes at 6x."
+        )
     )
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
-    parser.add_argument("--episodes", type=int, default=20)
+    parser.add_argument("--episodes", type=int, default=EXPECTED_EPISODES)
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--action-log", type=Path, default=DEFAULT_ACTION_LOG)
     parser.add_argument("--summary", type=Path, default=DEFAULT_SUMMARY)
@@ -57,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument(
         "--run-tag",
-        default=None,
+        default=DEFAULT_RUN_TAG,
         help="optional identifier added to replay filenames and the summary",
     )
     parser.add_argument(
@@ -274,9 +279,10 @@ def main() -> int:
         "tmi_scripts_dir",
     ):
         setattr(args, path_argument, getattr(args, path_argument).resolve())
-    if args.episodes != 20:
+    if args.episodes != EXPECTED_EPISODES:
         raise SystemExit(
-            f"{PROTOCOL_LABEL} fixes {EXPERIMENT_LABEL} evaluation at 20 episodes"
+            f"{PROTOCOL_LABEL} fixes {EXPERIMENT_LABEL} evaluation at "
+            f"{EXPECTED_EPISODES} episodes"
         )
     if not args.checkpoint.is_file():
         raise SystemExit(f"checkpoint does not exist: {args.checkpoint}")

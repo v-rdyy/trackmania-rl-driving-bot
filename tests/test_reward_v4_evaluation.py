@@ -19,6 +19,8 @@ class RewardV4EvaluationTests(unittest.TestCase):
 
         self.assertEqual(MODULE.evaluator.EXPERIMENT_LABEL, "reward-v4")
         self.assertEqual(MODULE.evaluator.EXPERIMENT_SLUG, "reward_v4")
+        self.assertEqual(MODULE.evaluator.EXPECTED_EPISODES, 20)
+        self.assertIsNone(MODULE.evaluator.DEFAULT_RUN_TAG)
         self.assertEqual(
             MODULE.evaluator.REWARD_FUNCTION.__name__,
             "signed_progress_efficiency_reward",
