@@ -115,6 +115,21 @@ def evaluated_race_records(
     return records[start:], start
 
 
+def validate_action_record_count(
+    *,
+    raw_records: int,
+    evaluated_records: int,
+    discarded_startup_records: int,
+) -> None:
+    """Confirm every raw record is either evaluated or explicitly discarded."""
+    if raw_records != evaluated_records + discarded_startup_records:
+        raise ProtocolError(
+            f"evaluation action log has {raw_records} records for "
+            f"{evaluated_records} evaluated steps and {discarded_startup_records} "
+            "startup records"
+        )
+
+
 def trajectory_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     if not records:
         raise ProtocolError("cannot analyze an empty evaluation trajectory")
@@ -456,13 +471,14 @@ def main() -> int:
                     "input_replay_sha256": sha256(local_replay),
                 }
             )
-    expected_actions = sum(int(episode["steps"]) for episode in episode_records)
-    if len(action_records) != expected_actions + discarded_startup_records:
-        raise ProtocolError(
-            f"evaluation action log has {len(action_records)} records for "
-            f"{expected_actions} evaluated steps and {discarded_startup_records} "
-            "startup records"
-        )
+    evaluated_action_count = sum(
+        len(records) for records in evaluated_by_episode.values()
+    )
+    validate_action_record_count(
+        raw_records=len(action_records),
+        evaluated_records=evaluated_action_count,
+        discarded_startup_records=discarded_startup_records,
+    )
     for episode in episode_records:
         episode["trajectory"] = trajectory_metrics(
             evaluated_by_episode[int(episode["episode"])]

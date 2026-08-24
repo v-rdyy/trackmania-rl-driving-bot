@@ -73,6 +73,24 @@ class RewardV3EvaluationTests(unittest.TestCase):
         self.assertEqual(discarded, 4)
         self.assertEqual([row["race_time_ms"] for row in evaluated], [0, 100])
 
+    def test_action_count_accepts_disclosed_startup_records(self) -> None:
+        MODULE.validate_action_record_count(
+            raw_records=25_008,
+            evaluated_records=24_963,
+            discarded_startup_records=45,
+        )
+
+    def test_action_count_rejects_unaccounted_records(self) -> None:
+        with self.assertRaisesRegex(
+            MODULE.ProtocolError,
+            "25008 records for 24963 evaluated steps and 44 startup records",
+        ):
+            MODULE.validate_action_record_count(
+                raw_records=25_008,
+                evaluated_records=24_963,
+                discarded_startup_records=44,
+            )
+
     def test_trajectory_preserves_terminal_vertical_and_upright_evidence(self) -> None:
         records = [
             record(
