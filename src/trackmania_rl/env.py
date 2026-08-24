@@ -421,6 +421,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode_start_race_time = 0
         self._last_diagnostics: ObservationDiagnostics | None = None
         self._last_position: np.ndarray | None = None
+        self._last_steer_action: float | None = None
         self._stuck_history: list[tuple[int, float, float]] = []
 
     def _observation(
@@ -455,6 +456,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode_start_race_time = int(state.race_time)
         self._last_diagnostics = diagnostics
         self._last_position = np.asarray(state.position, dtype=np.float64).copy()
+        self._last_steer_action = None
         self._stuck_history = [(0, diagnostics.progress, 0.0)]
         return observation, self._info(state, diagnostics)
 
@@ -516,6 +518,12 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self, action: np.ndarray
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         validated = self._validated_action(action)
+        previous_steer = self._last_steer_action
+        steering_rate_change = (
+            0.0
+            if previous_steer is None
+            else abs(float(validated[0]) - previous_steer)
+        )
         result = self.session.advance(validated)
         observation, diagnostics = self._observation(result.state)
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
@@ -553,6 +561,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             off_track=off_track,
             fallen=fallen,
             stuck=stuck,
+            steering_rate_change=steering_rate_change,
         )
         reward = float(self.reward_function(transition))
         if not math.isfinite(reward):
@@ -573,6 +582,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "stuck_window_world_distance": stuck_world_distance,
                 "race_finished": terminated,
                 "reward_function": self.reward_name,
+                "steering_rate_change": steering_rate_change,
             }
         )
         if self._logger is not None:
@@ -582,6 +592,8 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "step": self._step,
                     "race_time_ms": result.race_time_ms,
                     "raw_action": validated.tolist(),
+                    "previous_steer": previous_steer,
+                    "steering_rate_change": steering_rate_change,
                     "finite": True,
                     "within_range": True,
                     "valid": True,
@@ -618,6 +630,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             )
 
         self._last_diagnostics = diagnostics
+        self._last_steer_action = float(validated[0])
         self._step += 1
         return observation, reward, terminated, truncated, info
 

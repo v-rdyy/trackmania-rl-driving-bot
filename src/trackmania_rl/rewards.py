@@ -22,6 +22,7 @@ class RewardTransition:
     off_track: bool
     fallen: bool = False
     stuck: bool = False
+    steering_rate_change: float = 0.0
 
 
 RewardFunction = Callable[[RewardTransition], float]
@@ -32,6 +33,7 @@ V4_PROGRESS_NORMALIZATION_UNITS = 10.0
 V4_TIME_COST = 0.10
 V4_FINISH_BONUS = 50.0
 V4_FAILURE_PENALTY = 250.0
+V5_STEERING_RATE_COEFFICIENT = 0.05
 
 
 def phase1_smoke_reward(transition: RewardTransition) -> float:
@@ -78,3 +80,10 @@ def signed_progress_efficiency_reward(transition: RewardTransition) -> float:
     elif transition.truncated:
         reward -= V4_FAILURE_PENALTY
     return reward
+
+
+def steering_rate_smoothness_reward(transition: RewardTransition) -> float:
+    """Reward v5: V4 minus one normalized steering-rate-of-change term."""
+    return signed_progress_efficiency_reward(transition) - (
+        V5_STEERING_RATE_COEFFICIENT * transition.steering_rate_change
+    )

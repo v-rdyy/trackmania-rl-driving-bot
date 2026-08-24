@@ -15,6 +15,7 @@ from trackmania_rl.rewards import (
     phase1_smoke_reward,
     signed_progress_efficiency_reward,
     sparse_finish_reward,
+    steering_rate_smoothness_reward,
 )
 
 
@@ -29,6 +30,7 @@ def transition(
     off_track: bool = False,
     fallen: bool = False,
     stuck: bool = False,
+    steering_rate_change: float = 0.0,
 ) -> RewardTransition:
     previous_diagnostics = ObservationDiagnostics(
         progress=previous_progress,
@@ -53,6 +55,7 @@ def transition(
         off_track=off_track,
         fallen=fallen,
         stuck=stuck,
+        steering_rate_change=steering_rate_change,
     )
 
 
@@ -185,6 +188,40 @@ class RewardTests(unittest.TestCase):
                 transition(terminated=True, truncated=True)
             ),
             49.9,
+        )
+
+    def test_v5_matches_v4_when_steering_does_not_change(self) -> None:
+        unchanged = transition(previous_progress=10.0, progress=14.0)
+
+        self.assertEqual(
+            steering_rate_smoothness_reward(unchanged),
+            signed_progress_efficiency_reward(unchanged),
+        )
+
+    def test_v5_subtracts_only_absolute_steering_rate_change(self) -> None:
+        changed = transition(
+            previous_progress=10.0,
+            progress=14.0,
+            steering_rate_change=0.4,
+        )
+
+        self.assertAlmostEqual(
+            steering_rate_smoothness_reward(changed),
+            0.28,
+        )
+
+    def test_v5_preserves_v4_terminal_terms(self) -> None:
+        self.assertAlmostEqual(
+            steering_rate_smoothness_reward(
+                transition(terminated=True, steering_rate_change=2.0)
+            ),
+            49.8,
+        )
+        self.assertAlmostEqual(
+            steering_rate_smoothness_reward(
+                transition(truncated=True, stuck=True, steering_rate_change=2.0)
+            ),
+            -250.2,
         )
 
 

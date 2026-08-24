@@ -22,6 +22,7 @@ from trackmania_rl.observations import ReferencePath
 from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     sparse_finish_reward,
+    steering_rate_smoothness_reward,
 )
 from trackmania_rl.tmi_bridge import MessageType
 
@@ -177,6 +178,50 @@ class TrackmaniaEnvTests(unittest.TestCase):
             record = json.loads(log_path.read_text(encoding="utf-8"))
             self.assertFalse(record["finite"])
             self.assertFalse(record["valid"])
+
+    def test_steering_rate_change_is_zero_on_reset_then_tracks_frame_delta(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, z=0, speed=100, race_time=100),
+                state(x=2, z=0, speed=100, race_time=200),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "actions.jsonl"
+            env = TrackmaniaEnv(
+                reference_path=self.path,
+                session=session,
+                action_log_path=log_path,
+                reward_function=steering_rate_smoothness_reward,
+            )
+            env.reset()
+            _, first_reward, _, _, first_info = env.step(
+                np.asarray([0.75, 1.0, 0.0], dtype=np.float32)
+            )
+            _, second_reward, _, _, second_info = env.step(
+                np.asarray([-0.25, 1.0, 0.0], dtype=np.float32)
+            )
+            env.reset()
+            _, reset_reward, _, _, reset_info = env.step(
+                np.asarray([-0.25, 1.0, 0.0], dtype=np.float32)
+            )
+            env.close()
+
+            records = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(first_info["steering_rate_change"], 0.0)
+        self.assertEqual(second_info["steering_rate_change"], 1.0)
+        self.assertEqual(reset_info["steering_rate_change"], 0.0)
+        self.assertAlmostEqual(first_reward, 0.0)
+        self.assertAlmostEqual(second_reward, -0.05)
+        self.assertAlmostEqual(reset_reward, 0.0)
+        self.assertIsNone(records[0]["previous_steer"])
+        self.assertEqual(records[1]["previous_steer"], 0.75)
+        self.assertIsNone(records[2]["previous_steer"])
 
     def test_off_track_step_is_truncated_with_owner_approved_penalty(self) -> None:
         session = FakeSession(
