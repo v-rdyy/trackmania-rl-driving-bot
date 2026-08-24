@@ -1,14 +1,14 @@
 # Trackmania RL Driving Bot — Full Project Scope
 
 **Status:** Phases 0 and 1 complete. Phase 2 reward v1-v4 experiments are
-complete. V4 retained V3's reliable finishing and nearly matched the human PB,
-but oscillation and severe lateral excursions remain; the next reward-design
-decision is not yet approved.
+complete. V4 nearly matched the human PB and finished 98/100 scale-validation
+episodes, but oscillation and severe lateral excursions remain; V5 is on hold
+while the next project direction is decided.
 **Owner workflow:** Claude/human as decision layer and reward design, Codex as implementation layer. Codex should not make reward-design or scope decisions unilaterally, flag and ask instead.
 
 **Current evidenced project narrative:**
 
-> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state instead of pixels. Iterated through 4 pre-registered rewards: sparse finish-only produced zero finishes; dense speed reached the final hoop but drove imprecisely; clamped centerline progress trained a reliable finisher; signed progress with time and terminal shaping retained 20/20 deterministic reliability and improved the TMNF race-clock best from 28.030s to 24.900s versus a 24.5s human PB. V4 trained for 1,001,472 additional steps at 100x from the pinned V3 checkpoint. Oscillation still occurred in 20/20 runs and severe lateral deviation worsened, so precision remains active work rather than being hidden by the finish rate.
+> Trained a PPO agent to drive TrackMania Nations Forever through a custom Gymnasium environment over TMInterface, using engineered state instead of pixels. Iterated through 4 pre-registered rewards: sparse finish-only produced zero finishes; dense speed reached the final hoop but drove imprecisely; clamped centerline progress trained a reliable finisher; signed progress with time and terminal shaping improved the TMNF race-clock best from 28.030s to 24.900s versus a 24.5s human PB and finished 98/100 scale-validation episodes (95% Wilson interval 93.00%-99.45%). V4 trained for 1,001,472 additional steps at 100x from the pinned V3 checkpoint. Oscillation still occurred in 100/100 runs and maximum lateral deviation reached 18.642 units, so precision remains visible in the result rather than being hidden by the finish rate.
 
 The paragraph above uses observed artifacts, not projected resume numbers. The
 `24.5s` human PB is a real measured comparison baseline. Future training totals
@@ -148,12 +148,13 @@ stronger shaping or curriculum, and which are not discovered; that comparison is
 a project result even if some techniques never emerge.
 
 Actual V4 outcome: signed progress, a per-step time cost, finish bonus, and
-decisive failure penalty retained 20/20 deterministic finishes and produced a
-`24.900s` race-clock best (`24.929s` mean), `0.400s` behind the human PB. It
-cleaned up the reviewed final-hoop approach but did not remove oscillation; fixed
-metrics still flagged 20/20 episodes and maximum lateral deviation rose to
-`17.833` units. The next precision experiment should be scoped from that evidence
-rather than treating V4 as a fully solved driver.
+decisive failure penalty produced a `24.900s` race-clock best, `0.400s` behind
+the human PB. A separate unchanged-checkpoint validation finished 98/100, with a
+`24.931s` mean and two upright late-course stuck failures. It cleaned up the
+typical reviewed final-hoop approach but did not remove oscillation; fixed
+metrics still flagged 100/100 episodes and maximum lateral deviation reached
+`18.642` units. V5 remains on hold pending the owner's choice between a precision
+experiment and finalizing the existing result.
 
 ---
 

@@ -6,8 +6,8 @@ have passed. Phase 2 reward v1-v4 experiments are complete: sparse finish-only r
 produced zero finishes and a flat curve, while dense speed reward produced a
 30-35% deterministic finish rate but an oscillatory line and unreliable final
 checkpoint/hoop approach. Reward v3 trained a reliability-focused progress
-policy; reward v4 retained its 20/20 deterministic finish rate while improving
-the TMNF race-clock best from `28.030s` to `24.900s`.
+policy; reward v4 improved the TMNF race-clock best from `28.030s` to `24.900s`
+and then finished `98/100` scale-validation episodes.
 Development history follows the rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -55,10 +55,14 @@ Development history follows the rules in
 - Reward v4 continued from that pinned V3 model for `1,001,472` additional
   timesteps. Its 20-episode deterministic evaluation also finished 20/20, with
   best `24.900s`, mean `24.929s`, and worst `24.950s`: only `0.400s` off the PB.
-- V4 fixed the observed final-hoop collision in the reviewed runs but did not
-  solve precision. Oscillation remained 20/20, and maximum absolute lateral
-  deviation increased from V3's `13.568` to `17.833` units. A precision-focused
-  next reward is now evidence-backed but not yet approved.
+- The unchanged V4 checkpoint then finished 98/100 episodes in a separately
+  preserved scale validation (95% Wilson interval `93.00%`-`99.45%`). Its
+  `24.900s` best held, mean was `24.931s`, and its two failures were an upright
+  premature-braking stall near the finish and a high-speed left-side impact on
+  the final approach.
+- V4 did not solve precision. Oscillation remained 100/100, and maximum absolute
+  lateral deviation reached `18.642` units. V5 is on hold while the owner chooses
+  between a precision experiment and finalizing V1-V4 as the resume result.
 
 Run the Phase 1 PPO smoke test while A01 is loaded. The wrapper automatically
 respawns through TMInterface, observes the full pre-race countdown transition,
@@ -89,7 +93,9 @@ The checksum-pinned V2 evidence/source bundle used before V3 is documented in
 [`docs/pre-v3-backup.md`](docs/pre-v3-backup.md). The completed V3 protocol,
 results, detector correction, and hashes are in [`reward_v3.md`](reward_v3.md).
 The completed V4 hypothesis, fixed formula, training result, V3 comparison, and
-qualitative evidence are in [`reward_v4.md`](reward_v4.md).
+100-episode scale validation are in [`reward_v4.md`](reward_v4.md). The complete
+hypothesis-result-motivation story across all four versions is in
+[`docs/reward-comparison-v1-v4.md`](docs/reward-comparison-v1-v4.md).
 
 Live V3/V4 evaluation and replay-inspection entry points now start the configured
 `TmForever/default` ModLoader profile and load A01 themselves. Manual game/menu
