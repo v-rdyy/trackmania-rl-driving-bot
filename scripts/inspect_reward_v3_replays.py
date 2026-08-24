@@ -25,6 +25,18 @@ DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "artifacts" / "videos" / "reward_v3_final_jump"
 
 
+def replay_experiment_label(stem: str) -> str:
+    match = next(
+        (
+            version.upper()
+            for version in ("v4", "v3", "v2", "v1", "v0")
+            if stem.startswith(f"reward_{version}_")
+        ),
+        None,
+    )
+    return match or "TrackMania"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("replays", nargs="+", type=Path)
@@ -91,7 +103,10 @@ def inspect_replay(
     if video_path.exists() or telemetry_path.exists():
         raise FileExistsError(f"refusing to overwrite replay inspection: {local_replay.stem}")
 
-    label = f"V3 preserved replay | {local_replay.stem} | {simulation_speed:g}x"
+    label = (
+        f"{replay_experiment_label(local_replay.stem)} preserved replay | "
+        f"{local_replay.stem} | {simulation_speed:g}x"
+    )
     recorder = ProgressVideoRecorder(video_path, label=label, fps=fps, max_width=max_width)
     initial = telemetry_record(state, reference, 0)
     records = [initial]
