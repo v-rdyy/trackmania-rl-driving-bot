@@ -226,30 +226,75 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertTrue(truncated)
         self.assertTrue(info["timeout"])
 
-    def test_vertical_fall_is_truncated_before_timeout(self) -> None:
+    def test_vertical_drop_requires_stalled_confirmation(self) -> None:
         session = FakeSession(
             [
                 state(x=0, z=0, speed=0, race_time=0),
                 state(x=1, y=-11, z=0, speed=100, race_time=100),
+                state(x=1, y=-11, z=0, speed=0, race_time=2100),
             ]
         )
         env = TrackmaniaEnv(
-            config=EnvironmentConfig(max_vertical_drop=10.0),
+            config=EnvironmentConfig(
+                max_vertical_drop=10.0,
+                stuck_window_ms=2_000,
+            ),
             reference_path=self.path,
             session=session,
         )
         env.reset()
+
+        _, first_reward, terminated, truncated, first_info = env.step(
+            np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+        )
+        self.assertFalse(terminated)
+        self.assertFalse(truncated)
+        self.assertTrue(first_info["below_reference"])
+        self.assertFalse(first_info["fallen"])
 
         _, reward, terminated, truncated, info = env.step(
             np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
         )
         env.close()
 
-        self.assertAlmostEqual(reward, -0.9)
+        self.assertAlmostEqual(first_reward, 0.1)
+        self.assertAlmostEqual(reward, -1.0)
         self.assertFalse(terminated)
         self.assertTrue(truncated)
+        self.assertTrue(info["below_reference"])
         self.assertTrue(info["fallen"])
+        self.assertFalse(info["stuck"])
         self.assertFalse(info["timeout"])
+
+    def test_low_jump_arc_is_not_a_fall_while_progress_continues(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, y=-11, z=0, speed=100, race_time=100),
+                state(x=15, y=-11, z=0, speed=100, race_time=2100),
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(
+                max_vertical_drop=10.0,
+                stuck_window_ms=2_000,
+            ),
+            reference_path=self.path,
+            session=session,
+        )
+        env.reset()
+        env.step(np.asarray([0.0, 0.0, 0.0], dtype=np.float32))
+
+        _, _, terminated, truncated, info = env.step(
+            np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertFalse(terminated)
+        self.assertFalse(truncated)
+        self.assertTrue(info["below_reference"])
+        self.assertFalse(info["fallen"])
+        self.assertFalse(info["stuck"])
 
     def test_live_config_can_request_a_map_without_changing_offline_sessions(self) -> None:
         config = EnvironmentConfig(map_to_load="A01-Race.Challenge.Gbx")

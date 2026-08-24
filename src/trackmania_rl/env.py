@@ -503,7 +503,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
         timed_out = elapsed_ms >= self.config.max_episode_ms
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
-        fallen = diagnostics.vertical_offset < -self.config.max_vertical_drop
+        below_reference = (
+            diagnostics.vertical_offset < -self.config.max_vertical_drop
+        )
         terminated = bool(result.race_finished)
         stuck_candidate, stuck_progress_gain, stuck_world_distance = (
             self._stuck_status(
@@ -512,7 +514,11 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 diagnostics=diagnostics,
             )
         )
-        stuck = bool(not terminated and stuck_candidate)
+        # A jump arc below one recorded human trajectory is not itself a fall.
+        # Confirm the car has also stopped progressing and moving before using
+        # the vertical deviation as a terminal failure signal.
+        fallen = bool(not terminated and below_reference and stuck_candidate)
+        stuck = bool(not terminated and stuck_candidate and not fallen)
         truncated = bool(
             not terminated and (timed_out or off_track or fallen or stuck)
         )
@@ -541,6 +547,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "applied_gas": result.applied_gas,
                 "timeout": timed_out,
                 "off_track": off_track,
+                "below_reference": below_reference,
                 "fallen": fallen,
                 "stuck": stuck,
                 "stuck_window_progress_gain": stuck_progress_gain,
@@ -578,6 +585,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "truncated": truncated,
                     "timeout": timed_out,
                     "off_track": off_track,
+                    "below_reference": below_reference,
                     "fallen": fallen,
                     "stuck": stuck,
                     "stuck_window_progress_gain": stuck_progress_gain,
