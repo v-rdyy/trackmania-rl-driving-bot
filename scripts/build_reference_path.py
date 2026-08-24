@@ -1,4 +1,4 @@
-"""Build the committed A01 reference path from verified lap telemetry."""
+"""Build a committed reference path from verified lap telemetry."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ VERIFIED_SOURCE_SHA256 = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Resample verified A01 telemetry into a fixed-spacing path."
+        description="Resample verified track telemetry into a fixed-spacing path."
     )
     parser.add_argument(
         "--input",
@@ -37,6 +37,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--expected-source-sha256",
         default=VERIFIED_SOURCE_SHA256,
+    )
+    parser.add_argument("--track", default="A01-Race")
+    parser.add_argument(
+        "--source-kind",
+        default="resampled_manual_driving_reference",
+    )
+    parser.add_argument(
+        "--decision",
+        default="docs/decisions/0003-a01-reference-path.md",
     )
     return parser.parse_args()
 
@@ -104,6 +113,9 @@ def write_outputs(
     moving_samples: int,
     spacing: float,
     total_length: float,
+    track: str,
+    source_kind: str,
+    decision: str,
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8", newline="") as csv_file:
@@ -126,8 +138,8 @@ def write_outputs(
     except ValueError:
         source_label = str(source)
     metadata = {
-        "track": "A01-Race",
-        "kind": "resampled_manual_driving_reference",
+        "track": track,
+        "kind": source_kind,
         "source": source_label,
         "source_sha256": source_sha256,
         "source_samples": source_samples,
@@ -137,7 +149,7 @@ def write_outputs(
         "total_length": total_length,
         "horizontal_axes": ["x", "z"],
         "elevation_axis": "y",
-        "decision": "docs/decisions/0003-a01-reference-path.md",
+        "decision": decision,
     }
     metadata_path = output.with_suffix(".meta.json")
     metadata_path.write_text(
@@ -167,9 +179,13 @@ def main() -> int:
         moving_samples=len(moving),
         spacing=args.spacing,
         total_length=total_length,
+        track=args.track,
+        source_kind=args.source_kind,
+        decision=args.decision,
     )
     print(
-        f"wrote {len(points)} A01 reference points at {args.spacing:.3f}-unit "
+        f"wrote {len(points)} {args.track} reference points at "
+        f"{args.spacing:.3f}-unit "
         f"spacing over {total_length:.3f} units to {args.output}"
     )
     return 0

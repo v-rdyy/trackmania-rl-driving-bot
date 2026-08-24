@@ -29,6 +29,7 @@ from trackmania_rl.evaluation_metrics import (
 )
 from trackmania_rl.rewards import clamped_forward_progress_reward
 from trackmania_rl.tmi_bridge import ProtocolError
+from trackmania_rl.observations import ReferencePath
 
 EXPERIMENT_LABEL = "reward-v3"
 EXPERIMENT_SLUG = "reward_v3"
@@ -43,7 +44,11 @@ EXPECTED_EPISODES = 20
 DEFAULT_RUN_TAG: str | None = None
 DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
 HUMAN_PB_MS = 24_500
-FINAL_JUMP_PROGRESS = 1_700.0
+FINAL_JUMP_PROGRESS: float | None = 1_700.0
+TRACK_LABEL = "A01-Race"
+MAP_TO_LOAD = "A01-Race.Challenge.Gbx"
+REFERENCE_PATH = WORKSPACE_ROOT / "data" / "tracks" / "a01_reference_path.csv"
+EXPECTED_CHECKPOINT_SHA256: str | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -208,6 +213,8 @@ def lap_time_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "lap_time_basis": (
             "TMNF terminal race clock; directly comparable to the displayed human PB"
+            if HUMAN_PB_MS is not None
+            else "TMNF terminal race clock; no human comparison is registered"
         ),
         "best_finish_time_ms": min(race_clock_times) if race_clock_times else None,
         "average_finish_time_ms": (
@@ -216,7 +223,9 @@ def lap_time_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         "worst_finish_time_ms": max(race_clock_times) if race_clock_times else None,
         "human_pb_ms": HUMAN_PB_MS,
         "best_finish_gap_to_human_pb_ms": (
-            min(race_clock_times) - HUMAN_PB_MS if race_clock_times else None
+            min(race_clock_times) - HUMAN_PB_MS
+            if race_clock_times and HUMAN_PB_MS is not None
+            else None
         ),
         "controlled_elapsed_time_basis": (
             "terminal race clock minus the environment's captured reset state"
@@ -253,7 +262,7 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     late_falls = sum(
         bool(episode["fallen"])
         and float(episode["trajectory"]["final_progress"])
-        >= FINAL_JUMP_PROGRESS
+        >= float(FINAL_JUMP_PROGRESS)
         for episode in episodes
     )
     stuck_truncations = sum(bool(episode["stuck"]) for episode in episodes)
@@ -268,7 +277,7 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
         f"Terminal causes included {falls} falls, {stuck_truncations} stuck "
         f"cutoffs, and {timeouts} timeouts.",
         f"{late_falls} falls terminated at or after final-jump progress "
-        f"{FINAL_JUMP_PROGRESS:.0f}.",
+        f"{float(FINAL_JUMP_PROGRESS):.0f}.",
         f"Best projected path progress was {best_progress:.3f} units.",
     ]
     if finishes == 0 and falls == len(episodes):
@@ -285,6 +294,7 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
 
 
 def main() -> int:
+    global FINAL_JUMP_PROGRESS
     args = parse_args()
     for path_argument in (
         "checkpoint",
@@ -301,6 +311,8 @@ def main() -> int:
         )
     if not args.checkpoint.is_file():
         raise SystemExit(f"checkpoint does not exist: {args.checkpoint}")
+    if not REFERENCE_PATH.is_file():
+        raise SystemExit(f"reference path does not exist: {REFERENCE_PATH}")
     if not args.tmi_scripts_dir.is_dir():
         raise SystemExit(
             f"TMInterface Scripts directory does not exist: {args.tmi_scripts_dir}"
@@ -325,6 +337,17 @@ def main() -> int:
         print(f"TrackMania ready (launched={launched})", flush=True)
 
     checkpoint_hash = sha256(args.checkpoint)
+    if (
+        EXPECTED_CHECKPOINT_SHA256 is not None
+        and checkpoint_hash != EXPECTED_CHECKPOINT_SHA256
+    ):
+        raise SystemExit(
+            f"checkpoint hash mismatch: expected {EXPECTED_CHECKPOINT_SHA256}, "
+            f"got {checkpoint_hash}"
+        )
+    reference_path = ReferencePath.from_csv(REFERENCE_PATH)
+    if FINAL_JUMP_PROGRESS is None:
+        FINAL_JUMP_PROGRESS = 0.8 * reference_path.total_length
     replay_prefix = f"{EXPERIMENT_SLUG}_final_{checkpoint_hash[:8].lower()}"
     if args.run_tag is not None:
         replay_prefix = f"{replay_prefix}_{args.run_tag}"
@@ -356,12 +379,13 @@ def main() -> int:
                 stuck_progress_gain_units=1.0,
                 stuck_world_distance_units=2.0,
                 legacy_reversed_pedal_mapping=False,
-                map_to_load="A01-Race.Challenge.Gbx",
+                map_to_load=MAP_TO_LOAD,
                 auto_respawn_on_connect=False,
                 wait_for_race_start_on_connect=True,
             ),
             reward_function=REWARD_FUNCTION,
             action_log_path=args.action_log,
+            reference_path=reference_path,
         )
         model = PPO.load(args.checkpoint, device="cpu")
         try:
@@ -503,7 +527,7 @@ def main() -> int:
     late_falls = sum(
         bool(episode["fallen"])
         and float(episode["trajectory"]["final_progress"])
-        >= FINAL_JUMP_PROGRESS
+        >= float(FINAL_JUMP_PROGRESS)
         for episode in episode_records
     )
     precision_summary = aggregate_precision_metrics(
@@ -511,6 +535,11 @@ def main() -> int:
     )
     time_metrics = lap_time_metrics(episode_records)
     summary = {
+        "track": TRACK_LABEL,
+        "map_to_load": MAP_TO_LOAD,
+        "reference_path": str(REFERENCE_PATH.relative_to(WORKSPACE_ROOT)),
+        "reference_path_sha256": sha256(REFERENCE_PATH),
+        "reference_path_total_length": reference_path.total_length,
         "episodes": args.episodes,
         "deterministic": True,
         "simulation_speed": 6.0,
