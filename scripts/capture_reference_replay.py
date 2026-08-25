@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import math
+import shutil
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.env import EnvironmentConfig, LiveTmiSession
 from trackmania_rl.game_launch import close_trackmania, ensure_trackmania_running
+from trackmania_rl.track_assets import ensure_pinned_track_copy
 from trackmania_rl.tmi_bridge import ProtocolError
 
 DEFAULT_INPUT = (
@@ -25,6 +27,21 @@ DEFAULT_OUTPUT = (
     WORKSPACE_ROOT / "artifacts" / "telemetry" / "a02_nadeo_author.jsonl"
 )
 DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
+A02_CHALLENGE = Path(
+    r"C:\Program Files (x86)\Steam\steamapps\common\TrackMania Nations Forever"
+    r"\GameData\Tracks\Campaigns\Nations\White\A02-Race.Challenge.Gbx"
+)
+A02_CHALLENGE_SHA256 = (
+    "DCBB1376DCBD10A6018E26D6991EF0155717FA27A57AED27236B95A5876A9D80"
+)
+A02_USER_CHALLENGE = (
+    Path.home()
+    / "Documents"
+    / "TrackMania"
+    / "Tracks"
+    / "Challenges"
+    / "A02-Race.Challenge.Gbx"
+)
 
 
 def sha256(path: Path) -> str:
@@ -102,11 +119,28 @@ def main() -> int:
         raise SystemExit(f"input replay does not exist: {args.input}")
     if args.output.exists():
         raise SystemExit(f"refusing to overwrite telemetry: {args.output}")
+    if not args.tmi_scripts_dir.is_dir():
+        raise SystemExit(f"TMInterface Scripts directory missing: {args.tmi_scripts_dir}")
     external_inputs = args.tmi_scripts_dir / args.input.name
-    if not external_inputs.is_file() or sha256(external_inputs) != sha256(args.input):
+    input_hash = sha256(args.input)
+    if external_inputs.exists() and sha256(external_inputs) != input_hash:
         raise SystemExit(
-            "TMInterface Scripts copy is missing or differs from the preserved inputs"
+            "refusing to overwrite different TMInterface inputs: "
+            f"{external_inputs}"
         )
+    if not external_inputs.exists():
+        shutil.copy2(args.input, external_inputs)
+    if sha256(external_inputs) != input_hash:
+        raise SystemExit("TMInterface Scripts copy failed checksum verification")
+    installed = ensure_pinned_track_copy(
+        A02_CHALLENGE,
+        A02_USER_CHALLENGE,
+        A02_CHALLENGE_SHA256,
+    )
+    print(
+        f"A02 user challenge ready (installed={installed})",
+        flush=True,
+    )
 
     if not args.reuse_game:
         close_trackmania()
