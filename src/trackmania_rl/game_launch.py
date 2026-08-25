@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import ctypes
-import socket
 import subprocess
 import time
 from pathlib import Path
+
+import psutil
 
 from trackmania_rl.video_capture import (
     VideoCaptureError,
@@ -38,9 +39,15 @@ def tmloader_command(
 
 
 def _bridge_is_listening(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.settimeout(0.25)
-        return probe.connect_ex(("127.0.0.1", port)) == 0
+    """Inspect listeners without consuming python_link.as's client connection."""
+    for connection in psutil.net_connections(kind="tcp"):
+        if not connection.laddr or connection.status != psutil.CONN_LISTEN:
+            continue
+        if connection.laddr.port != port:
+            continue
+        if connection.laddr.ip in {"127.0.0.1", "0.0.0.0", "::", "::1"}:
+            return True
+    return False
 
 
 def press_trackmania_key(
