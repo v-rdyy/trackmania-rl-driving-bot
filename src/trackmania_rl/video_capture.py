@@ -196,6 +196,7 @@ def _draw_overlay(
 def _capture_worker(
     output_path: str,
     label: str,
+    overlay: bool,
     fps: int,
     output_size: tuple[int, int],
     target: WindowTarget,
@@ -226,8 +227,8 @@ def _capture_worker(
         ready_sent = True
         interval = 1.0 / fps
         next_frame = time.perf_counter()
-        title_font = _font(28, bold=True)
-        detail_font = _font(21)
+        title_font = _font(28, bold=True) if overlay else None
+        detail_font = _font(21) if overlay else None
         status: dict[str, Any] = {"state": "preparing A01"}
         while not stop_event.is_set():
             while True:
@@ -248,13 +249,14 @@ def _capture_worker(
                     maximum_frame_standard_deviation,
                     float(array.std()),
                 )
-            _draw_overlay(
-                frame,
-                label=label,
-                status=status,
-                title_font=title_font,
-                detail_font=detail_font,
-            )
+            if overlay:
+                _draw_overlay(
+                    frame,
+                    label=label,
+                    status=status,
+                    title_font=title_font,
+                    detail_font=detail_font,
+                )
             writer.send(np.asarray(frame, dtype=np.uint8))
             frame_count += 1
             next_frame += interval
@@ -309,13 +311,14 @@ def probe_video(path: Path) -> dict[str, Any]:
 
 
 class ProgressVideoRecorder:
-    """Capture one annotated evaluation episode to an H.264 MP4."""
+    """Capture one evaluation episode to an H.264 MP4."""
 
     def __init__(
         self,
         output_path: Path,
         *,
         label: str,
+        overlay: bool = False,
         fps: int = 20,
         max_width: int = 1280,
     ) -> None:
@@ -323,6 +326,7 @@ class ProgressVideoRecorder:
             raise ValueError("fps must be positive")
         self.output_path = output_path
         self.label = label
+        self.overlay = overlay
         self.fps = fps
         self.max_width = max_width
         self.target: WindowTarget | None = None
@@ -377,6 +381,7 @@ class ProgressVideoRecorder:
             args=(
                 str(self.output_path),
                 self.label,
+                self.overlay,
                 self.fps,
                 self.output_size,
                 self.target,
@@ -434,6 +439,7 @@ class ProgressVideoRecorder:
             {
                 "path": str(self.output_path),
                 "sha256": sha256(self.output_path),
+                "overlay": self.overlay,
                 "frames_written": self.frame_count,
                 "capture_wall_seconds": time.perf_counter() - self._started_at,
                 "maximum_frame_standard_deviation": (

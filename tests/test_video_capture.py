@@ -13,7 +13,12 @@ import numpy as np
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.video_capture import probe_video, scaled_even_size, sha256
+from trackmania_rl.video_capture import (
+    ProgressVideoRecorder,
+    probe_video,
+    scaled_even_size,
+    sha256,
+)
 
 SCRIPT_PATH = WORKSPACE_ROOT / "scripts" / "capture_progress_videos.py"
 SPEC = importlib.util.spec_from_file_location("capture_progress_videos", SCRIPT_PATH)
@@ -23,6 +28,14 @@ SPEC.loader.exec_module(MODULE)
 
 
 class VideoCaptureTests(unittest.TestCase):
+    def test_delivered_video_capture_has_no_overlay_by_default(self) -> None:
+        recorder = ProgressVideoRecorder(
+            Path("clean.mp4"),
+            label="metadata remains outside the frames",
+        )
+
+        self.assertFalse(recorder.overlay)
+
     def test_scaled_size_preserves_aspect_and_encoder_safe_dimensions(self) -> None:
         self.assertEqual(scaled_even_size(2560, 1400, 1280), (1280, 700))
         width, height = scaled_even_size(1919, 1079, 1280)
