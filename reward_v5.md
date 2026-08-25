@@ -1,6 +1,6 @@
 # Reward v5: Steering-rate smoothness
 
-Status: Training complete; evaluation pending
+Status: Complete; 20-episode gate failed, so no 100-episode scale run
 
 Date pre-registered: 2026-08-24
 
@@ -149,3 +149,62 @@ oscillatory falsifies or weakens the hypothesis at this coefficient and budget.
 The second-track V4 evaluation requested alongside V5 is a separate
 generalization measurement. It does not alter this reward, training, A01 gate,
 or checkpoint selection.
+
+## Deterministic evaluation result
+
+The frozen final checkpoint completed all `20/20` deterministic A01 episodes.
+There were zero falls, stuck truncations, timeouts, off-track terminations, or
+inversions. Best/mean/worst TMNF race-clock lap times were `24.770s`, `24.784s`,
+and `24.800s`, respectively. The best was `0.270s` slower than the real `24.5s`
+human PB. The evaluator audited `4,946` active-race action records; every action
+was finite, in range, and valid. It explicitly discarded `45` first-episode
+startup records after detecting the countdown restart, so the apparently long
+raw first episode did not contaminate its `24.770s` race-clock result.
+
+The primary gate failed: oscillation was detected in `20/20`, versus the
+required maximum of `10/20`. Peak sign crossings remained `5` in a two-second
+window, the same as V4. The reliability gate passed (`20/20`, required at least
+`19/20`) and the mean-lap gate passed (`24.784s`, required at most `25.500s`).
+Because all three conditions were required, the pre-registered 100-episode V5
+scale run was not performed.
+
+The single added term still changed several secondary metrics relative to V4's
+original comparable 20 episodes:
+
+| Metric | V4 | V5 | Change |
+| --- | ---: | ---: | ---: |
+| finishes | 20/20 | 20/20 | unchanged |
+| best lap | 24.900s | 24.770s | 0.130s faster |
+| mean lap | 24.929s | 24.784s | 0.146s faster |
+| oscillation detected | 20/20 | 20/20 | unchanged |
+| mean steering total variation | 32.028 | 31.574 | 1.4% lower |
+| mean absolute steering | 0.567 | 0.528 | 6.8% lower |
+| mean hysteresis sign crossings | 24.6 | 19.6 | 20.3% lower |
+| mean significant direction reversals | 35.0 | 37.1 | 6.0% higher |
+| mean p95 absolute lateral offset | 10.628 | 9.063 | 14.7% lower |
+| maximum absolute lateral offset | 17.833 | 11.954 | 33.0% lower |
+
+The normal-speed review of preserved episode 4 showed a clean, upright finish:
+the car negotiated the corners and final jump without the checkpoint collision
+or flip seen in earlier versions. It still hugged the inside boundary in the
+early turn, and the action trace retained enough rapid reversals to trip the
+fixed detector. The representative video is
+`artifacts/videos/reward_v5_evaluation/reward_v5_final_6324dfc2_ep_04.mp4`,
+SHA-256
+`411AA081440ED75D9B9DA06819E9EC0AA050096CD5F2DFF0E700693614D82019`.
+All 20 input replays remain preserved under
+`artifacts/replays/reward_v5_evaluation/`.
+
+The evaluation-summary SHA-256 is
+`8F4BB8671F42119E0231D707B40C9E72F265AFE84A75A2A8221A8F7DD3113361`;
+the action-log SHA-256 is
+`2C020376D805CA0E6F5A5604B052CB773EB4D0C0F6DDDE18C809E0BE63F9330A`.
+
+## Hypothesis outcome
+
+The hypothesis is not supported at coefficient `0.05` and this training budget.
+The penalty modestly reduced steering effort, hysteresis crossings, and lateral
+error without impairing cornering, finish rate, or lap time. It did **not**
+reduce fixed oscillation prevalence at all, and significant direction reversals
+increased slightly. This is a useful partial effect, but it does not qualify V5
+as the requested oscillation fix and does not justify relaxing the frozen gate.
