@@ -46,6 +46,13 @@ MANIFEST_PATH = RUN_DIR / "run_manifest.json"
 SUMMARY_PATH = RUN_DIR / "training_summary.json"
 MONITOR_PREFIX = RUN_DIR / "training"
 REWARD_DOC = WORKSPACE_ROOT / "reward_v5.md"
+EXPERIMENT_LABEL = "reward-v5"
+REWARD_FUNCTION = steering_rate_smoothness_reward
+REWARD_FUNCTION_NAME = "steering_rate_smoothness_reward"
+REWARD_METADATA: dict[str, Any] = {
+    "steering_rate_coefficient": V5_STEERING_RATE_COEFFICIENT,
+}
+CHECKPOINT_NAME_PREFIX = "ppo_reward_v5"
 V4_CHECKPOINT = WORKSPACE_ROOT / "checkpoints" / "reward_v4" / "final_model.zip"
 EXPECTED_V4_CHECKPOINT_SHA256 = (
     "6DF90018CEC877796F6865BB6CB8D1A86929D84B6826642D26001DC5871C63F2"
@@ -67,7 +74,7 @@ REWARD_CONTRACT = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run one million additional V5 PPO steps from V4."
+        description=f"Run one million additional {EXPERIMENT_LABEL} PPO steps from V4."
     )
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--resume", type=Path)
@@ -96,7 +103,7 @@ def formal_tensorboard_event_files() -> list[Path]:
         path
         for path in TENSORBOARD_ROOT.rglob("events.out.tfevents.*")
         if re.fullmatch(
-            r"reward_v5_steering_rate_smoothness_\d+",
+            rf"{re.escape(TENSORBOARD_RUN_NAME)}_\d+",
             path.parent.name,
         )
     )
@@ -105,14 +112,14 @@ def formal_tensorboard_event_files() -> list[Path]:
 def read_monitor_rows() -> list[dict[str, str]]:
     monitor_files = sorted(RUN_DIR.glob("*.monitor.csv"))
     if not monitor_files:
-        raise ProtocolError("reward-v5 run did not create a Monitor CSV")
+        raise ProtocolError(f"{EXPERIMENT_LABEL} run did not create a Monitor CSV")
     rows: list[dict[str, str]] = []
     for path in monitor_files:
         with path.open("r", encoding="utf-8", newline="") as source:
             data_lines = [line for line in source if not line.startswith("#")]
         rows.extend(csv.DictReader(data_lines))
     if not rows:
-        raise ProtocolError("reward-v5 Monitor CSV contains no completed episodes")
+        raise ProtocolError(f"{EXPERIMENT_LABEL} Monitor CSV contains no completed episodes")
     return rows
 
 
@@ -128,7 +135,7 @@ def main() -> int:
         or any(CHECKPOINT_DIR.glob("*.zip"))
     ):
         raise SystemExit(
-            "reward-v5 artifacts already exist; preserve them and use --resume"
+            f"{EXPERIMENT_LABEL} artifacts already exist; preserve them and use --resume"
         )
 
     v4_checkpoint = verify_v4_checkpoint()
@@ -168,9 +175,9 @@ def main() -> int:
         "v4_initialization": v4_checkpoint,
         "additional_timesteps_requested": ADDITIONAL_TIMESTEPS,
         "target_total_timesteps": TARGET_TOTAL_TIMESTEPS,
-        "reward_function": "steering_rate_smoothness_reward",
+        "reward_function": REWARD_FUNCTION_NAME,
         "reward_contract": REWARD_CONTRACT,
-        "steering_rate_coefficient": V5_STEERING_RATE_COEFFICIENT,
+        **REWARD_METADATA,
         "tensorboard_run_name": TENSORBOARD_RUN_NAME,
         "simulation_speed": SIMULATION_SPEED,
         "step_period_ms": 100,
@@ -232,7 +239,7 @@ def main() -> int:
     )
     base_env = TrackmaniaEnv(
         config=config,
-        reward_function=steering_rate_smoothness_reward,
+        reward_function=REWARD_FUNCTION,
     )
     monitored_env = Monitor(
         base_env,
@@ -263,11 +270,11 @@ def main() -> int:
             f"expected {V4_STARTING_TIMESTEPS}"
         )
     if starting_timesteps < V4_STARTING_TIMESTEPS:
-        raise ProtocolError("V5 resume checkpoint predates the pinned V4 model")
+        raise ProtocolError(f"{EXPERIMENT_LABEL} resume checkpoint predates the pinned V4 model")
     if starting_timesteps >= TARGET_TOTAL_TIMESTEPS:
         raise SystemExit(
             f"checkpoint already has {starting_timesteps} timesteps; "
-            "no formal V5 training remains"
+            f"no formal {EXPERIMENT_LABEL} training remains"
         )
 
     discarded_steps_total = discarded_steps_before + max(
@@ -289,14 +296,14 @@ def main() -> int:
             CheckpointCallback(
                 save_freq=50_000,
                 save_path=str(CHECKPOINT_DIR),
-                name_prefix="ppo_reward_v5",
+                name_prefix=CHECKPOINT_NAME_PREFIX,
             ),
             action_stats,
             PeriodicProgressCallback(),
         ]
     )
     print(
-        f"reward-v5 training started: initial={starting_timesteps}, "
+        f"{EXPERIMENT_LABEL} training started: initial={starting_timesteps}, "
         f"target={TARGET_TOTAL_TIMESTEPS}, remaining={remaining_timesteps}",
         flush=True,
     )
@@ -333,7 +340,7 @@ def main() -> int:
 
     event_files = formal_tensorboard_event_files()
     if not event_files:
-        raise ProtocolError("reward-v5 training created no TensorBoard event file")
+        raise ProtocolError(f"{EXPERIMENT_LABEL} training created no TensorBoard event file")
     tensorboard_metrics = read_tensorboard_metrics(event_files)
     monitor_rows = read_monitor_rows()
     episode_rewards = [float(row["r"]) for row in monitor_rows]
@@ -373,9 +380,9 @@ def main() -> int:
             - V4_STARTING_TIMESTEPS
             + discarded_steps_total
         ),
-        "reward_function": "steering_rate_smoothness_reward",
+        "reward_function": REWARD_FUNCTION_NAME,
         "reward_contract": REWARD_CONTRACT,
-        "steering_rate_coefficient": V5_STEERING_RATE_COEFFICIENT,
+        **REWARD_METADATA,
         "episodes": len(monitor_rows),
         "finishes": finishes,
         "timeouts": timeouts,
@@ -430,7 +437,7 @@ def main() -> int:
     write_json(MANIFEST_PATH, manifest)
 
     print(
-        f"reward-v5 training complete: additional="
+        f"{EXPERIMENT_LABEL} training complete: additional="
         f"{int(model.num_timesteps) - V4_STARTING_TIMESTEPS}, "
         f"episodes={len(monitor_rows)}, finishes={finishes}",
         flush=True,
