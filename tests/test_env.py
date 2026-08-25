@@ -21,6 +21,7 @@ from trackmania_rl.env import (
 from trackmania_rl.observations import ReferencePath
 from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
+    clustered_reversal_frequency_reward,
     sparse_finish_reward,
     steering_rate_smoothness_reward,
 )
@@ -222,6 +223,43 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertIsNone(records[0]["previous_steer"])
         self.assertEqual(records[1]["previous_steer"], 0.75)
         self.assertIsNone(records[2]["previous_steer"])
+
+    def test_clustered_reversal_history_is_event_triggered_and_clears_on_reset(self) -> None:
+        session = FakeSession(
+            [state(x=index, z=0, speed=100, race_time=index * 100) for index in range(8)]
+        )
+        actions = [0.0, 0.10, 0.0, 0.10, 0.0, 0.10]
+        env = TrackmaniaEnv(
+            reference_path=self.path,
+            session=session,
+            reward_function=clustered_reversal_frequency_reward,
+        )
+        env.reset()
+        infos = []
+        rewards = []
+        for steer in actions:
+            _, reward, _, _, info = env.step(
+                np.asarray([steer, 1.0, 0.0], dtype=np.float32)
+            )
+            infos.append(info)
+            rewards.append(reward)
+        env.reset()
+        _, _, _, _, reset_info = env.step(
+            np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertEqual(
+            [info["steering_slope_reversal"] for info in infos],
+            [False, False, True, True, True, True],
+        )
+        self.assertEqual(
+            [info["steering_reversals_in_window"] for info in infos],
+            [0, 0, 1, 2, 3, 4],
+        )
+        self.assertAlmostEqual(rewards[-1], rewards[-2] - 0.05)
+        self.assertFalse(reset_info["steering_slope_reversal"])
+        self.assertEqual(reset_info["steering_reversals_in_window"], 0)
 
     def test_off_track_step_is_truncated_with_owner_approved_penalty(self) -> None:
         session = FakeSession(

@@ -24,6 +24,8 @@ from trackmania_rl.game_launch import confirm_a01_solo
 from trackmania_rl.rewards import (
     RewardFunction,
     RewardTransition,
+    V6_REVERSAL_WINDOW_SECONDS,
+    V6_STEERING_DELTA_DEADBAND,
     phase1_smoke_reward,
 )
 from trackmania_rl.tmi_bridge import MessageType, ProtocolError, TmiBridgeClient
@@ -422,6 +424,8 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._last_diagnostics: ObservationDiagnostics | None = None
         self._last_position: np.ndarray | None = None
         self._last_steer_action: float | None = None
+        self._last_steering_delta_direction = 0
+        self._steering_reversal_steps: list[int] = []
         self._stuck_history: list[tuple[int, float, float]] = []
 
     def _observation(
@@ -457,8 +461,46 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._last_diagnostics = diagnostics
         self._last_position = np.asarray(state.position, dtype=np.float64).copy()
         self._last_steer_action = None
+        self._last_steering_delta_direction = 0
+        self._steering_reversal_steps = []
         self._stuck_history = [(0, diagnostics.progress, 0.0)]
         return observation, self._info(state, diagnostics)
+
+    def _steering_reversal_status(
+        self,
+        current_steer: float,
+    ) -> tuple[int, bool, int]:
+        previous_steer = self._last_steer_action
+        steering_delta = (
+            0.0 if previous_steer is None else current_steer - previous_steer
+        )
+        delta_direction = (
+            1
+            if steering_delta >= V6_STEERING_DELTA_DEADBAND
+            else -1
+            if steering_delta <= -V6_STEERING_DELTA_DEADBAND
+            else 0
+        )
+        reversal = bool(
+            delta_direction
+            and self._last_steering_delta_direction
+            and delta_direction != self._last_steering_delta_direction
+        )
+        if delta_direction:
+            self._last_steering_delta_direction = delta_direction
+        if reversal:
+            self._steering_reversal_steps.append(self._step)
+
+        window_steps = round(
+            V6_REVERSAL_WINDOW_SECONDS * 1000.0 / self.config.step_period_ms
+        )
+        first_in_window = self._step - window_steps
+        self._steering_reversal_steps = [
+            step
+            for step in self._steering_reversal_steps
+            if step >= first_in_window
+        ]
+        return delta_direction, reversal, len(self._steering_reversal_steps)
 
     def _stuck_status(
         self,
@@ -524,6 +566,11 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             if previous_steer is None
             else abs(float(validated[0]) - previous_steer)
         )
+        (
+            steering_delta_direction,
+            steering_slope_reversal,
+            steering_reversals_in_window,
+        ) = self._steering_reversal_status(float(validated[0]))
         result = self.session.advance(validated)
         observation, diagnostics = self._observation(result.state)
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
@@ -562,6 +609,8 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             fallen=fallen,
             stuck=stuck,
             steering_rate_change=steering_rate_change,
+            steering_slope_reversal=steering_slope_reversal,
+            steering_reversals_in_window=steering_reversals_in_window,
         )
         reward = float(self.reward_function(transition))
         if not math.isfinite(reward):
@@ -583,6 +632,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "race_finished": terminated,
                 "reward_function": self.reward_name,
                 "steering_rate_change": steering_rate_change,
+                "steering_delta_direction": steering_delta_direction,
+                "steering_slope_reversal": steering_slope_reversal,
+                "steering_reversals_in_window": steering_reversals_in_window,
             }
         )
         if self._logger is not None:
@@ -594,6 +646,9 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "raw_action": validated.tolist(),
                     "previous_steer": previous_steer,
                     "steering_rate_change": steering_rate_change,
+                    "steering_delta_direction": steering_delta_direction,
+                    "steering_slope_reversal": steering_slope_reversal,
+                    "steering_reversals_in_window": steering_reversals_in_window,
                     "finite": True,
                     "within_range": True,
                     "valid": True,

@@ -11,6 +11,7 @@ from trackmania_rl.observations import ObservationDiagnostics
 from trackmania_rl.rewards import (
     RewardTransition,
     clamped_forward_progress_reward,
+    clustered_reversal_frequency_reward,
     dense_speed_reward,
     phase1_smoke_reward,
     signed_progress_efficiency_reward,
@@ -31,6 +32,8 @@ def transition(
     fallen: bool = False,
     stuck: bool = False,
     steering_rate_change: float = 0.0,
+    steering_slope_reversal: bool = False,
+    steering_reversals_in_window: int = 0,
 ) -> RewardTransition:
     previous_diagnostics = ObservationDiagnostics(
         progress=previous_progress,
@@ -56,6 +59,8 @@ def transition(
         fallen=fallen,
         stuck=stuck,
         steering_rate_change=steering_rate_change,
+        steering_slope_reversal=steering_slope_reversal,
+        steering_reversals_in_window=steering_reversals_in_window,
     )
 
 
@@ -220,6 +225,68 @@ class RewardTests(unittest.TestCase):
         self.assertAlmostEqual(
             steering_rate_smoothness_reward(
                 transition(truncated=True, stuck=True, steering_rate_change=2.0)
+            ),
+            -250.2,
+        )
+
+    def test_v6_matches_v4_before_the_fourth_clustered_reversal(self) -> None:
+        for reversal_count in range(4):
+            with self.subTest(reversal_count=reversal_count):
+                candidate = transition(
+                    previous_progress=10.0,
+                    progress=14.0,
+                    steering_slope_reversal=True,
+                    steering_reversals_in_window=reversal_count,
+                )
+                self.assertEqual(
+                    clustered_reversal_frequency_reward(candidate),
+                    signed_progress_efficiency_reward(candidate),
+                )
+
+    def test_v6_penalizes_frequency_only_when_a_new_reversal_occurs(self) -> None:
+        fourth_reversal = transition(
+            previous_progress=10.0,
+            progress=14.0,
+            steering_rate_change=2.0,
+            steering_slope_reversal=True,
+            steering_reversals_in_window=4,
+        )
+        quiet_frame_in_busy_window = transition(
+            previous_progress=10.0,
+            progress=14.0,
+            steering_rate_change=2.0,
+            steering_slope_reversal=False,
+            steering_reversals_in_window=6,
+        )
+
+        self.assertAlmostEqual(
+            clustered_reversal_frequency_reward(fourth_reversal),
+            0.25,
+        )
+        self.assertAlmostEqual(
+            clustered_reversal_frequency_reward(quiet_frame_in_busy_window),
+            0.30,
+        )
+
+    def test_v6_preserves_v4_terminal_terms(self) -> None:
+        self.assertAlmostEqual(
+            clustered_reversal_frequency_reward(
+                transition(
+                    terminated=True,
+                    steering_slope_reversal=True,
+                    steering_reversals_in_window=5,
+                )
+            ),
+            49.8,
+        )
+        self.assertAlmostEqual(
+            clustered_reversal_frequency_reward(
+                transition(
+                    truncated=True,
+                    stuck=True,
+                    steering_slope_reversal=True,
+                    steering_reversals_in_window=5,
+                )
             ),
             -250.2,
         )

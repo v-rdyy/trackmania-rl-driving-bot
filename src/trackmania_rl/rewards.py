@@ -23,6 +23,8 @@ class RewardTransition:
     fallen: bool = False
     stuck: bool = False
     steering_rate_change: float = 0.0
+    steering_slope_reversal: bool = False
+    steering_reversals_in_window: int = 0
 
 
 RewardFunction = Callable[[RewardTransition], float]
@@ -34,6 +36,10 @@ V4_TIME_COST = 0.10
 V4_FINISH_BONUS = 50.0
 V4_FAILURE_PENALTY = 250.0
 V5_STEERING_RATE_COEFFICIENT = 0.05
+V6_STEERING_DELTA_DEADBAND = 0.05
+V6_REVERSAL_WINDOW_SECONDS = 2.0
+V6_FREE_REVERSALS_PER_WINDOW = 3
+V6_REVERSAL_FREQUENCY_COEFFICIENT = 0.05
 
 
 def phase1_smoke_reward(transition: RewardTransition) -> float:
@@ -87,3 +93,18 @@ def steering_rate_smoothness_reward(transition: RewardTransition) -> float:
     return signed_progress_efficiency_reward(transition) - (
         V5_STEERING_RATE_COEFFICIENT * transition.steering_rate_change
     )
+
+
+def clustered_reversal_frequency_reward(transition: RewardTransition) -> float:
+    """Reward v6: V4 minus an event-triggered clustered-reversal cost."""
+    excess_reversals = max(
+        0,
+        transition.steering_reversals_in_window
+        - V6_FREE_REVERSALS_PER_WINDOW,
+    )
+    frequency_cost = (
+        V6_REVERSAL_FREQUENCY_COEFFICIENT * excess_reversals
+        if transition.steering_slope_reversal
+        else 0.0
+    )
+    return signed_progress_efficiency_reward(transition) - frequency_cost
