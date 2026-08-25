@@ -1,9 +1,14 @@
 # Reward v6 proposal: Clustered steering-reversal frequency
 
-Status: Reward-side hypothesis and formula pre-registered; training-track
-sequence awaiting owner approval; not implemented or trained
+Status: A01-only protocol approved; hypothesis, formula, and success gates
+frozen before implementation; not yet trained
 
 Date pre-registered: 2026-08-25
+
+Owner approval recorded: 2026-08-25. Option A (A01-only V6) was selected. The
+pre-registered hypothesis, formula, and five success gates below are frozen
+exactly as drafted and must not be adjusted after observing training or
+evaluation results. Multi-track training remains a separate future phase.
 
 ## Motivation
 
