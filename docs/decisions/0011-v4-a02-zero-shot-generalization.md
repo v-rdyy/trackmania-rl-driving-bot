@@ -2,8 +2,9 @@
 
 ## Status
 
-Blocked before measurement on 2026-08-24. No V4 episode ran on A02, so there is
-no generalization score and no result to interpret.
+Reference setup resolved on 2026-08-24; zero-shot measurement is next. No V4
+episode has run on A02 yet, so there is still no generalization score to
+interpret.
 
 ## Question
 
@@ -31,11 +32,14 @@ from an agent attempt. Pin the installed source files before extraction:
 - `A02-Race.Replay.gbx`: SHA-256
   `7546E19CE9CA0D36E074406256A547A256F20B23602985085E98082EE7D178E3`
 
-TMInterface 2.2.1's direct replay-file `dump_inputs` support will extract the
-author inputs. Replay those inputs at 100 ms telemetry intervals, require a real
-finish and a monotonic race clock, then resample the driven positions at the same
-5-unit spacing used for A01. Preserve the extracted inputs, raw telemetry,
-reference path, hashes, and provenance manifests.
+Extract the author inputs with the TMInterface author's public `gbxtools`
+conversion semantics and checksum-pinned `pygbx==0.3` parser. This fallback is
+required because the installed TMInterface 2.2.1 direct-file `dump_inputs`
+command rejects even a replay that the same client saved and extracted through
+its UI. Replay the extracted inputs at 100 ms telemetry intervals, require a
+real finish and a monotonic race clock, then resample the driven positions at
+the same 5-unit spacing used for A01. Preserve the extracted inputs, raw
+telemetry, reference path, hashes, and provenance manifests.
 
 The evaluation will retain the same action audit, replay retention, finish/fall/
 stuck classification, lateral-deviation metrics, and oscillation detection used
@@ -63,34 +67,83 @@ A02 is a stronger controlled comparison than a distant or advanced track:
 No V5 checkpoint will be used for this measurement. V5 remains the separate,
 single-variable steering-smoothness experiment requested by the owner.
 
-## Blocked setup record
+## Resolved setup record
 
-The installed challenge and replay hashes matched the pre-registration, and the
-bridge was live-verified at the main menu. The extraction workflow then tried
-TMInterface 2.2.1's direct replay-file command with both forms below:
+The installed challenge and replay hashes matched the pre-registration. The
+exact UI-observed paths on this Steam/TMUF-compatible profile are:
+
+- TrackMania's Replay browser reads
+  `Documents\TrackMania\Tracks\Replays`, not the nominal TMNF
+  `Documents\TmForever\Tracks\Replays` folder.
+- TMInterface 2.2.1's **Save Current Replay** UI writes to
+  `Documents\TrackMania\Tracks\Replays\TMInterface` because `replay_folder` is
+  `TMInterface`.
+- The saved local round-trip replay was
+  `a01v4roundtrip.Replay.Gbx`, 42,644 bytes, SHA-256
+  `2A978D8AADE6BC9EB04701BD2C7ACE4295FB2148DD67E0096C5C853D8BE2C8E3`.
+- The adjacent **Get Inputs** UI action successfully copied 8,128 characters of
+  inputs from that replay and ended them with neutral controls at 24.95 s.
+
+This proves the replay data and UI extraction path are valid. In contrast, the
+bridge tried the installed 2.2.1 direct replay-file command against both the
+pinned A02 replay and TMInterface's own local round-trip replay using absolute,
+Replay-folder-relative, game-root-relative, and Scripts-folder paths; quoted
+and unquoted paths; one- and two-argument forms; and lowercase `.gbx` staging.
+Representative commands were:
 
 ```text
-dump_inputs a02_nadeo_author.Replay.Gbx a02_nadeo_author.txt
-dump_inputs "C:\Program Files (x86)\Steam\steamapps\common\TrackMania Nations Forever\GameData\Tracks\Campaigns\Nations\White\A02-Race.Replay.gbx" a02_nadeo_author.txt
+dump_inputs "C:\Users\Vardhan\Documents\TrackMania\Tracks\Replays\TMInterface\a01v4roundtrip.Replay.Gbx" a01v4roundtrip_direct.txt
+dump_inputs a01v4roundtrip.Replay.Gbx
+dump_inputs Tracks/Replays/TMInterface/a01v4roundtrip.Replay.Gbx
 ```
 
-In both cases the bridge accepted and acknowledged `SCOnConnectSync`, but
-TMInterface created no output file in `Documents\TMInterface\Scripts` within
-the fixed 30-second verification window. Earlier versions of the extractor also
-waited unnecessarily for a race-step callback; replacing that with a menu-only
-command connection resolved the handshake ambiguity but exposed the same
-output-file failure. No reference telemetry or A02 centerline was fabricated,
-and the frozen V4 evaluator was therefore not started.
+Every direct-file form produced TMInterface's own error, `Failed to extract
+inputs, the file may not be a valid replay or exist.` The in-game Validate
+button is also disabled for the installed Nadeo replay, which TMInterface's
+guide identifies as an online/protected-replay limitation. There is therefore
+no verified direct-file bridge syntax to preserve for this build: the verified
+2.2.1 workflow is the managed Replay UI, while protected A02 requires the
+official external-parser fallback.
+
+The fallback found four finishing `alinoa` ghosts in the pinned replay and
+selected the fastest one deterministically:
+
+- ghost index: `0`
+- recorded race time: `16,250 ms`
+- control entries: `53`
+- extracted input bytes: `544`
+- extracted input SHA-256:
+  `E476F390F8FA6ADF3F8C7488F366D6118474883D1F6B18494CFEE812A4CE7142`
+
+Live playback then exposed a separate map-search issue. `map
+A02-Race.Challenge.Gbx` searches the indexed user folder, not Steam's built-in
+campaign tree. The checksum-pinned challenge must be present at
+`Documents\TrackMania\Tracks\Challenges\A02-Race.Challenge.Gbx` before TMNF
+starts; the capture/evaluation tools now install it safely and refuse to
+overwrite a different user file. A fresh launch is required for TMNF to index a
+new copy.
+
+The unchanged extracted inputs finished A02 live at `16,530 ms`, producing 167
+finite, monotonic 100 ms samples over 845.114 units. The 280 ms difference from
+the embedded ghost time comes from reducing sub-10 ms replay events to
+TMInterface's 10 ms input-command grid; this reference is used for geometry,
+not as an author-time claim. Resampling produced 171 points at 5-unit spacing:
+
+- telemetry SHA-256:
+  `1270BFD662A5539ED3A32EB6F309355CA8921701BB3762A8A3E5D1E037D2081F`
+- reference CSV SHA-256:
+  `B6570AFD0B2FD87D0E0BB9286D94867A0BB7C19DEE2BEC8F49ADED089BF316AE`
 
 Several launcher hardening findings were kept separately in git history: a TCP
 readiness probe was consuming a real `python_link.as` client connection, fresh
 launches injected focus-dependent Enter presses at the main menu, and a proposed
 queued-handshake plugin recovery did not fix the live failure. The unsuccessful
-plugin change was removed from the active installed copy. These issues are not
-reported as A02 policy performance.
+plugin change was removed from the active installed copy. A later live capture
+also showed that a visible loading window and open listener do not yet mean
+TMInterface has left `StartUp`; fresh launches now require ten continuous
+seconds of observed window/listener readiness before a bridge client connects.
+These issues are tooling results, not A02 policy performance.
 
-To resume this decision, first establish the exact TMInterface 2.2.1 replay-path
-syntax or obtain a known-good A02 input script, then create and checksum the A02
-reference path before any V4 episode. Do not substitute A01's centerline or let
-V4 attempt A02 without track-relative geometry, because either would change the
-meaning of the test.
+The A02 reference is now ready. The next action is the pre-registered 20-episode
+frozen V4 measurement. Do not substitute A01's centerline, retrain on A02, or
+select a checkpoint based on A02 behavior.

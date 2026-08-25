@@ -1,0 +1,17 @@
+{
+  "decision": "docs\\decisions\\0011-v4-a02-zero-shot-generalization.md",
+  "elevation_axis": "y",
+  "horizontal_axes": [
+    "x",
+    "z"
+  ],
+  "kind": "official_nadeo_author_replay_reference",
+  "moving_samples": 167,
+  "output_points": 171,
+  "source": "artifacts/telemetry/a02_nadeo_author.jsonl",
+  "source_samples": 167,
+  "source_sha256": "1270BFD662A5539ED3A32EB6F309355CA8921701BB3762A8A3E5D1E037D2081F",
+  "spacing": 5.0,
+  "total_length": 845.1139063936619,
+  "track": "A02-Race"
+}

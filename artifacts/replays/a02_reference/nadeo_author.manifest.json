@@ -1,0 +1,19 @@
+{
+  "available_ghost_count": 4,
+  "extraction_method": "pygbx-fastest-finishing-ghost",
+  "extraction_provenance": "TMInterface author donadigo's public gbxtools/generate_input_file.py",
+  "finishing_ghost_count": 4,
+  "output": "artifacts\\replays\\a02_reference\\nadeo_author.txt",
+  "output_bytes": 544,
+  "output_sha256": "E476F390F8FA6ADF3F8C7488F366D6118474883D1F6B18494CFEE812A4CE7142",
+  "pygbx_version": "0.3",
+  "python_lzo_version": "1.15",
+  "selected_ghost_control_entries": 53,
+  "selected_ghost_index": 0,
+  "selected_ghost_login": "alinoa",
+  "selected_ghost_race_time_ms": 16250,
+  "source": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\TrackMania Nations Forever\\GameData\\Tracks\\Campaigns\\Nations\\White\\A02-Race.Replay.gbx",
+  "source_bytes": 58885,
+  "source_sha256": "7546E19CE9CA0D36E074406256A547A256F20B23602985085E98082EE7D178E3",
+  "track": "A02-Race"
+}

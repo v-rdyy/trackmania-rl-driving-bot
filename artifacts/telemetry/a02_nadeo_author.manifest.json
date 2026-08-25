@@ -1,0 +1,20 @@
+{
+  "input": "artifacts\\replays\\a02_reference\\nadeo_author.txt",
+  "input_sha256": "E476F390F8FA6ADF3F8C7488F366D6118474883D1F6B18494CFEE812A4CE7142",
+  "kind": "official_nadeo_author_replay_telemetry",
+  "map": "A02-Race.Challenge.Gbx",
+  "maximum_segment_length": 7.580379964219612,
+  "path_length": 845.113906393662,
+  "position_span": [
+    592.2936401367188,
+    28.56672191619873,
+    285.6972961425781
+  ],
+  "samples": 167,
+  "simulation_speed": 6.0,
+  "step_period_ms": 100,
+  "telemetry": "artifacts\\telemetry\\a02_nadeo_author.jsonl",
+  "telemetry_sha256": "1270BFD662A5539ED3A32EB6F309355CA8921701BB3762A8A3E5D1E037D2081F",
+  "terminal_race_time_ms": 16530,
+  "track": "A02-Race"
+}
