@@ -1,6 +1,6 @@
 # Reward v5: Steering-rate smoothness
 
-Status: Pre-registered; not implemented or trained
+Status: Training complete; evaluation pending
 
 Date pre-registered: 2026-08-24
 
@@ -84,6 +84,29 @@ No reward coefficient, environment threshold, initialization rule, training
 budget, or checkpoint-selection rule may change during the formal run. The
 final checkpoint remains the pre-registered selection; do not choose an earlier
 checkpoint after seeing evaluation results.
+
+## Training result
+
+The uninterrupted formal run completed on 2026-08-24 in one attempt. PPO
+finished its active rollout at model timestep `3,004,416`, for `1,001,472`
+additional interactions after the pinned V4 timestep. This is the expected
+rollout-boundary overshoot allowed by the protocol; no interactions were
+discarded or replayed. Wall time was `2,609.184s` (about 43 minutes 29 seconds).
+
+The run logged `3,850` training episodes: `3,733` finishes, `20` timeouts, `15`
+verified falls, and `82` stuck truncations. These stochastic training outcomes
+are operational evidence, not the pre-registered deterministic evaluation.
+All `1,001,472` policy actions were finite, in range, and passed the affine
+action-space audit with no hidden clipping. Host sleep and hibernation were
+confirmed disabled immediately before the run.
+
+The frozen final checkpoint is
+`checkpoints/reward_v5/final_model.zip`, SHA-256
+`6324DFC2047DC744474D12FB0D8F0000982434FBB48A221247C427EBA787E5C2`.
+The training-summary SHA-256 is
+`35ED39475C23013EBA18AE1951568CE7DB0B5412BF9C5028F27F3FA203BDD193`.
+No conclusion about the oscillation hypothesis is drawn until the deterministic
+evaluation below is complete.
 
 ## Frozen A01 evaluation and scale gate
 
