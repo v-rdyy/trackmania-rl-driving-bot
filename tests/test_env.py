@@ -261,6 +261,39 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertFalse(reset_info["steering_slope_reversal"])
         self.assertEqual(reset_info["steering_reversals_in_window"], 0)
 
+    def test_race_clock_boundary_clears_countdown_steering_history(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=-100),
+                state(x=1, z=0, speed=0, race_time=-10),
+                state(x=2, z=0, speed=0, race_time=0),
+                state(x=3, z=0, speed=100, race_time=100),
+                state(x=4, z=0, speed=100, race_time=200),
+            ]
+        )
+        env = TrackmaniaEnv(reference_path=self.path, session=session)
+        env.reset()
+        _, _, _, _, countdown_info = env.step(
+            np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+        )
+        _, _, _, _, start_info = env.step(
+            np.asarray([0.10, 1.0, 0.0], dtype=np.float32)
+        )
+        _, _, _, _, first_delta_info = env.step(
+            np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+        )
+        _, _, _, _, first_reversal_info = env.step(
+            np.asarray([0.10, 1.0, 0.0], dtype=np.float32)
+        )
+        env.close()
+
+        self.assertFalse(countdown_info["race_clock_boundary"])
+        self.assertTrue(start_info["race_clock_boundary"])
+        self.assertEqual(start_info["steering_delta_direction"], 0)
+        self.assertFalse(first_delta_info["steering_slope_reversal"])
+        self.assertTrue(first_reversal_info["steering_slope_reversal"])
+        self.assertEqual(first_reversal_info["steering_reversals_in_window"], 1)
+
     def test_off_track_step_is_truncated_with_owner_approved_penalty(self) -> None:
         session = FakeSession(
             [

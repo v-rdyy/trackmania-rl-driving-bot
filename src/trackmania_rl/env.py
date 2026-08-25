@@ -421,6 +421,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode = -1
         self._step = 0
         self._episode_start_race_time = 0
+        self._last_step_race_time_ms: int | None = None
         self._last_diagnostics: ObservationDiagnostics | None = None
         self._last_position: np.ndarray | None = None
         self._last_steer_action: float | None = None
@@ -458,6 +459,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode += 1
         self._step = 0
         self._episode_start_race_time = int(state.race_time)
+        self._last_step_race_time_ms = int(state.race_time)
         self._last_diagnostics = diagnostics
         self._last_position = np.asarray(state.position, dtype=np.float64).copy()
         self._last_steer_action = None
@@ -572,6 +574,24 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             steering_reversals_in_window,
         ) = self._steering_reversal_status(float(validated[0]))
         result = self.session.advance(validated)
+        race_clock_boundary = bool(
+            self._last_step_race_time_ms is not None
+            and (
+                result.race_time_ms < self._last_step_race_time_ms
+                or (
+                    self._last_step_race_time_ms < 0
+                    and result.race_time_ms >= 0
+                )
+            )
+        )
+        if race_clock_boundary:
+            previous_steer = None
+            steering_rate_change = 0.0
+            steering_delta_direction = 0
+            steering_slope_reversal = False
+            steering_reversals_in_window = 0
+            self._last_steering_delta_direction = 0
+            self._steering_reversal_steps = []
         observation, diagnostics = self._observation(result.state)
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
         timed_out = elapsed_ms >= self.config.max_episode_ms
@@ -635,6 +655,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "steering_delta_direction": steering_delta_direction,
                 "steering_slope_reversal": steering_slope_reversal,
                 "steering_reversals_in_window": steering_reversals_in_window,
+                "race_clock_boundary": race_clock_boundary,
             }
         )
         if self._logger is not None:
@@ -649,6 +670,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "steering_delta_direction": steering_delta_direction,
                     "steering_slope_reversal": steering_slope_reversal,
                     "steering_reversals_in_window": steering_reversals_in_window,
+                    "race_clock_boundary": race_clock_boundary,
                     "finite": True,
                     "within_range": True,
                     "valid": True,
@@ -686,6 +708,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
 
         self._last_diagnostics = diagnostics
         self._last_steer_action = float(validated[0])
+        self._last_step_race_time_ms = int(result.race_time_ms)
         self._step += 1
         return observation, reward, terminated, truncated, info
 
