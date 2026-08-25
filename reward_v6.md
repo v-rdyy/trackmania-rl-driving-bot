@@ -1,7 +1,7 @@
-# Reward v6 proposal: Clustered steering-reversal frequency
+# Reward v6: Clustered steering-reversal frequency
 
-Status: A01-only training complete; deterministic evaluation pending; hypothesis,
-formula, and success gates remain frozen
+Status: A01-only training and deterministic evaluation complete; hypothesis
+falsified; formula and success gates remained frozen
 
 Date pre-registered: 2026-08-25
 
@@ -234,3 +234,157 @@ These last two gates test the mechanism V6 actually targets rather than
 declaring success from a smaller steering magnitude. If multi-track training is
 selected instead, the A01 gates remain useful but A02 needs its own frozen
 reliability and precision gates before training begins.
+
+## Deterministic evaluation result
+
+The frozen final checkpoint was evaluated once for 20 deterministic A01
+episodes using the V4/V5-comparable protocol. Eighteen episodes finished, for a
+`90%` finish rate. The other two were verified stuck truncations, not falls or
+timeouts: episode 11 stopped at progress `1967.72` after `33.600s`, and episode
+12 stopped at progress `1974.73` after `32.100s`, both around 89% of the
+reference path.
+
+Successful TMNF race-clock lap times were:
+
+- best: `26.730s` (episode 17), `2.230s` slower than the owner's `24.5s` PB;
+- mean: `29.542s` across 18 finishes; and
+- worst: `34.610s` (episode 16).
+
+Episode 13 at `29.660s` was the successful finish closest to the mean. The
+best-to-worst spread was `7.880s`, unlike V4's `0.050s` original 20-run spread.
+
+All five pre-registered gates failed:
+
+| Frozen gate | Required | Observed | Result |
+| --- | ---: | ---: | --- |
+| oscillation prevalence | at most 10/20 | 20/20 | fail |
+| finish reliability | at least 19/20 | 18/20 | fail |
+| mean successful lap | at most 25.500s | 29.542s | fail |
+| mean significant slope reversals | at most 28.0 | 43.45 | fail |
+| mean hotspot reversals | at most 6.4 | 15.1 | fail |
+
+The checkpoint therefore did not qualify for a 100-episode scale run. No gate
+or threshold was relaxed after observing the result.
+
+### V4/V5/V6 tradeoff
+
+| Metric | V4 | V5 | V6 |
+| --- | ---: | ---: | ---: |
+| finishes | 20/20 | 20/20 | 18/20 |
+| best lap | 24.900s | 24.770s | 26.730s |
+| mean successful lap | 24.929s | 24.784s | 29.542s |
+| worst successful lap | 24.950s | 24.800s | 34.610s |
+| oscillation detected | 20/20 | 20/20 | 20/20 |
+| mean peak sign crossings in 2s | 5.0 | 5.0 | 6.0 |
+| mean hysteresis sign crossings | 24.6 | 19.6 | 32.25 |
+| mean significant slope reversals | 35.0 | 37.1 | 43.45 |
+| mean p95 absolute lateral offset | 10.628 | 9.063 | 11.682 |
+| maximum absolute lateral offset | 17.833 | 11.954 | 24.376 |
+| upside-down episodes | 0/20 | 0/20 | 3/20 |
+| stuck episodes | 0/20 | 0/20 | 2/20 |
+
+V6 increased mean significant reversals by `24.1%` from V4 instead of reducing
+them by the pre-registered 20%. Hotspot reversals increased by `88.8%` from V4.
+It also regressed finish reliability, lap time, lateral precision, and vehicle
+orientation. This is not a smoothness/reliability tradeoff like V5's partial
+effect; V6 was worse on the targeted metric and the main driving outcomes.
+
+### Reversal location result
+
+The Decision 0008 reconstruction found `869` normalized significant reversal
+events. Their per-episode distribution was:
+
+| A01 progress | V4 | V5 | V6 |
+| --- | ---: | ---: | ---: |
+| 0-10% | 13.0 | 12.0 | 12.0 |
+| 10-20% | 3.0 | 5.0 | 6.1 |
+| 20-30% | 3.0 | 4.1 | 3.9 |
+| 30-40% | 3.0 | 2.0 | 1.6 |
+| 40-50% | 4.0 | 4.0 | 3.6 |
+| 50-60% | 1.0 | 1.0 | 0.3 |
+| 60-70% | 3.0 | 3.0 | 4.45 |
+| 70-80% | 3.0 | 3.0 | 4.1 |
+| 80-90% | 0.0 | 0.0 | 2.3 |
+| 90-100% | 2.0 | 3.0 | 5.1 |
+
+The requested reduction did not occur at either V5 hotspot. The early
+turn-exit/drop/landing region at `10-30%` rose to `10.0` events per episode,
+from V4's `6.0` and V5's `9.1`. Final airborne alignment at `90-100%` rose to
+`5.1`, from V4's `2.0` and V5's `3.0`. The regression also spread elsewhere:
+outside those frozen hotspot bins V6 averaged `28.35` reversals, versus `27.0`
+for V4 and `25.0` for V5, including a new `2.3` per episode at `80-90%` where
+both baselines recorded zero.
+
+Frame samples spanning all three representative clean captures were visually
+reviewed. The best run remained composed enough to complete in one continuous
+line, while the closest-to-mean and worst runs showed visibly larger chassis/yaw
+corrections in the airborne and late-alignment portions. The quantitative
+location result is therefore not merely a redistribution away from the original
+problem areas: both original clusters worsened, and a new late-track cluster
+appeared.
+
+### Reward-cost and boundary accounting
+
+Across the normalized active-race actions, the frequency term charged `46.30`
+total reward, or `2.315` per episode. It fired on `518` events and reached a
+maximum single-event cost of `0.20`. This was somewhat stronger than the
+pre-training V4 counterfactual estimate of `1.7675` per episode, yet the policy
+still adapted toward more, not fewer, reversals.
+
+Post-processing initially stopped because the live V6 instrumentation logged
+`870` reversals while the established offline metric reconstructed `869`.
+Episode 1 contained 45 discarded countdown actions; steering-delta direction
+had leaked across the countdown-to-active race-clock boundary and created one
+extra live event at step 49 (`400ms`). The event itself was inside the three-free
+allowance, but its presence in the rolling history increased three later costs
+by `0.15` total. Live logged frequency cost was therefore `46.45`, versus the
+normalized `46.30`.
+
+This could not affect the frozen actions or trajectory: deterministic
+evaluation performs no learning, reward is not a policy observation, and the
+reversal history changes only reward/instrumentation. The completed 20-episode
+batch and replays were therefore preserved rather than rerun. The evaluator now
+discloses the exact mismatch and normalizes from active-race actions; the
+environment also clears steering history whenever the race clock resets or
+crosses from countdown to active time, preventing recurrence in future runs.
+
+### Preserved evidence
+
+The representative captures contain only the game window and its native UI;
+the generated-video overlay is disabled (`overlay: false`):
+
+- best, episode 17 (`26.730s`):
+  `artifacts/videos/reward_v6_evaluation_clean/reward_v6_final_2825f18d_ep_17.mp4`,
+  SHA-256 `F0A1B2A3966A8BF8A5B1DEE4A35E3F7931D2E0D5810C90D2E06040E310939B09`;
+- closest to mean, episode 13 (`29.660s`):
+  `artifacts/videos/reward_v6_evaluation_clean/reward_v6_final_2825f18d_ep_13.mp4`,
+  SHA-256 `93287957F71353656D26379CD904E87CB66B81FEF1FDAEAFFA13DF3160CE07E0`;
+- worst finish, episode 16 (`34.610s`):
+  `artifacts/videos/reward_v6_evaluation_clean/reward_v6_final_2825f18d_ep_16.mp4`,
+  SHA-256 `D7FC097310AB177F21ECA0E9EA6583D5B0FEA6471BF8F849A5A4EA7ACF207492`.
+
+Evidence hashes:
+
+- final evaluation summary:
+  `B2BCF5CB53ED781B396BD8BC7FC2C99EBC7AB4C1AB232E0696766956F09A18B5`;
+- evaluation action log:
+  `C76AB3BABDA55D4E902A1BF252FC8E67F0FE07627BED12BE7F0180988BEE1111`;
+- clean-capture manifest:
+  `348EA4E940D559AA75F229DB3E76BEC2E6AA4338468259022F5B1003FDD356CA`.
+
+## Hypothesis outcome
+
+The pre-registered hypothesis is falsified at coefficient `0.05`, the frozen
+two-second window, and this training budget. Penalizing new clustered reversal
+events did not reduce oscillation prevalence or reversal frequency, including
+at the two locations the term was designed to target. It instead produced a
+slower, less reliable, more laterally variable policy with more reversals and
+three upside-down detections.
+
+V6 should not seed the multi-track phase. V5 has a small 20-episode lap-time and
+lateral-deviation advantage over V4, but its smoothness hypothesis also failed
+and it was not promoted to a 100-episode run. V4 remains the recommended
+multi-track starting reward because it is the simplest successful formula and
+has the stronger 100-episode A01 reliability evidence. The choice and the
+multi-track sampling/evaluation protocol still require their own explicit scope;
+no multi-track training starts as part of V6.
