@@ -71,6 +71,20 @@ class RewardV6EvaluationTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["total_frequency_cost"], 0.15)
         self.assertAlmostEqual(metrics["maximum_single_event_cost"], 0.10)
 
+    def test_summary_discloses_indirect_boundary_cost_difference(self) -> None:
+        disclosure = MODULE.cost_normalization_disclosure(
+            actual_logged_cost=46.45,
+            normalized_cost=46.30,
+        )
+        self.assertAlmostEqual(
+            disclosure["logged_minus_normalized_frequency_cost"],
+            0.15,
+        )
+        self.assertIn(
+            "reward is neither a policy observation",
+            disclosure["normalization_note"],
+        )
+
     def test_unpenalized_startup_only_extra_is_disclosed(self) -> None:
         active = [
             {

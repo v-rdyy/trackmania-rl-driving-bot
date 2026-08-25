@@ -144,6 +144,29 @@ def boundary_instrumentation_mismatches(
     return mismatches
 
 
+def cost_normalization_disclosure(
+    *,
+    actual_logged_cost: float,
+    normalized_cost: float,
+) -> dict[str, Any]:
+    return {
+        "normalization_note": (
+            "The offline Decision 0008 reconstruction is authoritative after "
+            "discarding countdown prefixes. Any listed live-only event was "
+            "limited to the first 2-second boundary window. Although the extra "
+            "event itself was free, its presence could increase costs on later "
+            "events; logged_minus_normalized_frequency_cost discloses that "
+            "reward-only effect. Frozen evaluation actions are unaffected "
+            "because reward is neither a policy observation nor a learning "
+            "input during deterministic evaluation."
+        ),
+        "actual_logged_frequency_cost": actual_logged_cost,
+        "logged_minus_normalized_frequency_cost": (
+            actual_logged_cost - normalized_cost
+        ),
+    }
+
+
 def reversal_location_metrics(
     action_log: Path,
     summary: dict[str, Any],
@@ -192,17 +215,16 @@ def reversal_location_metrics(
         events,
         episode_count=len(grouped),
     )
+    actual_logged_frequency_cost = sum(actual_logged_frequency_costs)
     metrics.update(
         {
             "logged_reversal_count": logged_reversal_count,
             "normalized_reversal_count": len(events),
             "instrumentation_boundary_mismatches": boundary_mismatches,
-            "normalization_note": (
-                "The offline Decision 0008 reconstruction is authoritative after "
-                "discarding countdown prefixes. Any listed live-only event was "
-                "limited to the first unpenalized 2-second boundary window."
+            **cost_normalization_disclosure(
+                actual_logged_cost=actual_logged_frequency_cost,
+                normalized_cost=normalized_costs["total_frequency_cost"],
             ),
-            "actual_logged_frequency_cost": sum(actual_logged_frequency_costs),
             **normalized_costs,
             "v4_baseline_mean_reversals": 35.0,
             "v5_baseline_mean_reversals": 37.1,
