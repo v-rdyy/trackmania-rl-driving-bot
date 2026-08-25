@@ -188,10 +188,15 @@ The normal-speed review of preserved episode 4 showed a clean, upright finish:
 the car negotiated the corners and final jump without the checkpoint collision
 or flip seen in earlier versions. It still hugged the inside boundary in the
 early turn, and the action trace retained enough rapid reversals to trip the
-fixed detector. The representative video is
-`artifacts/videos/reward_v5_evaluation/reward_v5_final_6324dfc2_ep_04.mp4`,
-SHA-256
-`411AA081440ED75D9B9DA06819E9EC0AA050096CD5F2DFF0E700693614D82019`.
+fixed detector. Clean, overlay-free normal-speed captures were rendered from
+the exact preserved inputs for the best episode (`24.770s`, episode 4), the
+closest-to-mean episode (`24.780s`, episode 7), and the worst episode
+(`24.800s`, episode 2). They are stored under
+`artifacts/videos/reward_v5_evaluation_clean/`; their SHA-256 values are
+`0F31673831CB1E5EDAFCEF3C536D07C6A488A1E971BA742906A2F7BC8E9A8D25`,
+`0E4F4D84F3E4C1F67BBA7C51E39C3997D153C91DEFE28885FF1329DA9E0F3644`,
+and `1745085E5664BA368D025A8051A927045398FF6108BA203020431285DBF96ADA`,
+respectively. Each video manifest records `overlay: false`.
 All 20 input replays remain preserved under
 `artifacts/replays/reward_v5_evaluation/`.
 
