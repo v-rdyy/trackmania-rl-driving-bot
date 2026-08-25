@@ -28,6 +28,24 @@ other half of the episodes stopped moving long enough to trigger the unchanged
 2.1-second stuck detector, and inversion/oscillation remained common. This is
 therefore not evidence that the policy is generally reliable outside A01.
 
+## Standalone generalization finding
+
+Stated plainly: V4 achieves near-human-PB performance on A01 but generalizes
+poorly to A02 zero-shot. On A01 it finished `98/100` scale-validation episodes
+and reached `24.900 s`, only `0.400 s` behind the owner's real `24.5 s` PB. The
+same frozen policy, supplied with the same kind of track-relative centerline
+observations on A02, finished only `10/20`; eight episodes inverted and ten
+ended through the stuck detector.
+
+This is evidence that V4 has substantially overfit to A01's specific geometry
+rather than learning general driving. Its ten A02 finishes show some transferable
+control, so it is not merely replaying a fixed A01 action sequence, but the drop
+from near-perfect A01 reliability to 50% A02 reliability is too large to call
+the learned behavior track-general. Do not retrain or fine-tune this checkpoint
+on A02: preserving the frozen zero-shot measurement is the point of this result.
+Any later A01+A02 training is a new multi-track experiment, not a correction to
+Decision 0011.
+
 The evaluation artifacts are preserved as:
 
 - summary: `runs/reward_v4_a02_zero_shot/evaluation_summary.json`, SHA-256
