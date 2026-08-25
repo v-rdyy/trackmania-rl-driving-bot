@@ -1,4 +1,4 @@
-"""Render preserved V3 input replays past the legacy vertical-drop cutoff."""
+"""Render preserved input replays against an explicit map reference."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from trackmania_rl.tmi_bridge import ProtocolError
 from trackmania_rl.video_capture import ProgressVideoRecorder, restart_trackmania_race, sha256
 
 
-REFERENCE_PATH = WORKSPACE_ROOT / "data" / "tracks" / "a01_reference_path.csv"
+DEFAULT_REFERENCE_PATH = WORKSPACE_ROOT / "data" / "tracks" / "a01_reference_path.csv"
 DEFAULT_REPLAY_DIR = WORKSPACE_ROOT / "artifacts" / "replays" / "reward_v3_evaluation"
 DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "artifacts" / "videos" / "reward_v3_final_jump"
@@ -45,6 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-race-ms", type=int, default=32_000)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--max-width", type=int, default=960)
+    parser.add_argument("--reference-path", type=Path, default=DEFAULT_REFERENCE_PATH)
+    parser.add_argument("--map-to-load", default="A01-Race.Challenge.Gbx")
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--reuse-game", action="store_true")
@@ -71,6 +73,15 @@ def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
             output.write("\n")
 
 
+def resolve_replay_path(replay: Path) -> Path:
+    if replay.is_absolute():
+        return replay
+    workspace_replay = WORKSPACE_ROOT / replay
+    if workspace_replay.is_file():
+        return workspace_replay
+    return DEFAULT_REPLAY_DIR / replay
+
+
 def inspect_replay(
     replay: Path,
     *,
@@ -84,7 +95,7 @@ def inspect_replay(
     max_width: int,
     simulation_speed: float,
 ) -> dict[str, Any]:
-    local_replay = replay if replay.is_absolute() else DEFAULT_REPLAY_DIR / replay
+    local_replay = resolve_replay_path(replay)
     if not local_replay.is_file():
         raise FileNotFoundError(local_replay)
     external_replay = tmi_scripts_dir / local_replay.name
@@ -174,7 +185,7 @@ def main() -> int:
         raise SystemExit("--simulation-speed must be positive and finite")
     if args.max_race_ms <= 0:
         raise SystemExit("--max-race-ms must be positive")
-    reference = ReferencePath.from_csv(REFERENCE_PATH)
+    reference = ReferencePath.from_csv(args.reference_path.resolve())
     if not args.reuse_game:
         close_trackmania()
     _, launched = ensure_trackmania_running(port=args.port, confirm_existing=True)
@@ -185,7 +196,7 @@ def main() -> int:
             port=args.port,
             simulation_speed=args.simulation_speed,
             max_episode_ms=args.max_race_ms,
-            map_to_load="A01-Race.Challenge.Gbx",
+            map_to_load=args.map_to_load,
             auto_respawn_on_connect=False,
         )
     )

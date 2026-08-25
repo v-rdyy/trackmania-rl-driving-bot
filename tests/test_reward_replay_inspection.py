@@ -27,6 +27,20 @@ class RewardReplayInspectionTests(unittest.TestCase):
     def test_unknown_replay_uses_neutral_label(self) -> None:
         self.assertEqual(MODULE.replay_experiment_label("manual_run"), "TrackMania")
 
+    def test_workspace_relative_replay_is_not_forced_into_v3_directory(self) -> None:
+        relative = Path("scripts") / "inspect_reward_v3_replays.py"
+        self.assertEqual(
+            MODULE.resolve_replay_path(relative),
+            WORKSPACE_ROOT / relative,
+        )
+
+    def test_bare_replay_name_keeps_legacy_v3_default(self) -> None:
+        replay = Path("preserved.txt")
+        self.assertEqual(
+            MODULE.resolve_replay_path(replay),
+            MODULE.DEFAULT_REPLAY_DIR / replay,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
