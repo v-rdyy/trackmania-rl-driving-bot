@@ -222,7 +222,7 @@ The increase was localized rather than uniform:
 | 10-20% | 60 | 100 | +2.0 |
 | 20-30% | 60 | 82 | +1.1 |
 | 30-40% | 60 | 40 | -1.0 |
-| 40-90% | 300 | 300 | 0.0 |
+| 40-90% | 220 | 220 | 0.0 |
 | 90-100% | 40 | 60 | +1.0 |
 
 Thus the net rise came from two locations. The `10-30%` region added `62`
