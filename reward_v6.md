@@ -1,7 +1,7 @@
 # Reward v6 proposal: Clustered steering-reversal frequency
 
-Status: A01-only protocol approved; hypothesis, formula, and success gates
-frozen before implementation; not yet trained
+Status: A01-only training complete; deterministic evaluation pending; hypothesis,
+formula, and success gates remain frozen
 
 Date pre-registered: 2026-08-25
 
@@ -173,7 +173,45 @@ frozen evidence that V4 substantially overfit A01. It simply avoids obscuring
 that finding by bundling the first generalization intervention with a new reward
 mechanism.
 
-## Evaluation proposal pending sequence approval
+## Training result
+
+The formal A01-only V6 run completed on 2026-08-25 in one uninterrupted attempt.
+It initialized from the checksum-pinned V4 checkpoint at timestep `2,002,944`
+and PPO completed its active rollout at timestep `3,004,416`, producing
+`1,001,472` additional interactions. The 1,472-step overshoot is the same
+pre-approved rollout-boundary behavior used for V4 and V5; no steps were
+discarded or repeated. Wall time was `2,624.889s` (about 43 minutes 45 seconds).
+
+The stochastic training log contained `3,776` completed episodes and `3,673`
+finishes. Terminal flags included `10` timeouts, `6` verified falls, `88` stuck
+truncations, and no lateral off-track truncations; flags are reported directly
+and are not assumed to be mutually exclusive. These are training-distribution
+outcomes, not the frozen deterministic evaluation.
+
+All `1,001,472` policy actions were finite, in range, and passed the affine
+action-space audit with no hidden clipping. Sleep and hibernation were disabled
+for AC and DC under the High performance power plan. The manifest records the
+pre-training `reward_v6.md` SHA-256 as
+`8DDA7C721946F3974C0FD37C8B6F45ED70EBFF1B4CA047EDC7D70846218EE8B1`,
+so the hypothesis and gates can be verified as preceding the run.
+
+The frozen final checkpoint is:
+
+- `checkpoints/reward_v6/final_model.zip`
+- SHA-256 `2825F18DA19C8C0438F490ABF7FED484808F734F363BE3EA11EAC4D3A99418A8`
+
+Training evidence:
+
+- summary SHA-256:
+  `7FBE96E8123C39DC7C68D93CA7B71821EBC14EBCCBF6FF0FA88E19DC1C4893F9`
+- completed manifest SHA-256:
+  `F7DD2046321157F70AA761598794A761533CE58EF3167AC00E35824BEC3EE99C`
+
+No conclusion about the V6 hypothesis is drawn from training episodes. The five
+pre-registered gates below remain unchanged and are evaluated only against the
+frozen final checkpoint's deterministic 20-episode run.
+
+## Frozen evaluation protocol
 
 For an A01-only V6, retain V5's 20-episode deterministic protocol and report the
 same finish, race-clock, lateral-deviation, oscillation, orientation, stuck, and
