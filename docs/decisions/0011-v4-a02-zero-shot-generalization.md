@@ -2,9 +2,51 @@
 
 ## Status
 
-Reference setup resolved on 2026-08-24; zero-shot measurement is next. No V4
-episode has run on A02 yet, so there is still no generalization score to
-interpret.
+Complete on 2026-08-24. The frozen V4 policy finished 10 of 20 deterministic
+A02 episodes without retraining. This is evidence of partial zero-shot transfer
+under the shared centerline observation, but not reliable generalization.
+
+## Result
+
+The pre-registered 20-episode run used the exact frozen V4 checkpoint and 6x
+simulation speed. It produced:
+
+- finish rate: `10/20` (`50%`)
+- best / mean / worst finish: `20.110 s` / `22.461 s` / `24.900 s`
+- terminal causes: `10` finishes, `10` verified stuck truncations, `0` falls,
+  and `0` timeouts
+- steering oscillation: `13/20` episodes
+- upside-down behavior: `8/20` episodes, totaling `34.0 s`
+- mean p95 / maximum absolute lateral deviation: `10.128` / `20.379` units
+- mean significant direction reversals: `28.75`
+
+The result is mixed. V4 transferred enough of its learned response to the
+engineered track-relative observations to complete a geometrically different
+track half the time, and its best zero-shot finish was only `3.58 s` behind the
+live-replayed Nadeo author reference used to build the centerline. However, the
+other half of the episodes stopped moving long enough to trigger the unchanged
+2.1-second stuck detector, and inversion/oscillation remained common. This is
+therefore not evidence that the policy is generally reliable outside A01.
+
+The evaluation artifacts are preserved as:
+
+- summary: `runs/reward_v4_a02_zero_shot/evaluation_summary.json`, SHA-256
+  `D05AF1725B693CC293F3635A03EDB7AC63DB0D2AFBE48F4B0D813C46A2BD5694`
+- action audit: `runs/reward_v4_a02_zero_shot/evaluation_actions.jsonl`,
+  SHA-256
+  `C7EDDCEA1FC675C7FBA33F83D289D36F1741824C4C07B97B6BD374CA62AD96DD`
+- all 20 preserved inputs: `artifacts/replays/reward_v4_a02_zero_shot/`
+
+Clean, overlay-free H.264 captures were replayed from the preserved inputs, not
+rerolled from the policy. The closest successful episode to the 22.461-second
+finish mean is episode 4 at 22.170 seconds:
+
+- best, episode 8: SHA-256
+  `AADC3579FBD5FCE461780FCB53E5ACCE2D73F8D4DCB2B865057EAC8214ECFF82`
+- closest to mean, episode 4: SHA-256
+  `7FB81BE920977AB4AAD405F1E0017A8D7BDC8EDA721CD74621086ADD74F62A75`
+- worst finish, episode 20: SHA-256
+  `0C12A88E15B0BF31B4E7D5839FC5BBE09BC047475AFC1E33C51328312F4228DA`
 
 ## Question
 
@@ -144,6 +186,6 @@ TMInterface has left `StartUp`; fresh launches now require ten continuous
 seconds of observed window/listener readiness before a bridge client connects.
 These issues are tooling results, not A02 policy performance.
 
-The A02 reference is now ready. The next action is the pre-registered 20-episode
-frozen V4 measurement. Do not substitute A01's centerline, retrain on A02, or
-select a checkpoint based on A02 behavior.
+The measurement used A02's centerline without substituting A01 geometry,
+retraining on A02, or selecting a checkpoint based on A02 behavior. The frozen
+checkpoint hash matched the pre-registration before evaluation.
