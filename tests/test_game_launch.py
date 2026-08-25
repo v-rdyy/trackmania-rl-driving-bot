@@ -51,7 +51,7 @@ class GameLaunchTests(unittest.TestCase):
     @patch("trackmania_rl.game_launch._bridge_is_listening", return_value=True)
     @patch("trackmania_rl.game_launch.subprocess.Popen")
     @patch("trackmania_rl.game_launch.find_trackmania_window")
-    def test_launches_missing_game_and_clears_startup_screen(
+    def test_launches_missing_game_without_blind_menu_input(
         self,
         find_window: Mock,
         popen: Mock,
@@ -72,7 +72,7 @@ class GameLaunchTests(unittest.TestCase):
         popen.assert_called_once_with(
             ["TMLoader.exe", "run", "TmForever", "default"]
         )
-        confirm_solo.assert_called_once_with(target)
+        confirm_solo.assert_not_called()
 
     @patch("trackmania_rl.game_launch.find_trackmania_window")
     def test_existing_game_is_not_touched(self, find_window: Mock) -> None:

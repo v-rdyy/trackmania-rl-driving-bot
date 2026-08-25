@@ -110,10 +110,13 @@ def ensure_trackmania_running(
     timeout_seconds: float = 60.0,
     confirm_existing: bool = False,
 ) -> tuple[WindowTarget, bool]:
-    """Start ModLoader's profile when needed and clear its startup confirmation.
+    """Start ModLoader's profile and wait for its bridge-ready main menu.
 
-    Returns the visible game window and whether this call launched it. An existing
-    game is left untouched so Enter is never injected into an active race.
+    Returns the visible game window and whether this call launched it. A fresh
+    launch is left at the main menu so the bridge client can issue an explicit
+    map command; blind Enter presses here depend on retained menu focus. An
+    existing game is also left untouched unless the caller explicitly requests
+    confirmation of an interrupted map load.
     """
     if timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive")
@@ -150,8 +153,6 @@ def ensure_trackmania_running(
     if target is None:
         raise RuntimeError("TrackMania launch completed without a visible window")
     time.sleep(0.5)
-    confirm_a01_solo(target)
-    time.sleep(0.75)
     return target, True
 
 
