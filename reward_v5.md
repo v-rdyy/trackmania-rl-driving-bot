@@ -205,6 +205,76 @@ The evaluation-summary SHA-256 is
 the action-log SHA-256 is
 `2C020376D805CA0E6F5A5604B052CB773EB4D0C0F6DDDE18C809E0BE63F9330A`.
 
+## Post-evaluation reversal diagnostic
+
+Before proposing V6, the requested diagnostic pass located and sized every
+Decision 0008 significant direction reversal in V4's and V5's comparable
+20-episode action logs. The analysis uses the same `0.05` steering-delta
+deadband and the evaluator's disclosed countdown-restart filter. Its event
+count exactly reproduced the existing evaluation totals: `700` for V4 (`35.0`
+per episode) and `742` for V5 (`37.1` per episode).
+
+The increase was localized rather than uniform:
+
+| A01 progress | V4 events | V5 events | Change per episode |
+| --- | ---: | ---: | ---: |
+| 0-10% | 260 | 240 | -1.0 |
+| 10-20% | 60 | 100 | +2.0 |
+| 20-30% | 60 | 82 | +1.1 |
+| 30-40% | 60 | 40 | -1.0 |
+| 40-90% | 300 | 300 | 0.0 |
+| 90-100% | 40 | 60 | +1.0 |
+
+Thus the net rise came from two locations. The `10-30%` region added `62`
+events across 20 episodes and corresponds in the reviewed runs to the broad
+early turn's exit, the drop/landing, and the immediate straight (roughly
+`6.6-11.5s` in representative episode 4). The final `90-100%` added one event
+per episode during the airborne/final-alignment sequence. Reductions in the
+opening `0-10%` and `30-40%` regions offset 40 of those added events. There was
+no event-count change at all from `40-90%` progress.
+
+The event sizes resolve only part of the apparent contradiction between more
+reversals and less lateral deviation:
+
+| Diagnostic | V4 | V5 | Change |
+| --- | ---: | ---: | ---: |
+| median one-frame delta at the reversal | 0.1231 | 0.1020 | 17.1% smaller |
+| p90 one-frame delta at the reversal | 0.2601 | 0.2416 | 7.1% smaller |
+| median travel between local extrema | 0.8980 | 0.8210 | 8.6% smaller |
+| p90 travel between local extrema | 1.4885 | 1.4119 | 5.1% smaller |
+| extrema-to-extrema travel above 0.50 | 75.4% | 72.0% | 3.5 points lower |
+
+The best (episode 4), closest-to-mean (episode 7), and worst (episode 2)
+preserved V5 finishes were visually reviewed at the two quantitative hotspots.
+All three showed the same basic pattern: boundary-hugging corrections through
+the early turn exit, corrections around the drop and landing, then smaller
+visible heading corrections on the straight; the added final event occurred
+around the jump/finish alignment. They did not show a new deliberate zigzag
+distributed across the whole lap. However, this is not purely tiny fine wobble
+either: the median extrema-to-extrema steering travel remained `0.821`, and
+`72.0%` of V5 events still spanned more than `0.50` of normalized steering.
+The observed behavior is best described as more localized corrective extrema
+layered onto still-large steering sweeps.
+
+This also clarifies the metric semantics. A "significant direction reversal"
+is a reversal in steering *slope* after the deadband; it is not necessarily a
+switch from left steering to right steering. V5 created more local extrema
+while full left/right hysteresis crossings fell from `24.6` to `19.6` per
+episode, steering effort fell, and lateral deviation improved. The higher local
+extrema count therefore does not by itself establish worse visible oscillation.
+The unchanged `20/20` oscillation flag still falsifies the pre-registered V5
+success claim, but a V6 design must first decide whether its target is full
+left/right crossings, local extrema, or path-level lateral motion; those signals
+diverged here. No V6 reward change is proposed in this diagnostic.
+
+The reproducible diagnostic is
+`scripts/diagnose_reward_v5_reversals.py`. Its output is
+`runs/reward_v5/reversal_diagnostic.json`, SHA-256
+`39782D858B66763CD2105E93038B49B5F63CFD3944A53BA1DA2439F678869772`.
+The `0.25` and `0.50` excursion bands in that artifact are explicitly
+post-evaluation descriptive groupings over normalized steering travel, not
+pre-registered reward thresholds or candidate V6 coefficients.
+
 ## Hypothesis outcome
 
 The hypothesis is not supported at coefficient `0.05` and this training budget.
