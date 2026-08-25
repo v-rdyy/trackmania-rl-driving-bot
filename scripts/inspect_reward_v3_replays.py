@@ -29,7 +29,7 @@ def replay_experiment_label(stem: str) -> str:
     match = next(
         (
             version.upper()
-            for version in ("v4", "v3", "v2", "v1", "v0")
+            for version in ("v6", "v5", "v4", "v3", "v2", "v1", "v0")
             if stem.startswith(f"reward_{version}_")
         ),
         None,

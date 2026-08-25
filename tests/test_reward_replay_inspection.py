@@ -16,6 +16,14 @@ SPEC.loader.exec_module(MODULE)
 class RewardReplayInspectionTests(unittest.TestCase):
     def test_video_label_follows_replay_version(self) -> None:
         self.assertEqual(
+            MODULE.replay_experiment_label("reward_v6_final_deadbeef_ep_01"),
+            "V6",
+        )
+        self.assertEqual(
+            MODULE.replay_experiment_label("reward_v5_final_6324dfc2_ep_04"),
+            "V5",
+        )
+        self.assertEqual(
             MODULE.replay_experiment_label("reward_v4_final_6df90018_ep_12"),
             "V4",
         )
