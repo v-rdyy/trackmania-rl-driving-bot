@@ -44,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--simulation-speed", type=float, default=6.0)
     parser.add_argument("--max-race-ms", type=int, default=45_000)
+    parser.add_argument(
+        "--reuse-game",
+        action="store_true",
+        help="reuse a verified stable game instead of launching a fresh process",
+    )
     return parser.parse_args()
 
 
@@ -103,8 +108,12 @@ def main() -> int:
             "TMInterface Scripts copy is missing or differs from the preserved inputs"
         )
 
-    close_trackmania()
-    _, launched = ensure_trackmania_running(port=args.port, confirm_existing=True)
+    if not args.reuse_game:
+        close_trackmania()
+    _, launched = ensure_trackmania_running(
+        port=args.port,
+        confirm_existing=not args.reuse_game,
+    )
     print(f"TrackMania ready (launched={launched})", flush=True)
     session = LiveTmiSession(
         EnvironmentConfig(

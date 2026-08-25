@@ -13,9 +13,12 @@ from pathlib import Path
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from trackmania_rl.env import EnvironmentConfig, LiveTmiSession
 from trackmania_rl.game_launch import close_trackmania, ensure_trackmania_running
-from trackmania_rl.tmi_bridge import ProtocolError
+from trackmania_rl.tmi_bridge import (
+    MessageType,
+    ProtocolError,
+    TmiBridgeClient,
+)
 
 A02_REPLAY = Path(
     r"C:\Program Files (x86)\Steam\steamapps\common\TrackMania Nations Forever"
@@ -49,6 +52,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument(
+        "--reuse-game",
+        action="store_true",
+        help="reuse a verified stable game/menu instead of launching a fresh process",
+    )
     return parser.parse_args()
 
 
@@ -92,26 +100,25 @@ def main() -> int:
     if not external_replay.exists():
         shutil.copy2(args.source_replay, external_replay)
 
-    close_trackmania()
-    _, launched = ensure_trackmania_running(port=args.port, confirm_existing=True)
-    print(f"TrackMania ready (launched={launched})", flush=True)
-    session = LiveTmiSession(
-        EnvironmentConfig(
-            port=args.port,
-            simulation_speed=1.0,
-            map_to_load="A02-Race.Challenge.Gbx",
-            auto_respawn_on_connect=False,
-            wait_for_race_start_on_connect=True,
-        )
+    if not args.reuse_game:
+        close_trackmania()
+    _, launched = ensure_trackmania_running(
+        port=args.port,
+        confirm_existing=not args.reuse_game,
     )
-    try:
-        session.prepare()
-        session.client.execute_command(
-            f"dump_inputs {external_replay.name} {external_inputs.name}"
+    print(f"TrackMania ready (launched={launched})", flush=True)
+    with TmiBridgeClient(port=args.port, timeout_seconds=args.timeout) as client:
+        message_type = client.read_message_type()
+        if message_type is not MessageType.SC_ON_CONNECT_SYNC:
+            raise ProtocolError(
+                f"expected menu connect callback, received {message_type.name}"
+            )
+        extraction_command = (
+            f'dump_inputs "{args.source_replay}" {external_inputs.name}'
         )
+        client.execute_command(extraction_command)
+        client.respond(message_type)
         wait_for_file(external_inputs, args.timeout)
-    finally:
-        session.close()
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(external_inputs, args.output)
@@ -120,9 +127,7 @@ def main() -> int:
         "source": str(args.source_replay),
         "source_sha256": source_hash,
         "source_bytes": args.source_replay.stat().st_size,
-        "extraction_command": (
-            f"dump_inputs {external_replay.name} {external_inputs.name}"
-        ),
+        "extraction_command": extraction_command,
         "tminterface_minimum_version": "2.2.0",
         "output": str(args.output.relative_to(WORKSPACE_ROOT)),
         "output_sha256": sha256(args.output),
