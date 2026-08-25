@@ -65,6 +65,7 @@ class GameLaunchTests(unittest.TestCase):
             observed, launched = ensure_trackmania_running(
                 executable=executable,
                 timeout_seconds=1.0,
+                startup_settle_seconds=0.0,
             )
 
         self.assertIs(observed, target)

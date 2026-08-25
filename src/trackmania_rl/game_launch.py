@@ -108,6 +108,7 @@ def ensure_trackmania_running(
     game: str = DEFAULT_GAME,
     profile: str = DEFAULT_PROFILE,
     timeout_seconds: float = 60.0,
+    startup_settle_seconds: float = 10.0,
     confirm_existing: bool = False,
 ) -> tuple[WindowTarget, bool]:
     """Start ModLoader's profile and wait for its bridge-ready main menu.
@@ -120,6 +121,8 @@ def ensure_trackmania_running(
     """
     if timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive")
+    if startup_settle_seconds < 0:
+        raise ValueError("startup_settle_seconds cannot be negative")
     try:
         target = find_trackmania_window()
         if confirm_existing:
@@ -134,15 +137,23 @@ def ensure_trackmania_running(
     subprocess.Popen(tmloader_command(executable=executable, game=game, profile=profile))
 
     deadline = time.monotonic() + timeout_seconds
+    ready_since: float | None = None
     target: WindowTarget | None = None
     while time.monotonic() < deadline:
         try:
             target = find_trackmania_window()
         except VideoCaptureError:
+            ready_since = None
             time.sleep(0.25)
             continue
         if _bridge_is_listening(port):
-            break
+            now = time.monotonic()
+            if ready_since is None:
+                ready_since = now
+            if now - ready_since >= startup_settle_seconds:
+                break
+        else:
+            ready_since = None
         time.sleep(0.25)
     else:
         raise TimeoutError(
@@ -152,7 +163,6 @@ def ensure_trackmania_running(
 
     if target is None:
         raise RuntimeError("TrackMania launch completed without a visible window")
-    time.sleep(0.5)
     return target, True
 
 
