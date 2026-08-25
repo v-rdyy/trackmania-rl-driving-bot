@@ -415,6 +415,14 @@ void Render(){
     if (@sock is null) {
         return;
     }
+    // A client can be accepted during the final startup frame after the Menus
+    // state-change callback has already fired. Recover the queued handshake
+    // from current state as well as relying on OnGameStateChanged.
+    if (on_connect_queued && @clientSock !is null &&
+        GetCurrentGameState() != TM::GameState::StartUp) {
+        OnConnect();
+        on_connect_queued = false;
+    }
     if (@clientSock is null) {
         AcceptClient(100);
     }
