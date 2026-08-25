@@ -61,6 +61,39 @@ class RewardV6EvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["hotspots"]["mean_events_per_episode"], 1.5)
         self.assertEqual(metrics["hotspots"]["outside_hotspot_event_count"], 1)
 
+    def test_frequency_cost_is_rebuilt_from_normalized_event_steps(self) -> None:
+        events = [
+            {"episode": 0, "step": step}
+            for step in (1, 2, 3, 4, 5)
+        ]
+        metrics = MODULE.normalized_frequency_cost_metrics(events, episode_count=1)
+        self.assertEqual(metrics["penalized_event_count"], 2)
+        self.assertAlmostEqual(metrics["total_frequency_cost"], 0.15)
+        self.assertAlmostEqual(metrics["maximum_single_event_cost"], 0.10)
+
+    def test_unpenalized_startup_only_extra_is_disclosed(self) -> None:
+        active = [
+            {
+                "step": step,
+                "race_time_ms": step * 100,
+                "steering_slope_reversal": step in (4, 8),
+                "steering_reversals_in_window": 1 if step == 4 else 2,
+            }
+            for step in range(10)
+        ]
+        mismatches = MODULE.boundary_instrumentation_mismatches(
+            active,
+            [{"step": 8}],
+        )
+        self.assertEqual(mismatches, [
+            {
+                "step": 4,
+                "race_time_ms": 400,
+                "steering_reversals_in_window": 1,
+                "frequency_cost": 0.0,
+            }
+        ])
+
     def test_gate_requires_all_five_preregistered_conditions(self) -> None:
         self.assertTrue(MODULE.success_gate(summary())["passed"])
         failing = (
