@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted before the measurement. No A02 evaluation has run yet.
+Blocked before measurement on 2026-08-24. No V4 episode ran on A02, so there is
+no generalization score and no result to interpret.
 
 ## Question
 
@@ -61,3 +62,35 @@ A02 is a stronger controlled comparison than a distant or advanced track:
 
 No V5 checkpoint will be used for this measurement. V5 remains the separate,
 single-variable steering-smoothness experiment requested by the owner.
+
+## Blocked setup record
+
+The installed challenge and replay hashes matched the pre-registration, and the
+bridge was live-verified at the main menu. The extraction workflow then tried
+TMInterface 2.2.1's direct replay-file command with both forms below:
+
+```text
+dump_inputs a02_nadeo_author.Replay.Gbx a02_nadeo_author.txt
+dump_inputs "C:\Program Files (x86)\Steam\steamapps\common\TrackMania Nations Forever\GameData\Tracks\Campaigns\Nations\White\A02-Race.Replay.gbx" a02_nadeo_author.txt
+```
+
+In both cases the bridge accepted and acknowledged `SCOnConnectSync`, but
+TMInterface created no output file in `Documents\TMInterface\Scripts` within
+the fixed 30-second verification window. Earlier versions of the extractor also
+waited unnecessarily for a race-step callback; replacing that with a menu-only
+command connection resolved the handshake ambiguity but exposed the same
+output-file failure. No reference telemetry or A02 centerline was fabricated,
+and the frozen V4 evaluator was therefore not started.
+
+Several launcher hardening findings were kept separately in git history: a TCP
+readiness probe was consuming a real `python_link.as` client connection, fresh
+launches injected focus-dependent Enter presses at the main menu, and a proposed
+queued-handshake plugin recovery did not fix the live failure. The unsuccessful
+plugin change was removed from the active installed copy. These issues are not
+reported as A02 policy performance.
+
+To resume this decision, first establish the exact TMInterface 2.2.1 replay-path
+syntax or obtain a known-good A02 input script, then create and checksum the A02
+reference path before any V4 episode. Do not substitute A01's centerline or let
+V4 attempt A02 without track-relative geometry, because either would change the
+meaning of the test.
