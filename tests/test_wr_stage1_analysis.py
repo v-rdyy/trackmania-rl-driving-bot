@@ -91,6 +91,7 @@ class WrStage1AnalysisTests(unittest.TestCase):
         self.assertEqual(MODULE.PLATEAU_MIN_ADDITIONAL_STEPS, 2_000_000)
         self.assertEqual(MODULE.SIGNIFICANT_LAP_IMPROVEMENT_MS, 50)
         self.assertEqual(MODULE.STOCHASTIC_WINDOW_IMPROVEMENT_MS, 100)
+        self.assertEqual(MODULE.SUCCESS_REPLAY_FINISH_TOLERANCE_MS, 1_000)
 
     def test_plateau_requires_three_flat_gates_and_stochastic_window(self) -> None:
         original_root = MODULE.WORKSPACE_ROOT

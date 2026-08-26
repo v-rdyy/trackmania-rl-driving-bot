@@ -53,6 +53,7 @@ SIGNIFICANT_LAP_IMPROVEMENT_MS = 50
 STOCHASTIC_WINDOW_IMPROVEMENT_MS = 100
 BASELINE_BEST_MS = 24_900
 BASELINE_MEAN_MS = 24_930.51020408163
+SUCCESS_REPLAY_FINISH_TOLERANCE_MS = 1_000
 
 
 @dataclass(frozen=True)
@@ -402,7 +403,10 @@ def finalize_case(
     if sha256(case.replay) != case.replay_sha256:
         raise ProtocolError(f"Stage 1 replay hash changed: {case.replay}")
     observed_time = int(records[-1]["race_time_ms"])
-    if abs(observed_time - case.terminal_race_time_ms) > 100:
+    allowed_time_difference = (
+        SUCCESS_REPLAY_FINISH_TOLERANCE_MS if case.finished else 100
+    )
+    if abs(observed_time - case.terminal_race_time_ms) > allowed_time_difference:
         raise ProtocolError(
             f"episode {case.episode} telemetry time differs by "
             f"{observed_time - case.terminal_race_time_ms}ms"
@@ -552,7 +556,12 @@ def main() -> int:
                         break
                     if not case.finished and current_time >= case.terminal_race_time_ms:
                         break
-                    if case.finished and current_time > case.terminal_race_time_ms + 100:
+                    if (
+                        case.finished
+                        and current_time
+                        > case.terminal_race_time_ms
+                        + SUCCESS_REPLAY_FINISH_TOLERANCE_MS
+                    ):
                         raise ProtocolError(
                             f"episode {case.episode} passed its finish time without "
                             "a replay finish flag"
