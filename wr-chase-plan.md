@@ -301,6 +301,71 @@ Gate 2 evidence:
 - clean worst (`24.880s`) video SHA-256:
   `6E308EB12F1D820DD2103758B8B654BC1D7FB4266ED6F7585DE01919CFC7B8FB`.
 
+### Observed Gate 3 result: 1,500,000 nominal interactions
+
+Gate 3 resumed Gate 2 and ended at model timestep `3,504,128`, or `1,501,184`
+actual Stage 1 interactions. Its uninterrupted `499,712`-interaction segment
+took `1,320.502s`. The cumulative stochastic log contained `5,215/5,650`
+finishes (`92.30%`). Its most recent 500 stochastic successful laps improved to
+`25.821s` from `26.252s` in the preceding 500, but that training-distribution
+improvement did not predict the frozen deterministic result.
+
+The formal ten-episode evaluation regressed to:
+
+- `1/10` finishes;
+- eight verified stuck truncations;
+- one confirmed fall;
+- no timeout or lateral off-track truncation; and
+- a sole successful lap of `29.100s`.
+
+The only successful lap is simultaneously Gate 3's best, closest-to-mean, and
+worst finish. Gate 3 therefore lost both Gate 2's reliability and pace.
+
+Input-replay telemetry was trustworthy in both measured zones for nine
+episodes, but episode 1 diverged by up to `937.41` world units in the final zone
+and showed four sliding wheels on the divergent trajectory. The fidelity gate
+correctly rejected that apparent slide instead of counting it as discovery.
+
+To resolve the blocked tenth episode, a separate ten-episode deterministic
+diagnostic logged full wheel and dynamics state directly during live policy
+steps. It did not replace the formal outcomes. The diagnostic independently
+produced `1/10` finishes, this time with nine stuck truncations, confirming that
+the reliability collapse was reproducible rather than a single unlucky batch.
+All ten live trajectories had zero candidate or confirmed drift windows and
+zero sliding-wheel samples in both known zones. Maximum absolute slip angle
+remained below `0.355 degrees` at the first turn and `0.378 degrees` at the
+final corner.
+
+The live diagnostic's opening drop used `2.000-2.100s` observed airtime,
+roughly `93.7-94.2%` minimum throttle, and an inconsistent trajectory angle:
+about `+0.74` degrees in seven runs and `-0.98` degrees in three. It was not the
+documented accelerator-release/diagonal optimization.
+
+The frozen decision remains **continue**. Gate 3 contains no discovery and the
+two-million-interaction minimum for plateau assessment has not yet been met.
+Gate 4 is the first point where the three-gate plateau rule can stop Stage 1.
+
+Gate 3 evidence:
+
+- checkpoint SHA-256:
+  `EA08FBD3769B15CCBCAF4963316CB3D863E59EC29E882C1B00AC2E4ACF725CE5`;
+- training summary SHA-256:
+  `0A4C5EF430293A047483F5F49C1D4F6BCB513BF8A4D3B486040711008E3A1099`;
+- formal evaluation summary SHA-256:
+  `DF39E053C217F08B531BCBE983FFD3836797AC098539BE869578B8451ED3961A`;
+- replay telemetry summary SHA-256:
+  `703A4C82DB9EBB5E49CEEA2884CCC61614B5CF2F7094B588310BE2FE5287A783`;
+- direct live diagnostic summary SHA-256:
+  `6C20BC0992573A1FBF862AD62DB0CA1C4B1B84A6E8D45C25BF7AD808B28AFC01`;
+- clean sole-finish (`29.100s`) video SHA-256:
+  `2BA82D0642A2E4714ED948F87905E9D9D75D68131E4B19C55081AE4E7135B5FC`;
+- clean representative stuck-input video SHA-256:
+  `54DD6381BC30F3C1069A9321736CC775C8E244D524DF99D14E6EBCE4A9589C76`.
+
+The attempted clean capture of formal fall episode 10 did not reproduce the
+fall after the saved input endpoint and is not presented as visual evidence of
+that failure. Its non-reproduction is preserved rather than silently discarded.
+
 ## Stage 2: localized assistance, held behind Stage 1
 
 No Stage 2 reward is implemented or pre-registered yet. If Stage 1 clearly
