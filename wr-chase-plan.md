@@ -1,6 +1,7 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 1 pre-registered; no Stage 1 training result observed
+Status: Stage 1 complete; unchanged-reward discovery plateaued without a
+confirmed slide after `2,000,896` actual additional interactions
 
 Date pre-registered: 2026-08-26
 
@@ -365,6 +366,98 @@ Gate 3 evidence:
 The attempted clean capture of formal fall episode 10 did not reproduce the
 fall after the saved input endpoint and is not presented as visual evidence of
 that failure. Its non-reproduction is preserved rather than silently discarded.
+
+### Observed Gate 4 and terminal Stage 1 result: 2,000,000 nominal interactions
+
+Gate 4 resumed Gate 3 and ended at model timestep `4,003,840`, or `2,000,896`
+actual Stage 1 interactions. Its uninterrupted `499,712`-interaction segment
+took `1,327.243s`. All `499,712` actions were finite, in range, affine-correct,
+and free of hidden clipping. Cumulative stochastic training produced
+`6,985/7,532` finishes (`92.74%`). The last 500 successful stochastic laps
+averaged `26.385s`, regressing by `0.119s` from `26.266s` in the preceding 500.
+
+The frozen ten-episode deterministic evaluation recovered completely from Gate
+3's reliability collapse:
+
+- `10/10` finishes;
+- zero falls, stuck truncations, timeouts, and lateral off-track truncations;
+- best: `24.870s`;
+- mean: `24.932s`; and
+- worst: `25.190s`.
+
+Gate 4 remained `0.120s` slower than Gate 1's Stage 1 best and was effectively
+equal to the original V4 mean. It was `0.370s` slower than the owner's
+`24.500s` PB and `1.100s` slower than Axell's `23.770s` benchmark at best.
+
+All ten slide conclusions came from complete, terminal-outcome-matched live
+`SimState` records captured while the policy drove, not from replayed physics.
+The checksum-pinned input replays remain preserved for reproducibility and
+video. This source choice prevents a divergent input replay from manufacturing
+the kind of false four-wheel-slide signal observed at Gate 3.
+
+No confirmed telemetry slide occurred anywhere on the track. Both registered
+zones had zero sliding-wheel samples and zero candidate windows. Maximum
+absolute slip angle was `0.422 degrees` in the first-turn zone and `0.375
+degrees` in the final-corner zone. Two of ten laps had a separate `200ms`
+four-wheel candidate near progress `2132`, close to the final landing/finish.
+It was outside the registered zones, did not meet the frozen `300ms`
+confirmation duration, and is not claimed as a useful technique.
+
+The opening strategy also did not become the documented optimization. Every
+lap recorded `2.000s +/- 0.100s` opening airtime. Mean minimum throttle through
+the drop was `0.900`, mean diagonal angle was `1.377 degrees`, and mean landing
+speed was `312.6`. First-turn entry at progress 560 averaged `-7.728` lateral
+units relative to the cautious driven reference, displayed speed `329.420`,
+and only `0.544 degrees` of slip. Longer unchanged-reward training changed the
+line but did not discover a throttle-release diagonal drop or a speedslide.
+
+The preregistered decision is **plateau**, so Stage 1 stops here. Every frozen
+check passed across the Gate 2/Gate 3/Gate 4 window: at least two million
+interactions elapsed; no confirmed discovery occurred; no checkpoint created a
+new stage best by at least `0.050s`; Gate 2's `24.865s` mean did not improve at
+Gate 4; and the latest stochastic 500-finish window regressed rather than
+improving by `0.100s`. Reliability was intentionally not retrofitted into the
+plateau rule, but Gate 4's `10/10` result independently shows that this terminal
+decision is not merely the result of another Gate 3-style failure collapse.
+
+The observed progression was non-monotonic:
+
+| Checkpoint | Actual additional interactions | Deterministic finishes | Best | Mean successful | Confirmed slide |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| frozen V4 baseline | `0` | `98/100` | `24.900s` | `24.931s` | none in Stage 0 sample |
+| Gate 1 | `501,760` | `6/10` | `24.750s` | `24.788s` | no |
+| Gate 2 | `1,001,472` | `10/10` | `24.850s` | `24.865s` | no |
+| Gate 3 | `1,501,184` | `1/10` | `29.100s` | `29.100s` | no |
+| Gate 4 | `2,000,896` | `10/10` | `24.870s` | `24.932s` | no |
+
+The frozen hypothesis was only partly supported. The model did plateau below
+record pace as expected, but sufficient training under this time box did not
+produce the hypothesized unassisted slide. The useful positive result was a
+`0.150s` Stage 1 best-lap gain at Gate 1; it came with worse reliability and
+did not survive as a monotonic trend. Pure additional V4 training therefore
+does not justify more compute under the same reward in this experiment.
+
+Gate 4 and terminal Stage 1 evidence:
+
+- checkpoint SHA-256:
+  `E0F1C2113C57406A1E32A0A341572DEA7AFC705483D6BD5B17751AD990626609`;
+- training summary SHA-256:
+  `ED0871EB7A6E7F89B71F9F6C35C4A15B2CBD8986CAAA85F1D6599894C0E116FE`;
+- deterministic evaluation summary SHA-256:
+  `0AB9BD7D1B032D92327BA5B346657F13FC71C37ACCD7A449AA09493EF576449C`;
+- direct live action log SHA-256:
+  `CA4140D907D0A61CB20F90765CCC4E8CCA826CB06E7F320FE071F38C4C9946BB`;
+- telemetry summary SHA-256:
+  `795B5AFB1A263EC8FD9177ED918A4E1B6DDA0A4A708A7FF784B6288EB0B56591`;
+- clean best (`24.870s`) video SHA-256:
+  `E477A41E9D94645E5F1BDDD42F850B57CE0D4C91A2E4AD0606B2E6F4C25B37FC`;
+- clean closest-to-mean (`24.900s`) video SHA-256:
+  `4B10BAD555AD0B92C7479CB81983C34CFB9C0BECEDE7F5C9B45375DCBD220931`;
+- clean worst (`25.190s`) video SHA-256:
+  `E85BE3E34863B04DCE175EBFF23233F19903A180CD91C4A075DC5F21A5CB3D59`.
+
+No Stage 2 reward or training was started. Localized assistance remains an
+owner-approval decision after review of this terminal Stage 1 result.
 
 ## Stage 2: localized assistance, held behind Stage 1
 
