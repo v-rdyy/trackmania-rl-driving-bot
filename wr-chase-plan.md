@@ -245,6 +245,62 @@ Gate 1 evidence:
 - clean worst successful (`24.870s`) video SHA-256:
   `F981F1F057222C8203A5ECE8C7AFCA009350BB69635CBE70F929B52D53C401DC`.
 
+### Observed Gate 2 result: 1,000,000 nominal interactions
+
+Gate 2 resumed the complete Gate 1 optimizer state and ended at model timestep
+`3,004,416`, or `1,001,472` actual Stage 1 interactions. Its uninterrupted
+`499,712`-interaction segment took `1,312.289s`. Across the cumulative training
+log, `3,590/3,808` stochastic episodes finished (`94.28%`). The most recent 500
+stochastic successful laps averaged `26.754s`, regressing from `26.052s` in the
+preceding 500 despite the deterministic result below.
+
+The frozen ten-episode evaluation produced `10/10` finishes with no falls,
+stuck truncations, timeouts, or off-track truncations:
+
+- best: `24.850s`;
+- mean: `24.865s`;
+- worst: `24.880s`.
+
+Gate 2 restored the observed ten-lap reliability lost at Gate 1, but was
+`0.100s` slower than Gate 1's best and about `0.077s` slower at the mean. It
+remained exactly `0.050s` faster than the original V4 best.
+
+All ten input replays reproduced the live evaluation trajectory exactly inside
+the two measured slide zones under the added fixed fidelity audit: maximum
+position and progress error were zero at matched timestamps. This check was
+added after a clean playback attempt failed to expose its finish flag within a
+one-second allowance; rather than keep widening the finish tolerance, analysis
+now stops at the original evaluation cutoff and permits a slide conclusion only
+when the earlier measured zones match the live position log within two units.
+
+The trusted telemetry again found zero candidate or confirmed drift windows,
+with zero sliding-wheel samples. Maximum absolute slip angle was below
+`0.354 degrees` in the first-turn region and below `0.350 degrees` in the final
+corner. The opening drop returned to `2.000s` observed airtime, but still held
+roughly `98.5%` throttle and used only about a `2.335-degree` mean diagonal, so
+the documented release/diagonal optimization had not emerged.
+
+The frozen decision remains **continue**. No discovery occurred, fewer than two
+million additional interactions have elapsed, and the original V4 best was
+still improved by the registered `0.050s` threshold.
+
+Gate 2 evidence:
+
+- checkpoint SHA-256:
+  `BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044`;
+- training summary SHA-256:
+  `1CBA6EE72AACA7670AF0D95A320C20002555DF708BFE577EDFE6C1230CB9E0A5`;
+- deterministic evaluation summary SHA-256:
+  `894B5CF73538580F80031CB62EAE86687B201AE8BC0C080B37A0380B2A9B47C3`;
+- full replay-telemetry summary SHA-256:
+  `78CEFBC732C5934A26152EB289451B6F91A4094428D601FC2A0E3CB2FCAAE595`;
+- clean best (`24.850s`) video SHA-256:
+  `4A7DED8777B42A8DB30DE4BD2AAE9004A74B5BCF854BFC25CE6D3376A50DABC6`;
+- clean closest-to-mean (`24.860s`) video SHA-256:
+  `40328A74153730CFF268E0B1AF6BDE2B256BA96DA099C71BD26835439024E125`;
+- clean worst (`24.880s`) video SHA-256:
+  `6E308EB12F1D820DD2103758B8B654BC1D7FB4266ED6F7585DE01919CFC7B8FB`.
+
 ## Stage 2: localized assistance, held behind Stage 1
 
 No Stage 2 reward is implemented or pre-registered yet. If Stage 1 clearly
