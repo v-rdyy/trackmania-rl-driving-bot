@@ -186,6 +186,65 @@ the time box. Stage 1 reports immediately after a confirmed discovery or a
 clear plateau, whichever occurs first. The fixed thresholds are not adjusted
 after looking at results.
 
+### Observed Gate 1 result: 500,000 nominal interactions
+
+This section was added after Gate 1 completed. The manifest preserves the
+pre-training version of this document as SHA-256
+`13D2ADE20C6FAB247899BE19C80B6C81753DDC2B35F9638F4E2797BFC9C244C9`.
+
+PPO completed `501,760` actual interactions in one uninterrupted attempt, from
+model timestep `2,002,944` to `2,504,704`, in `1,323.615s`. The rollout-boundary
+overshoot is disclosed rather than rounded away. All `501,760` audited actions
+were finite, within the declared action space, and passed the affine-action
+check without hidden clipping. The stochastic training log contained `1,916`
+episodes and `1,778` finishes (`92.80%`). Mean race-clock time among the last
+500 stochastic finishes was `25.949s`, versus `26.041s` for the preceding 500.
+
+The frozen checkpoint's ten deterministic episodes produced:
+
+- `6/10` finishes, four verified stuck truncations, zero falls, zero timeouts,
+  and zero lateral off-track truncations;
+- best successful lap `24.750s`;
+- mean successful lap `24.788s`;
+- worst successful lap `24.870s`.
+
+Successful pace improved over V4's 100-episode baseline by `0.150s` at the best
+and about `0.142s` at the mean, but reliability regressed sharply from V4's
+`98/100` result. Pace and reliability must therefore remain separate findings.
+
+Full replay telemetry found no candidate or confirmed drift window anywhere on
+the track. Both known zones had zero sliding-wheel samples. Maximum absolute
+slip angle was `0.321 degrees` in the first-turn region and `0.369 degrees` in
+the final-corner region.
+
+The opening strategy changed in the wrong direction for the documented
+downhill optimization: all ten runs remained airborne for `2.100s +/- 0.100s`,
+minimum throttle rose to about `0.989`, and mean diagonal angle fell to
+`1.388 degrees`. The lateral entry offset moved from V4's roughly `-16.98` to
+about `-10.40` units relative to the driven reference, but this is not claimed
+as a better road-center line because Decision 0003's limitation still applies.
+
+The frozen decision is **continue**: no telemetry discovery occurred, plateau
+assessment cannot begin before two million additional interactions, and the
+new best improved by more than the registered `0.050s` threshold.
+
+Gate 1 evidence:
+
+- checkpoint SHA-256:
+  `0C1E690A2EE07CE5170CC2B95370BA24E31F8C39E0D66B61687D7549158E4A71`;
+- training summary SHA-256:
+  `A4A037EE7EA340069C410722BAC5C882DADF4CFBED954BB46EE54DCFBD79005B`;
+- deterministic evaluation summary SHA-256:
+  `AC058C915EDD73B84B275CCE9AEE1D1B9683A0A5EF27C123C025B4B2A71FE5B7`;
+- full replay-telemetry summary SHA-256:
+  `2AB990C2D178602B6A14A365A1C56BBE4CE6FC424A575A13A4BED666CDA4E78D`;
+- clean best (`24.750s`) video SHA-256:
+  `617378B00DC41A8C3F53152778D599E13CE83EF5BA0EB3D71CDD2F5E29CA2695`;
+- clean closest-to-mean (`24.760s`) video SHA-256:
+  `07B6F3A87009523734ACE54EEDE7B77AAE60328785B37A0FB0946A03D6577122`;
+- clean worst successful (`24.870s`) video SHA-256:
+  `F981F1F057222C8203A5ECE8C7AFCA009350BB69635CBE70F929B52D53C401DC`.
+
 ## Stage 2: localized assistance, held behind Stage 1
 
 No Stage 2 reward is implemented or pre-registered yet. If Stage 1 clearly
