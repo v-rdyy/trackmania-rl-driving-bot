@@ -35,13 +35,32 @@ def record(
 
 
 class WrStage1AnalysisTests(unittest.TestCase):
-    def test_success_and_failure_replay_stop_conditions_are_distinct(self) -> None:
+    def test_replay_stops_at_original_evaluation_cutoff(self) -> None:
         source = SCRIPT_PATH.read_text(encoding="utf-8")
-        self.assertIn("if case.finished and current_finish:", source)
         self.assertIn(
-            "if not case.finished and current_time >= case.terminal_race_time_ms:",
+            'while int(records[-1]["race_time_ms"]) < case.terminal_race_time_ms:',
             source,
         )
+
+    def test_replay_fidelity_uses_fixed_position_and_progress_bounds(self) -> None:
+        replay = []
+        live = []
+        for step, progress in enumerate((700.0, 710.0, 720.0, 1100.0, 1110.0)):
+            replay_record = record(step, progress=progress)
+            replay_record["position"] = [progress, 0.0, 0.0]
+            replay.append(replay_record)
+            live.append(
+                {
+                    "race_time_ms": step * 100,
+                    "progress": progress + 0.5,
+                    "position": [progress + 0.5, 0.0, 0.0],
+                }
+            )
+        fidelity = MODULE.replay_fidelity(replay, live)
+        self.assertTrue(fidelity["trusted"])
+        live[0]["position"] = [703.0, 0.0, 0.0]
+        fidelity = MODULE.replay_fidelity(replay, live)
+        self.assertFalse(fidelity["trusted"])
 
     def test_confirmed_slide_requires_three_consecutive_two_wheel_samples(self) -> None:
         records = [
@@ -71,6 +90,7 @@ class WrStage1AnalysisTests(unittest.TestCase):
             cases.append(
                 {
                     "episode": episode,
+                    "replay_fidelity": {"trusted": True},
                     "drift": {
                         "known_zones": {
                             "first_turn": {"confirmed_windows": [{}]},
@@ -91,7 +111,8 @@ class WrStage1AnalysisTests(unittest.TestCase):
         self.assertEqual(MODULE.PLATEAU_MIN_ADDITIONAL_STEPS, 2_000_000)
         self.assertEqual(MODULE.SIGNIFICANT_LAP_IMPROVEMENT_MS, 50)
         self.assertEqual(MODULE.STOCHASTIC_WINDOW_IMPROVEMENT_MS, 100)
-        self.assertEqual(MODULE.SUCCESS_REPLAY_FINISH_TOLERANCE_MS, 1_000)
+        self.assertEqual(MODULE.REPLAY_FIDELITY_POSITION_UNITS, 2.0)
+        self.assertEqual(MODULE.REPLAY_FIDELITY_PROGRESS_UNITS, 2.0)
 
     def test_plateau_requires_three_flat_gates_and_stochastic_window(self) -> None:
         original_root = MODULE.WORKSPACE_ROOT
@@ -119,6 +140,7 @@ class WrStage1AnalysisTests(unittest.TestCase):
                         {
                             "target_additional_steps": target,
                             "telemetry_status": "complete",
+                            "telemetry_conclusion_valid": True,
                             "telemetry_discovery_triggered": False,
                             "deterministic_best_finish_time_ms": 24_900,
                             "deterministic_mean_finish_time_ms": mean,

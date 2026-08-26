@@ -16,6 +16,7 @@ sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 sys.path.insert(0, str(WORKSPACE_ROOT / "scripts"))
 
 import analyze_v4_wr_prerequisites as replay_analysis
+import evaluate_reward_v3 as evaluation_helpers
 from evaluate_wr_stage1 import EXPECTED_EPISODES
 from train_reward_v3 import sha256, write_json
 from train_wr_stage1 import (
@@ -53,7 +54,9 @@ SIGNIFICANT_LAP_IMPROVEMENT_MS = 50
 STOCHASTIC_WINDOW_IMPROVEMENT_MS = 100
 BASELINE_BEST_MS = 24_900
 BASELINE_MEAN_MS = 24_930.51020408163
-SUCCESS_REPLAY_FINISH_TOLERANCE_MS = 1_000
+REPLAY_FIDELITY_POSITION_UNITS = 2.0
+REPLAY_FIDELITY_PROGRESS_UNITS = 2.0
+REPLAY_FIDELITY_MINIMUM_MATCH_FRACTION = 0.9
 
 
 @dataclass(frozen=True)
@@ -82,6 +85,10 @@ def evaluation_summary_path(target: int) -> Path:
 
 def output_dir(target: int) -> Path:
     return ANALYSIS_ROOT / gate_slug(target)
+
+
+def evaluation_action_log_path(target: int) -> Path:
+    return RUN_DIR / "gates" / f"{gate_slug(target)}_evaluation_actions.jsonl"
 
 
 def select_replays(summary: dict[str, Any]) -> list[GateReplay]:
@@ -247,15 +254,18 @@ def drift_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def aggregate_discovery(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    trusted_cases = [
+        case for case in cases if bool(case["replay_fidelity"]["trusted"])
+    ]
     known_counts = {
         zone: sum(
             bool(case["drift"]["known_zones"][zone]["confirmed_windows"])
-            for case in cases
+            for case in trusted_cases
         )
         for zone in KNOWN_ZONES
     }
     outside_bins: dict[int, set[int]] = defaultdict(set)
-    for case in cases:
+    for case in trusted_cases:
         for event in case["drift"]["track_wide_confirmed_windows"]:
             midpoint = 0.5 * (
                 float(event["start_progress"]) + float(event["end_progress"])
@@ -277,6 +287,9 @@ def aggregate_discovery(cases: list[dict[str, Any]]) -> dict[str, Any]:
     )
     return {
         "required_episodes": DISCOVERY_EPISODES,
+        "replay_fidelity_trusted_episodes": len(trusted_cases),
+        "replay_fidelity_required_episodes": len(cases),
+        "telemetry_conclusion_valid": len(trusted_cases) == len(cases),
         "known_zone_confirmed_episode_counts": known_counts,
         "outside_known_zones_confirmed_episode_counts_by_progress_bin": outside_counts,
         "telemetry_discovery_triggered": bool(triggers),
@@ -305,6 +318,14 @@ def assess_stage1(manifest: dict[str, Any]) -> dict[str, Any]:
     if not complete:
         return {"decision": "continue", "reason": "no analyzed gate"}
     latest = complete[-1]
+    if not bool(latest.get("telemetry_conclusion_valid")):
+        return {
+            "decision": "instrumentation_required",
+            "reason": (
+                "input replay diverged from live evaluation inside a measured "
+                "slide zone; live full-state telemetry is required"
+            ),
+        }
     if any(bool(gate.get("telemetry_discovery_triggered")) for gate in complete):
         return {
             "decision": "review_discovery",
@@ -393,27 +414,111 @@ def assess_stage1(manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def replay_fidelity(
+    replay_records: list[dict[str, Any]],
+    evaluation_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    evaluation_by_time = {
+        int(record["race_time_ms"]): record for record in evaluation_records
+    }
+    zone_results: dict[str, Any] = {}
+    trusted = True
+    for zone, (low, high) in KNOWN_ZONES.items():
+        samples = [
+            record
+            for record in replay_records
+            if low <= float(record["progress"]) <= high
+        ]
+        matched: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for record in samples:
+            evaluation = evaluation_by_time.get(int(record["race_time_ms"]))
+            if evaluation is not None:
+                matched.append((record, evaluation))
+        position_errors = [
+            float(
+                sum(
+                    (float(replay_value) - float(live_value)) ** 2
+                    for replay_value, live_value in zip(
+                        replay["position"],
+                        live["position"],
+                        strict=True,
+                    )
+                )
+                ** 0.5
+            )
+            for replay, live in matched
+        ]
+        progress_errors = [
+            abs(float(replay["progress"]) - float(live["progress"]))
+            for replay, live in matched
+        ]
+        match_fraction = len(matched) / len(samples) if samples else 0.0
+        maximum_position_error = max(position_errors) if position_errors else None
+        maximum_progress_error = max(progress_errors) if progress_errors else None
+        zone_trusted = bool(
+            match_fraction >= REPLAY_FIDELITY_MINIMUM_MATCH_FRACTION
+            and maximum_position_error is not None
+            and maximum_progress_error is not None
+            and maximum_position_error <= REPLAY_FIDELITY_POSITION_UNITS
+            and maximum_progress_error <= REPLAY_FIDELITY_PROGRESS_UNITS
+        )
+        trusted = trusted and zone_trusted
+        zone_results[zone] = {
+            "replay_samples": len(samples),
+            "matched_samples": len(matched),
+            "match_fraction": match_fraction,
+            "maximum_position_error": maximum_position_error,
+            "maximum_progress_error": maximum_progress_error,
+            "trusted": zone_trusted,
+        }
+    return {
+        "trusted": trusted,
+        "position_error_limit_units": REPLAY_FIDELITY_POSITION_UNITS,
+        "progress_error_limit_units": REPLAY_FIDELITY_PROGRESS_UNITS,
+        "minimum_match_fraction": REPLAY_FIDELITY_MINIMUM_MATCH_FRACTION,
+        "known_zones": zone_results,
+    }
+
+
+def load_evaluation_records(target: int) -> dict[int, list[dict[str, Any]]]:
+    path = evaluation_action_log_path(target)
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    grouped: dict[int, list[dict[str, Any]]] = {
+        episode: [] for episode in range(EXPECTED_EPISODES)
+    }
+    for record in records:
+        grouped[int(record["episode"])].append(record)
+    normalized: dict[int, list[dict[str, Any]]] = {}
+    for episode, episode_records in grouped.items():
+        normalized[episode], _ = evaluation_helpers.evaluated_race_records(
+            episode_records
+        )
+    return normalized
+
+
 def finalize_case(
     case: GateReplay,
     records: list[dict[str, Any]],
     *,
     reference: ReferencePath,
     destination: Path,
+    evaluation_records: list[dict[str, Any]],
 ) -> dict[str, Any]:
     if sha256(case.replay) != case.replay_sha256:
         raise ProtocolError(f"Stage 1 replay hash changed: {case.replay}")
     observed_time = int(records[-1]["race_time_ms"])
-    allowed_time_difference = (
-        SUCCESS_REPLAY_FINISH_TOLERANCE_MS if case.finished else 100
-    )
-    if abs(observed_time - case.terminal_race_time_ms) > allowed_time_difference:
+    if abs(observed_time - case.terminal_race_time_ms) > 100:
         raise ProtocolError(
             f"episode {case.episode} telemetry time differs by "
             f"{observed_time - case.terminal_race_time_ms}ms"
         )
     observed_finish = bool(records[-1]["race_finished"])
-    if case.finished and not observed_finish:
-        raise ProtocolError(f"episode {case.episode} lost its recorded finish")
     events = replay_analysis.parse_replay_input_events(
         case.replay.read_text(encoding="utf-8")
     )
@@ -429,6 +534,7 @@ def finalize_case(
         "episode": case.episode,
         "expected_finished": case.finished,
         "observed_finished": observed_finish,
+        "replay_finish_reproduced": observed_finish == case.finished,
         "expected_terminal_race_time_ms": case.terminal_race_time_ms,
         "observed_terminal_race_time_ms": observed_time,
         "input_replay": str(case.replay.relative_to(WORKSPACE_ROOT)),
@@ -437,6 +543,7 @@ def finalize_case(
         "telemetry_sha256": sha256(telemetry),
         "records": len(records),
         "prerequisites": prerequisite,
+        "replay_fidelity": replay_fidelity(records, evaluation_records),
         "drift": drift_metrics(records),
     }
 
@@ -459,6 +566,9 @@ def update_manifest(target: int, result_path: Path, result: dict[str, Any]) -> N
             "telemetry_discovery_triggered": bool(
                 result["discovery"]["telemetry_discovery_triggered"]
             ),
+            "telemetry_conclusion_valid": bool(
+                result["discovery"]["telemetry_conclusion_valid"]
+            ),
             **result["lap_metrics"],
         }
     )
@@ -468,6 +578,7 @@ def update_manifest(target: int, result_path: Path, result: dict[str, Any]) -> N
     manifest["status"] = {
         "continue": "ready_for_next_gate",
         "review_discovery": "discovery_requires_visual_review",
+        "instrumentation_required": "instrumentation_required",
         "plateau": "plateau_detected",
         "timebox_inconclusive": "timebox_complete_inconclusive",
     }[decision["decision"]]
@@ -490,6 +601,7 @@ def main() -> int:
         raise SystemExit(f"Stage 1 telemetry analysis already exists: {summary_path}")
     destination.mkdir(parents=True, exist_ok=True)
     reference = ReferencePath.from_csv(REFERENCE_PATH)
+    evaluation_records = load_evaluation_records(args.gate_target)
 
     results: list[dict[str, Any]] = []
     if args.postprocess_existing:
@@ -508,6 +620,7 @@ def main() -> int:
                     records,
                     reference=reference,
                     destination=destination,
+                    evaluation_records=evaluation_records[case.episode - 1],
                 )
             )
     else:
@@ -549,23 +662,7 @@ def main() -> int:
                         race_finished=False,
                     )
                 ]
-                while True:
-                    current_time = int(records[-1]["race_time_ms"])
-                    current_finish = bool(records[-1]["race_finished"])
-                    if case.finished and current_finish:
-                        break
-                    if not case.finished and current_time >= case.terminal_race_time_ms:
-                        break
-                    if (
-                        case.finished
-                        and current_time
-                        > case.terminal_race_time_ms
-                        + SUCCESS_REPLAY_FINISH_TOLERANCE_MS
-                    ):
-                        raise ProtocolError(
-                            f"episode {case.episode} passed its finish time without "
-                            "a replay finish flag"
-                        )
+                while int(records[-1]["race_time_ms"]) < case.terminal_race_time_ms:
                     step = session.advance_playback()
                     records.append(
                         replay_analysis.state_record(
@@ -582,6 +679,7 @@ def main() -> int:
                         records,
                         reference=reference,
                         destination=destination,
+                        evaluation_records=evaluation_records[case.episode - 1],
                     )
                 )
                 print(
@@ -617,6 +715,11 @@ def main() -> int:
             "minimum_ground_contacts": MIN_GROUND_CONTACTS,
             "candidate_minimum_sliding_wheels": CANDIDATE_MIN_SLIDING_WHEELS,
             "confirmed_minimum_sliding_wheels": CONFIRMED_MIN_SLIDING_WHEELS,
+            "replay_fidelity_position_limit_units": REPLAY_FIDELITY_POSITION_UNITS,
+            "replay_fidelity_progress_limit_units": REPLAY_FIDELITY_PROGRESS_UNITS,
+            "replay_fidelity_minimum_match_fraction": (
+                REPLAY_FIDELITY_MINIMUM_MATCH_FRACTION
+            ),
         },
         "lap_metrics": lap_metrics(evaluation),
         "cases": results,
