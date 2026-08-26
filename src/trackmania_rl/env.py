@@ -558,6 +558,50 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             raise ValueError(reason)
         return converted
 
+    @staticmethod
+    def _full_simstate_log(state: object) -> dict[str, Any]:
+        """Expose full dynamics only in audit logs; never in reward/observation."""
+        try:
+            velocity = np.asarray(state.velocity, dtype=np.float64)
+            rotation = np.asarray(state.rotation_matrix, dtype=np.float64)
+            angular_velocity = np.asarray(
+                state.dyna.current_state.angular_speed,
+                dtype=np.float64,
+            )
+            wheel_contacts = [
+                bool(wheel.real_time_state.has_ground_contact)
+                for wheel in state.simulation_wheels
+            ]
+            wheel_sliding = [
+                bool(wheel.real_time_state.is_sliding)
+                for wheel in state.simulation_wheels
+            ]
+        except AttributeError:
+            return {"full_simstate_available": False}
+        values = np.concatenate((velocity, rotation.ravel(), angular_velocity))
+        if not np.isfinite(values).all():
+            raise ProtocolError("full SimState audit telemetry is nonfinite")
+        local_velocity = rotation.T @ velocity
+        forward_speed = float(local_velocity[2])
+        right_speed = float(local_velocity[0])
+        return {
+            "full_simstate_available": True,
+            "velocity": velocity.tolist(),
+            "rotation_matrix": rotation.tolist(),
+            "angular_velocity": angular_velocity.tolist(),
+            "local_forward_velocity": forward_speed,
+            "local_right_velocity": right_speed,
+            "local_up_velocity": float(local_velocity[1]),
+            "slip_angle_degrees": math.degrees(
+                math.atan2(right_speed, max(abs(forward_speed), 1e-9))
+            ),
+            "body_up_yaw_rate": float(np.dot(angular_velocity, rotation[:, 1])),
+            "wheel_ground_contacts": wheel_contacts,
+            "wheel_sliding": wheel_sliding,
+            "ground_contact_count": sum(wheel_contacts),
+            "sliding_wheel_count": sum(wheel_sliding),
+        }
+
     def step(
         self, action: np.ndarray
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
@@ -659,12 +703,16 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             }
         )
         if self._logger is not None:
+            full_simstate = self._full_simstate_log(result.state)
             self._logger.log_step(
                 {
                     "episode": self._episode,
                     "step": self._step,
                     "race_time_ms": result.race_time_ms,
                     "raw_action": validated.tolist(),
+                    "input_steer": float(validated[0]),
+                    "input_throttle": float(validated[1]),
+                    "input_brake": float(validated[2]),
                     "previous_steer": previous_steer,
                     "steering_rate_change": steering_rate_change,
                     "steering_delta_direction": steering_delta_direction,
@@ -703,6 +751,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "lateral_offset": diagnostics.lateral_offset,
                     "vertical_offset": diagnostics.vertical_offset,
                     "heading_error": diagnostics.heading_error,
+                    **full_simstate,
                 }
             )
 

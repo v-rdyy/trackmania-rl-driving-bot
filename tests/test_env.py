@@ -152,13 +152,53 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertEqual(info["applied_gas"], -32768)
             record = json.loads(log_path.read_text(encoding="utf-8"))
             self.assertEqual(record["raw_action"], [0.5, 0.75, 0.25])
+            self.assertEqual(record["input_steer"], 0.5)
+            self.assertEqual(record["input_throttle"], 0.75)
+            self.assertEqual(record["input_brake"], 0.25)
             self.assertEqual(record["upright_cosine"], 1.0)
+            self.assertFalse(record["full_simstate_available"])
             self.assertTrue(record["finite"])
             self.assertTrue(record["within_range"])
             self.assertFalse(record["timeout"])
             self.assertFalse(record["off_track"])
             self.assertFalse(record["fallen"])
             self.assertFalse(record["race_finished"])
+
+    def test_action_audit_can_include_full_live_simstate_dynamics(self) -> None:
+        start = state(x=0, z=0, speed=0, race_time=0)
+        driven = state(x=1, z=0, speed=100, race_time=100)
+        driven.dyna = SimpleNamespace(
+            current_state=SimpleNamespace(
+                angular_speed=np.asarray([0.0, 0.5, 0.0])
+            )
+        )
+        driven.simulation_wheels = [
+            SimpleNamespace(
+                real_time_state=SimpleNamespace(
+                    has_ground_contact=True,
+                    is_sliding=index < 2,
+                )
+            )
+            for index in range(4)
+        ]
+        session = FakeSession([start, driven])
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "actions.jsonl"
+            env = TrackmaniaEnv(
+                reference_path=self.path,
+                session=session,
+                action_log_path=log_path,
+            )
+            env.reset()
+            env.step(np.asarray([0.0, 1.0, 0.0], dtype=np.float32))
+            env.close()
+            record = json.loads(log_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(record["full_simstate_available"])
+        self.assertEqual(record["ground_contact_count"], 4)
+        self.assertEqual(record["sliding_wheel_count"], 2)
+        self.assertEqual(record["body_up_yaw_rate"], 0.5)
+        self.assertEqual(len(record["rotation_matrix"]), 3)
 
     def test_invalid_action_is_logged_and_rejected_before_session(self) -> None:
         session = FakeSession([state(x=0, z=0, speed=0, race_time=0)])
