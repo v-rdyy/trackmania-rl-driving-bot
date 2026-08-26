@@ -62,6 +62,52 @@ class WrStage1AnalysisTests(unittest.TestCase):
         fidelity = MODULE.replay_fidelity(replay, live)
         self.assertFalse(fidelity["trusted"])
 
+    def test_live_full_state_is_preferred_over_replay_measurements(self) -> None:
+        replay = [{"race_time_ms": 100, "progress": 700.0}]
+        live = [
+            {
+                "full_simstate_available": True,
+                "race_time_ms": 100,
+                "progress": 710.0,
+                "lateral_offset": -2.0,
+                "vertical_offset": 0.5,
+                "heading_error": 0.1,
+                "race_finished": True,
+            }
+        ]
+        selected, fidelity = MODULE.select_measurement_records(
+            replay,
+            live,
+            expected_terminal_race_time_ms=100,
+            expected_finished=True,
+        )
+        self.assertEqual(selected[0]["progress"], 710.0)
+        self.assertEqual(selected[0]["lateral_offset_from_reference"], -2.0)
+        self.assertTrue(fidelity["trusted"])
+        self.assertEqual(fidelity["source"], "direct_live_evaluation_simstate")
+
+    def test_incomplete_live_state_falls_back_to_replay_measurements(self) -> None:
+        replay = [{"race_time_ms": 200, "progress": 700.0}]
+        live = [
+            {
+                "full_simstate_available": True,
+                "race_time_ms": 100,
+                "progress": 710.0,
+                "race_finished": False,
+            }
+        ]
+        selected, fidelity = MODULE.select_measurement_records(
+            replay,
+            live,
+            expected_terminal_race_time_ms=200,
+            expected_finished=True,
+        )
+        self.assertIs(selected, replay)
+        self.assertEqual(
+            fidelity["source"],
+            "input_replay_with_live_position_fidelity_gate",
+        )
+
     def test_confirmed_slide_requires_three_consecutive_two_wheel_samples(self) -> None:
         records = [
             record(0, progress=700),

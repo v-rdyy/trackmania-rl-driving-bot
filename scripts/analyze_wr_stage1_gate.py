@@ -502,6 +502,46 @@ def load_evaluation_records(target: int) -> dict[int, list[dict[str, Any]]]:
     return normalized
 
 
+def select_measurement_records(
+    replay_records: list[dict[str, Any]],
+    evaluation_records: list[dict[str, Any]],
+    *,
+    expected_terminal_race_time_ms: int,
+    expected_finished: bool,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    live_terminal_matches = bool(
+        evaluation_records
+        and abs(
+            int(evaluation_records[-1]["race_time_ms"])
+            - expected_terminal_race_time_ms
+        )
+        <= 100
+        and bool(evaluation_records[-1]["race_finished"]) == expected_finished
+    )
+    if live_terminal_matches and all(
+        bool(record.get("full_simstate_available")) for record in evaluation_records
+    ):
+        live_records: list[dict[str, Any]] = []
+        for source in evaluation_records:
+            record = dict(source)
+            record["lateral_offset_from_reference"] = float(
+                record["lateral_offset"]
+            )
+            record["vertical_offset_from_reference"] = float(
+                record["vertical_offset"]
+            )
+            record["heading_error_radians"] = float(record["heading_error"])
+            live_records.append(record)
+        return live_records, {
+            "trusted": True,
+            "source": "direct_live_evaluation_simstate",
+        }
+    return replay_records, {
+        "source": "input_replay_with_live_position_fidelity_gate",
+        **replay_fidelity(replay_records, evaluation_records),
+    }
+
+
 def finalize_case(
     case: GateReplay,
     records: list[dict[str, Any]],
@@ -525,9 +565,15 @@ def finalize_case(
     replay_analysis.annotate_replay_inputs(records, events)
     telemetry = destination / f"episode_{case.episode:02d}.jsonl"
     replay_analysis.write_jsonl(telemetry, records)
+    measurement_records, fidelity = select_measurement_records(
+        records,
+        evaluation_records,
+        expected_terminal_race_time_ms=case.terminal_race_time_ms,
+        expected_finished=case.finished,
+    )
     prerequisite: dict[str, Any] | None
     try:
-        prerequisite = replay_analysis.analyze_records(records, reference)
+        prerequisite = replay_analysis.analyze_records(measurement_records, reference)
     except ValueError:
         prerequisite = None
     return {
@@ -542,9 +588,11 @@ def finalize_case(
         "telemetry": str(telemetry.relative_to(WORKSPACE_ROOT)),
         "telemetry_sha256": sha256(telemetry),
         "records": len(records),
+        "measurement_records": len(measurement_records),
+        "measurement_source": fidelity["source"],
         "prerequisites": prerequisite,
-        "replay_fidelity": replay_fidelity(records, evaluation_records),
-        "drift": drift_metrics(records),
+        "replay_fidelity": fidelity,
+        "drift": drift_metrics(measurement_records),
     }
 
 
@@ -702,6 +750,12 @@ def main() -> int:
         "gate_target_additional_steps": args.gate_target,
         "evaluation_summary": str(evaluation_path.relative_to(WORKSPACE_ROOT)),
         "evaluation_summary_sha256": sha256(evaluation_path),
+        "evaluation_action_log": str(
+            evaluation_action_log_path(args.gate_target).relative_to(WORKSPACE_ROOT)
+        ),
+        "evaluation_action_log_sha256": sha256(
+            evaluation_action_log_path(args.gate_target)
+        ),
         "reference_path": str(REFERENCE_PATH.relative_to(WORKSPACE_ROOT)),
         "reference_path_sha256": sha256(REFERENCE_PATH),
         "measurement_protocol": {
