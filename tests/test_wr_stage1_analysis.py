@@ -35,6 +35,14 @@ def record(
 
 
 class WrStage1AnalysisTests(unittest.TestCase):
+    def test_success_and_failure_replay_stop_conditions_are_distinct(self) -> None:
+        source = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn("if case.finished and current_finish:", source)
+        self.assertIn(
+            "if not case.finished and current_time >= case.terminal_race_time_ms:",
+            source,
+        )
+
     def test_confirmed_slide_requires_three_consecutive_two_wheel_samples(self) -> None:
         records = [
             record(0, progress=700),

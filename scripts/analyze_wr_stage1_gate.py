@@ -545,7 +545,18 @@ def main() -> int:
                         race_finished=False,
                     )
                 ]
-                while int(records[-1]["race_time_ms"]) < case.terminal_race_time_ms:
+                while True:
+                    current_time = int(records[-1]["race_time_ms"])
+                    current_finish = bool(records[-1]["race_finished"])
+                    if case.finished and current_finish:
+                        break
+                    if not case.finished and current_time >= case.terminal_race_time_ms:
+                        break
+                    if case.finished and current_time > case.terminal_race_time_ms + 100:
+                        raise ProtocolError(
+                            f"episode {case.episode} passed its finish time without "
+                            "a replay finish flag"
+                        )
                     step = session.advance_playback()
                     records.append(
                         replay_analysis.state_record(
