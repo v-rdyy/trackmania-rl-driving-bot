@@ -93,6 +93,14 @@ def normalized_records(path: Path) -> dict[int, list[dict[str, Any]]]:
             raise ProtocolError(
                 f"live diagnostic episode {episode + 1} lacks full SimState"
             )
+        for record in result[episode]:
+            record["lateral_offset_from_reference"] = float(
+                record["lateral_offset"]
+            )
+            record["vertical_offset_from_reference"] = float(
+                record["vertical_offset"]
+            )
+            record["heading_error_radians"] = float(record["heading_error"])
     return result
 
 

@@ -14,6 +14,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class WrStage1LiveDiagnosticTests(unittest.TestCase):
+    def test_direct_log_fields_are_normalized_for_prerequisite_analysis(self) -> None:
+        source = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.assertIn('record["lateral_offset_from_reference"]', source)
+        self.assertIn('record["vertical_offset_from_reference"]', source)
+        self.assertIn('record["heading_error_radians"]', source)
+
     def test_diagnostic_paths_never_replace_formal_gate_outputs(self) -> None:
         paths = MODULE.diagnostic_paths(1_500_000)
         self.assertIn("live_diagnostic", paths["action_log"].name)
