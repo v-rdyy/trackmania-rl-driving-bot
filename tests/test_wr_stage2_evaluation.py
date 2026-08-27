@@ -125,6 +125,16 @@ class WrStage2EvaluationTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "new_high_water_progress_delta"):
             MODULE.validate_direct_live_records(records, evaluation_summary())
 
+    def test_wrapper_binds_generic_summary_to_direct_live_gate(self) -> None:
+        original = {"episodes": 10}
+        bound = MODULE.bind_stage2_summary(500_000, original)
+        self.assertEqual(bound["gate_target_additional_steps"], 500_000)
+        self.assertEqual(
+            bound["measurement_source"], "direct_live_evaluation_simstate"
+        )
+        self.assertFalse(bound["replay_telemetry_fallback_used"])
+        self.assertNotIn("gate_target_additional_steps", original)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -246,9 +246,28 @@ def validate_direct_live_action_log(
     return validate_direct_live_records(records, evaluation_summary)
 
 
+def bind_stage2_summary(target: int, summary: dict[str, Any]) -> dict[str, Any]:
+    """Stamp the wrapper-owned gate identity onto the generic evaluation."""
+    bound = dict(summary)
+    bound.update(
+        {
+            "gate_target_additional_steps": target,
+            "measurement_source": "direct_live_evaluation_simstate",
+            "replay_telemetry_fallback_used": False,
+        }
+    )
+    return bound
+
+
 def record_evaluation(target: int, paths: dict[str, Path]) -> None:
     summary = json.loads(paths["summary"].read_text(encoding="utf-8"))
     live_audit = validate_direct_live_action_log(paths["action_log"], summary)
+    summary = bind_stage2_summary(target, summary)
+    # The generic evaluator cannot know the Stage 2 gate number. Stamp it into
+    # the immutable wrapper summary before its hash is recorded in the manifest
+    # so the offline analyzer can prove that all three evidence files belong to
+    # the same gate.
+    write_json(paths["summary"], summary)
     manifest = load_manifest()
     if target == 0:
         if not manifest:
