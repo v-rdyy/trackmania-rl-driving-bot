@@ -1,14 +1,15 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 1 complete; unchanged-reward discovery plateaued without a
-confirmed slide after `2,000,896` actual additional interactions
+Status: Stage 2 pre-registered; no Stage 2 training result observed
 
 Date pre-registered: 2026-08-26
 
-This plan is a sibling to `reward-comparison-v1-v4.md`. It does not define a
-new reward version. Stage 1 deliberately continues the exact V4 reward so the
-project can distinguish techniques discovered by reinforcement learning from
-techniques introduced through explicit shaping.
+Stage 2 date pre-registered: 2026-08-27
+
+This plan is a sibling to `reward-comparison-v1-v4.md`. Stage 1 deliberately
+continued the exact V4 reward so the project could distinguish techniques
+discovered by reinforcement learning from techniques introduced through
+explicit shaping. Stage 2 is the separate localized-assistance iteration.
 
 ## Benchmarks and scope
 
@@ -437,6 +438,17 @@ produce the hypothesized unassisted slide. The useful positive result was a
 did not survive as a monotonic trend. Pure additional V4 training therefore
 does not justify more compute under the same reward in this experiment.
 
+This is a genuine plateau **within the tested budget**, not evidence that pure
+discovery is impossible at greater scale. `2,000,896` decisions at this
+project's 10 Hz control rate represent about `55.6` simulated control-hours.
+Yosh described roughly `400` equivalent training-hours with a 20 Hz
+controller, which would be about `28.8 million` action opportunities if
+continuous. The figures are not directly comparable because his reset time,
+algorithm, reward scale, and definition of equivalent hours are not disclosed.
+They nevertheless show that this project's Stage 1 used far less exploration,
+so its conclusion is deliberately limited to the registered two-million-step
+budget.
+
 Gate 4 and terminal Stage 1 evidence:
 
 - checkpoint SHA-256:
@@ -456,21 +468,150 @@ Gate 4 and terminal Stage 1 evidence:
 - clean worst (`25.190s`) video SHA-256:
   `E85BE3E34863B04DCE175EBFF23233F19903A180CD91C4A075DC5F21A5CB3D59`.
 
-No Stage 2 reward or training was started. Localized assistance remains an
-owner-approval decision after review of this terminal Stage 1 result.
+At the time this terminal result was committed, no Stage 2 reward or training
+had started. The owner subsequently approved the separately pre-registered
+localized-assistance experiment below.
 
-## Stage 2: localized assistance, held behind Stage 1
+## Stage 2: localized drift assistance
 
-No Stage 2 reward is implemented or pre-registered yet. If Stage 1 clearly
-plateaus without a useful slide, Stage 2 may add a localized slip/drift bonus
-only in a region where replay analysis and established A01 strategy show that a
-real speedslide saves time. The first-turn and final-corner regions are the only
-current candidates. The Uphill claim remains an investigation item, not a
-reward zone.
+Stage 2 follows the structure of Yosh's intervention, not an undisclosed exact
+formula. His transcript says that the AI received extra reward for drifting
+inside one specific section, but gives no coefficient, physics threshold,
+duration, or coordinate bounds. The exact formula below is this project's
+pre-registered engineering choice. The owner's approved direction applies it
+to both established A01 speedslide zones. It does not claim that Yosh's text
+itself identifies or rewards both zones.
 
-Stage 2 will be its own clean reward iteration, initialized from a checksum-
-pinned Stage 1 checkpoint and pre-registered before training. It will not
-hand-script steering, braking, or throttle sequences.
+### Frozen Stage 2 hypothesis
+
+> Adding a bounded reward for new forward progress made while live telemetry confirms drift-like dynamics, only inside the first-turn and final-corner zones, is expected to induce repeated drift attempts in one or both zones where unchanged V4 training produced none. Consistent with Yosh's result, the first induced attempts are expected to be imprecise and may initially worsen lap time or finish reliability before technique quality improves.
+
+This sentence is recorded before the Stage 2 baseline or training is run and
+must not be edited after observing a result.
+
+### Initialization checkpoint
+
+Stage 2 starts from Stage 1 Gate 2's optimizer-bearing checkpoint:
+
+- path: `checkpoints/wr_chase_stage1/gate_01000000_model.zip`;
+- SHA-256:
+  `BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044`;
+- model timestep: `3,004,416`; and
+- frozen result: `10/10` finishes, `24.850s` best, `24.865s` mean,
+  `24.880s` worst, with no falls or stuck episodes.
+
+Gate 2 is the strongest pace/reliability compromise among Stage 1 checkpoints.
+Gate 1 was `0.100s` faster at best but finished only `6/10`; Gate 3 collapsed
+to `1/10`; Gate 4 recovered to `10/10` but was slower and much more variable
+than Gate 2. Retaining Gate 2's optimizer state avoids combining the reward
+change with an optimizer reset. Its Adam moments were learned under V4, but
+that limitation applies to every optimizer-bearing Stage 1 candidate.
+
+Before training, the unchanged Gate 2 policy will receive a fresh 10-episode
+deterministic baseline through the direct-live Stage 2 telemetry path. This is
+an instrumentation/comparability check, not another checkpoint-selection
+contest; the preserved result above remains the reason Gate 2 was selected.
+
+### Exact Stage 2 reward addition
+
+The V4 reward and every terminal term remain unchanged. Let
+`maximum_progress_before_step` be the greatest reference-path progress reached
+earlier in the current episode:
+
+```text
+new_progress_delta = max(
+    0,
+    current_progress - maximum_progress_before_step,
+)
+new_progress_fraction = clip(new_progress_delta, 0, 20) / 20
+
+in_assisted_zone = (
+    680 <= current_progress <= 930
+    or 1100 <= current_progress <= 1410
+)
+
+drift_attempt = (
+    ground_contact_count >= 3
+    and displayed_speed >= 350
+    and sliding_wheel_count >= 1
+    and abs(slip_angle_degrees) >= 1.0
+    and abs(body_up_yaw_rate) >= 0.25
+)
+
+localized_drift_bonus = (
+    0.50 * new_progress_fraction
+    if in_assisted_zone and drift_attempt
+    else 0.0
+)
+
+stage2_reward = v4_reward + localized_drift_bonus
+```
+
+The coefficient is capped at `0.50` per 100 ms step. Even if every unit of the
+combined `560`-unit assisted range qualified on its first traversal, the
+high-water-progress scaling bounds the approximate one-pass bonus to `14.0`.
+That is material enough to distinguish drift attempts but remains below V4's
+`+50` finish bonus and far below its `-250` verified-failure penalty.
+
+Using episode-high-water progress is deliberate: reversing and repeatedly
+crossing the same zone cannot earn the bonus again. One sliding wheel is enough
+to reward an exploratory attempt, while the stricter measurement rule below
+still requires two sliding wheels and sustained behavior before the project
+claims that a slide was learned. The bonus is binary with respect to angle once
+the minimum is met; it does not encode an optimal speedslide angle or reward
+larger, crash-prone slip angles.
+
+This design retains a real sparsity risk: Stage 1 recorded zero sliding-wheel
+samples in both zones, so Stage 2 is identical to V4 until exploration first
+crosses every binary eligibility threshold at once. If that never happens, the
+registered interpretation is that this localized binary assistance remained
+too sparse within the Stage 2 budget. The thresholds or coefficient will not be
+softened after observing that outcome.
+
+Wheel contact, wheel sliding, velocity slip angle, and body-up yaw rate must
+come directly from the live `SimState` used for that policy step. They are
+available only to reward calculation and audit logging, not added to the PPO
+observation. Missing or incomplete live dynamics is a hard instrumentation
+failure. Stage 2 never substitutes input-replay physics for a reward or slide
+conclusion.
+
+No reward is added outside the two registered zones. There is no Uphill zone,
+track-wide drift reward, direct steering/brake/throttle term, steering
+smoothness term, target path, target angle, or scripted action sequence.
+
+### Frozen Stage 2 gates
+
+- Training uses nominal `500,000`-interaction gates at 100x with the existing
+  100 ms action period. PPO rollout overshoot is reported exactly.
+- Save optimizer-bearing checkpoints every nominal `250,000` interactions and
+  at each gate.
+- At every gate, run 10 deterministic episodes at 6x, preserve all input
+  replays and the complete action audit, and compute slide/prerequisite metrics
+  exclusively from terminal-outcome-matched direct-live `SimState` records.
+- Preserve finish rate; best, mean, and worst race-clock times; lateral and
+  oscillation metrics; both zone-specific bonus totals; candidate/confirmed
+  slide windows; opening-drop measurements; and clean videos for review gates.
+- Candidate and confirmed windows retain Stage 1's frozen thresholds. A
+  confirmed slide requires at least three consecutive 100 ms samples with at
+  least three wheels grounded, speed `>=350`, absolute slip `>=1 degree`,
+  absolute body-up yaw `>=0.25 rad/s`, and at least two sliding wheels.
+- A repeated induction requires a confirmed slide in the same registered zone
+  in at least `3/10` deterministic episodes. Stop and report that gate for
+  visual review immediately; pace improvement is not required because early
+  slowdown and imprecision are part of the hypothesis.
+- Invalid/incomplete live telemetry stops the experiment as an instrumentation
+  failure. There is no replay fallback.
+- Safety review triggers after `0/10` finishes at one gate, or `<=5/10`
+  finishes at two consecutive gates. One weak gate alone is retained because
+  early reliability loss is pre-registered as plausible.
+- The initial Stage 2 time box is `2,000,000` interactions. If no repeated
+  induction occurs, report the bonus as ineffective within that budget and do
+  not change its coefficient after the fact. No automatic extension is allowed.
+
+TensorBoard name: `wr_chase_stage2_localized_drift`. Artifacts use distinct
+`runs/wr_chase_stage2/`, `checkpoints/wr_chase_stage2/`,
+`artifacts/replays/wr_chase_stage2/`, and
+`artifacts/analysis/wr_chase_stage2/` roots. Stage 1 evidence is immutable.
 
 ## Realistic expectation
 
