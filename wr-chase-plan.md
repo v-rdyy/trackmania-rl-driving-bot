@@ -676,6 +676,71 @@ Evidence:
 - every delivered video manifest records H.264, `overlay: false`, and a
   successful replay finish.
 
+### Gate 500,000 result
+
+The first Stage 2 segment completed `501,760` interactions rather than exactly
+`500,000` because PPO finished its current rollout. The overshoot is disclosed
+and retained. The resulting deterministic evaluation again finished `9/10`
+episodes:
+
+- best finish: `24.780s`;
+- mean of the nine finishes: `24.816s`;
+- worst finish: `24.900s`; and
+- one non-finish: upright stuck termination at `26.400s`, maximum progress
+  `2161.96`, with no fall, off-track, or upside-down event.
+
+Compared with target zero, best time improved `0.070s` and mean finish time
+improved about `0.046s`, while the worst finish was `0.030s` slower. This is
+not evidence that localized assistance worked. The independent live audit
+found zero eligible attempt steps, zero candidate windows, zero confirmed
+windows, and exactly `0.0` bonus in both registered zones. The checkpoint only
+received the unchanged V4 component of the Stage 2 reward during all observed
+qualifying decisions, so the modest pace gain is attributed to continued PPO
+training on that base signal.
+
+Precision regressed despite the pace gain. Mean p95 absolute lateral offset
+rose from `12.209` to `17.770` units and maximum absolute offset rose from
+`18.653` to `24.176`. Mean significant steering reversals rose from `32.3` to
+`39.7`, even though mean steering total variation fell from `39.981` to
+`34.931` and mean absolute steering fell from `0.625` to `0.444`. That pattern
+is consistent with more frequent, smaller corrections, not a learned slide.
+Oscillation remained detected in `10/10` episodes.
+
+The approach did change incidentally. First-turn entry moved closer to the
+reference center, from the baseline's `-11.13..-10.77` range to
+`-7.79..-7.53`, at essentially unchanged `329.35..330.35` entry speed. Opening
+drop airtime remained `2,000ms` in nine runs and rose to `2,100ms` in one;
+drop-chord diagonal angle narrowed to `1.26..1.84` degrees. Thus one claimed
+speedslide prerequisite improved without generating even a candidate slide,
+while airtime did not improve.
+
+The live reward and progress-high-water reconstructions again had maximum
+absolute error `0.0`. All ten raw input replays were checksum-bound and
+preserved. No safety or induction threshold fired, so the frozen decision is
+`continue` to Gate 1,000,000 without changing the coefficient or thresholds.
+
+Evidence:
+
+- checkpoint SHA-256:
+  `8A06E00055886E8E671E988D5D6948C6688B74780EDB32A87C6CC213870C8326`;
+- training summary SHA-256:
+  `1632251A0B036EA776B73A8B400BCBF389A5440EDDDB06644A75E653946CAFC0`;
+- evaluation summary SHA-256:
+  `786F236AC7DA51BBF85F3E6678CCA0440DB24D718FFA59A14A5601C08D190C45`;
+- direct-live action log SHA-256:
+  `BA1126A9CF7EA8076E32DDDA602D8DCB6D155219B510B5839719D092236B6026`;
+- independent analysis SHA-256:
+  `B0CBED778FCC775DA6ACF8E40B48534EC54654E448B07A562E4920092874ADD7`;
+- clean best (`24.780s`) video SHA-256:
+  `E015AA97BD56B6E6E2F5E537E5B370FDCB2DD0E588788B4D0A483DC638951CD7`;
+- clean closest-to-mean (`24.800s`) video SHA-256:
+  `21B454B550A2A672304FF72F9A0D1ECDDBD4E60B09C4326D8809C7263F026914`;
+- clean worst (`24.900s`) video SHA-256:
+  `6B2206F73A726F045900EE3BC413B8300C10046460A0F68CBA84252FCC73941E`;
+  and
+- all three video records are H.264, successful finishes, and
+  `overlay: false`.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
