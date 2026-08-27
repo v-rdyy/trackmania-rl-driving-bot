@@ -423,6 +423,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode_start_race_time = 0
         self._last_step_race_time_ms: int | None = None
         self._last_diagnostics: ObservationDiagnostics | None = None
+        self._maximum_progress: float | None = None
         self._last_position: np.ndarray | None = None
         self._last_steer_action: float | None = None
         self._last_steering_delta_direction = 0
@@ -461,6 +462,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode_start_race_time = int(state.race_time)
         self._last_step_race_time_ms = int(state.race_time)
         self._last_diagnostics = diagnostics
+        self._maximum_progress = diagnostics.progress
         self._last_position = np.asarray(state.position, dtype=np.float64).copy()
         self._last_steer_action = None
         self._last_steering_delta_direction = 0
@@ -560,7 +562,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
 
     @staticmethod
     def _full_simstate_log(state: object) -> dict[str, Any]:
-        """Expose full dynamics only in audit logs; never in reward/observation."""
+        """Extract live dynamics for reward calculation and audit, not observation."""
         try:
             velocity = np.asarray(state.velocity, dtype=np.float64)
             rotation = np.asarray(state.rotation_matrix, dtype=np.float64)
@@ -578,6 +580,8 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             ]
         except AttributeError:
             return {"full_simstate_available": False}
+        if len(wheel_contacts) != 4 or len(wheel_sliding) != 4:
+            raise ProtocolError("live SimState must expose exactly four wheels")
         values = np.concatenate((velocity, rotation.ravel(), angular_velocity))
         if not np.isfinite(values).all():
             raise ProtocolError("full SimState audit telemetry is nonfinite")
@@ -637,6 +641,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             self._last_steering_delta_direction = 0
             self._steering_reversal_steps = []
         observation, diagnostics = self._observation(result.state)
+        full_simstate = self._full_simstate_log(result.state)
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
         timed_out = elapsed_ms >= self.config.max_episode_ms
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
@@ -661,6 +666,13 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         )
         if self._last_diagnostics is None:
             raise RuntimeError("step requires reset diagnostics")
+        if self._maximum_progress is None:
+            raise RuntimeError("step requires reset progress high-water mark")
+        maximum_progress_before_step = self._maximum_progress
+        new_high_water_progress_delta = max(
+            0.0,
+            diagnostics.progress - maximum_progress_before_step,
+        )
         transition = RewardTransition(
             previous_diagnostics=self._last_diagnostics,
             diagnostics=diagnostics,
@@ -675,6 +687,14 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             steering_rate_change=steering_rate_change,
             steering_slope_reversal=steering_slope_reversal,
             steering_reversals_in_window=steering_reversals_in_window,
+            new_high_water_progress_delta=new_high_water_progress_delta,
+            full_simstate_available=bool(
+                full_simstate["full_simstate_available"]
+            ),
+            ground_contact_count=int(full_simstate.get("ground_contact_count", 0)),
+            sliding_wheel_count=int(full_simstate.get("sliding_wheel_count", 0)),
+            slip_angle_degrees=float(full_simstate.get("slip_angle_degrees", 0.0)),
+            body_up_yaw_rate=float(full_simstate.get("body_up_yaw_rate", 0.0)),
         )
         reward = float(self.reward_function(transition))
         if not math.isfinite(reward):
@@ -703,7 +723,6 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             }
         )
         if self._logger is not None:
-            full_simstate = self._full_simstate_log(result.state)
             self._logger.log_step(
                 {
                     "episode": self._episode,
@@ -747,7 +766,11 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                     "stuck_window_progress_gain": stuck_progress_gain,
                     "stuck_window_world_distance": stuck_world_distance,
                     "race_finished": terminated,
+                    "previous_progress": self._last_diagnostics.progress,
                     "progress": diagnostics.progress,
+                    "new_high_water_progress_delta": (
+                        new_high_water_progress_delta
+                    ),
                     "lateral_offset": diagnostics.lateral_offset,
                     "vertical_offset": diagnostics.vertical_offset,
                     "heading_error": diagnostics.heading_error,
@@ -756,6 +779,10 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
             )
 
         self._last_diagnostics = diagnostics
+        self._maximum_progress = max(
+            maximum_progress_before_step,
+            diagnostics.progress,
+        )
         self._last_steer_action = float(validated[0])
         self._last_step_race_time_ms = int(result.race_time_ms)
         self._step += 1

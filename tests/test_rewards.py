@@ -13,6 +13,8 @@ from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     clustered_reversal_frequency_reward,
     dense_speed_reward,
+    localized_drift_assistance_reward,
+    localized_drift_bonus,
     phase1_smoke_reward,
     signed_progress_efficiency_reward,
     sparse_finish_reward,
@@ -34,6 +36,12 @@ def transition(
     steering_rate_change: float = 0.0,
     steering_slope_reversal: bool = False,
     steering_reversals_in_window: int = 0,
+    new_high_water_progress_delta: float = 0.0,
+    full_simstate_available: bool = False,
+    ground_contact_count: int = 0,
+    sliding_wheel_count: int = 0,
+    slip_angle_degrees: float = 0.0,
+    body_up_yaw_rate: float = 0.0,
 ) -> RewardTransition:
     previous_diagnostics = ObservationDiagnostics(
         progress=previous_progress,
@@ -61,6 +69,12 @@ def transition(
         steering_rate_change=steering_rate_change,
         steering_slope_reversal=steering_slope_reversal,
         steering_reversals_in_window=steering_reversals_in_window,
+        new_high_water_progress_delta=new_high_water_progress_delta,
+        full_simstate_available=full_simstate_available,
+        ground_contact_count=ground_contact_count,
+        sliding_wheel_count=sliding_wheel_count,
+        slip_angle_degrees=slip_angle_degrees,
+        body_up_yaw_rate=body_up_yaw_rate,
     )
 
 
@@ -290,6 +304,177 @@ class RewardTests(unittest.TestCase):
             ),
             -250.2,
         )
+
+    def test_stage2_requires_live_simstate_even_outside_assisted_zones(self) -> None:
+        with self.assertRaisesRegex(ValueError, "complete live SimState"):
+            localized_drift_assistance_reward(
+                transition(previous_progress=10.0, progress=14.0)
+            )
+
+    def test_stage2_adds_exact_bounded_bonus_at_every_frozen_threshold(self) -> None:
+        candidate = transition(
+            display_speed=350,
+            previous_progress=680.0,
+            progress=700.0,
+            new_high_water_progress_delta=20.0,
+            full_simstate_available=True,
+            ground_contact_count=3,
+            sliding_wheel_count=1,
+            slip_angle_degrees=-1.0,
+            body_up_yaw_rate=-0.25,
+        )
+
+        self.assertAlmostEqual(localized_drift_bonus(candidate), 0.5)
+        self.assertAlmostEqual(
+            localized_drift_assistance_reward(candidate),
+            signed_progress_efficiency_reward(candidate) + 0.5,
+        )
+
+        stronger = transition(
+            display_speed=500,
+            previous_progress=680.0,
+            progress=720.0,
+            new_high_water_progress_delta=40.0,
+            full_simstate_available=True,
+            ground_contact_count=4,
+            sliding_wheel_count=4,
+            slip_angle_degrees=20.0,
+            body_up_yaw_rate=10.0,
+        )
+        self.assertAlmostEqual(localized_drift_bonus(stronger), 0.5)
+
+    def test_stage2_bonus_scales_only_with_new_high_water_progress(self) -> None:
+        candidate = transition(
+            display_speed=400,
+            previous_progress=700.0,
+            progress=710.0,
+            new_high_water_progress_delta=5.0,
+            full_simstate_available=True,
+            ground_contact_count=4,
+            sliding_wheel_count=2,
+            slip_angle_degrees=2.0,
+            body_up_yaw_rate=0.5,
+        )
+
+        self.assertAlmostEqual(localized_drift_bonus(candidate), 0.125)
+        repeated_progress = transition(
+            display_speed=400,
+            previous_progress=700.0,
+            progress=710.0,
+            new_high_water_progress_delta=0.0,
+            full_simstate_available=True,
+            ground_contact_count=4,
+            sliding_wheel_count=2,
+            slip_angle_degrees=2.0,
+            body_up_yaw_rate=0.5,
+        )
+        self.assertEqual(localized_drift_bonus(repeated_progress), 0.0)
+
+    def test_stage2_bonus_is_restricted_to_both_inclusive_zones(self) -> None:
+        for progress in (680.0, 930.0, 1100.0, 1410.0):
+            with self.subTest(progress=progress):
+                candidate = transition(
+                    display_speed=400,
+                    previous_progress=progress - 20.0,
+                    progress=progress,
+                    new_high_water_progress_delta=20.0,
+                    full_simstate_available=True,
+                    ground_contact_count=4,
+                    sliding_wheel_count=2,
+                    slip_angle_degrees=2.0,
+                    body_up_yaw_rate=0.5,
+                )
+                self.assertAlmostEqual(localized_drift_bonus(candidate), 0.5)
+
+        for progress in (679.999, 930.001, 1099.999, 1410.001):
+            with self.subTest(progress=progress):
+                candidate = transition(
+                    display_speed=400,
+                    previous_progress=progress - 20.0,
+                    progress=progress,
+                    new_high_water_progress_delta=20.0,
+                    full_simstate_available=True,
+                    ground_contact_count=4,
+                    sliding_wheel_count=2,
+                    slip_angle_degrees=2.0,
+                    body_up_yaw_rate=0.5,
+                )
+                self.assertEqual(localized_drift_bonus(candidate), 0.0)
+
+    def test_stage2_every_drift_attempt_gate_is_required(self) -> None:
+        qualifying = {
+            "display_speed": 400,
+            "previous_progress": 700.0,
+            "progress": 720.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 2.0,
+            "body_up_yaw_rate": 0.5,
+        }
+        failing_values = {
+            "display_speed": 349,
+            "ground_contact_count": 2,
+            "sliding_wheel_count": 0,
+            "slip_angle_degrees": 0.999,
+            "body_up_yaw_rate": 0.249,
+        }
+
+        for field, value in failing_values.items():
+            with self.subTest(field=field):
+                candidate = transition(**(qualifying | {field: value}))
+                self.assertEqual(localized_drift_bonus(candidate), 0.0)
+                self.assertEqual(
+                    localized_drift_assistance_reward(candidate),
+                    signed_progress_efficiency_reward(candidate),
+                )
+
+    def test_stage2_preserves_v4_terminal_terms(self) -> None:
+        qualifying = {
+            "display_speed": 400,
+            "previous_progress": 700.0,
+            "progress": 720.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 2.0,
+            "body_up_yaw_rate": 0.5,
+        }
+        finished = transition(**qualifying, terminated=True)
+        failed = transition(**qualifying, truncated=True, stuck=True)
+
+        self.assertAlmostEqual(
+            localized_drift_assistance_reward(finished),
+            signed_progress_efficiency_reward(finished) + 0.5,
+        )
+        self.assertAlmostEqual(
+            localized_drift_assistance_reward(failed),
+            signed_progress_efficiency_reward(failed) + 0.5,
+        )
+
+    def test_stage2_rejects_invalid_wheel_counts_and_nonfinite_dynamics(self) -> None:
+        base = {
+            "display_speed": 400,
+            "previous_progress": 700.0,
+            "progress": 720.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 2.0,
+            "body_up_yaw_rate": 0.5,
+        }
+        for field, value in (
+            ("ground_contact_count", 5),
+            ("sliding_wheel_count", -1),
+            ("slip_angle_degrees", float("nan")),
+            ("body_up_yaw_rate", float("inf")),
+            ("new_high_water_progress_delta", float("nan")),
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                localized_drift_bonus(transition(**(base | {field: value})))
 
 
 if __name__ == "__main__":

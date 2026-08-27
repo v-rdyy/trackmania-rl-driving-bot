@@ -22,10 +22,11 @@ from trackmania_rl.observations import ReferencePath
 from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     clustered_reversal_frequency_reward,
+    localized_drift_assistance_reward,
     sparse_finish_reward,
     steering_rate_smoothness_reward,
 )
-from trackmania_rl.tmi_bridge import MessageType
+from trackmania_rl.tmi_bridge import MessageType, ProtocolError
 
 
 def state(
@@ -46,6 +47,38 @@ def state(
         race_time=race_time,
         data=bytearray(b"state"),
     )
+
+
+def add_live_dynamics(
+    sim_state: SimpleNamespace,
+    *,
+    sliding_wheels: int = 1,
+    ground_contacts: int = 4,
+    slip_angle_degrees: float = 2.0,
+    body_up_yaw_rate: float = 0.5,
+) -> SimpleNamespace:
+    """Attach a complete four-wheel SimState fixture with controlled dynamics."""
+    forward_speed = 100.0
+    right_speed = np.tan(np.radians(slip_angle_degrees)) * forward_speed
+    local_velocity = np.asarray([right_speed, 0.0, forward_speed])
+    sim_state.velocity = sim_state.rotation_matrix @ local_velocity
+    sim_state.dyna = SimpleNamespace(
+        current_state=SimpleNamespace(
+            angular_speed=(
+                sim_state.rotation_matrix[:, 1] * body_up_yaw_rate
+            )
+        )
+    )
+    sim_state.simulation_wheels = [
+        SimpleNamespace(
+            real_time_state=SimpleNamespace(
+                has_ground_contact=index < ground_contacts,
+                is_sliding=index < sliding_wheels,
+            )
+        )
+        for index in range(4)
+    ]
+    return sim_state
 
 
 class FakeSession:
@@ -163,6 +196,8 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertFalse(record["off_track"])
             self.assertFalse(record["fallen"])
             self.assertFalse(record["race_finished"])
+            self.assertEqual(record["previous_progress"], 0.0)
+            self.assertEqual(record["new_high_water_progress_delta"], 1.0)
 
     def test_action_audit_can_include_full_live_simstate_dynamics(self) -> None:
         start = state(x=0, z=0, speed=0, race_time=0)
@@ -199,6 +234,88 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertEqual(record["sliding_wheel_count"], 2)
         self.assertEqual(record["body_up_yaw_rate"], 0.5)
         self.assertEqual(len(record["rotation_matrix"]), 3)
+
+    def test_stage2_uses_live_dynamics_and_high_water_progress_only_once(self) -> None:
+        reference = ReferencePath(
+            distances=np.asarray([0.0, 1_500.0]),
+            points=np.asarray([[0.0, 0.0, 0.0], [1_500.0, 0.0, 0.0]]),
+        )
+        start = state(x=690, z=0, speed=0, race_time=0)
+        states = [
+            start,
+            add_live_dynamics(state(x=710, z=0, speed=400, race_time=100)),
+            add_live_dynamics(state(x=700, z=0, speed=400, race_time=200)),
+            add_live_dynamics(state(x=710, z=0, speed=400, race_time=300)),
+            add_live_dynamics(state(x=730, z=0, speed=400, race_time=400)),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "stage2_actions.jsonl"
+            env = TrackmaniaEnv(
+                reference_path=reference,
+                session=FakeSession(states),
+                action_log_path=log_path,
+                reward_function=localized_drift_assistance_reward,
+            )
+            observation, _ = env.reset()
+            rewards = [
+                env.step(np.asarray([0.0, 1.0, 0.0], dtype=np.float32))[1]
+                for _ in range(4)
+            ]
+            reset_observation, _ = env.reset()
+            reset_reward = env.step(
+                np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+            )[1]
+            env.close()
+            records = [
+                json.loads(line)
+                for line in log_path.read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(observation.shape, (26,))
+        self.assertEqual(reset_observation.shape, (26,))
+        self.assertEqual(rewards, [2.4, -1.1, 0.9, 2.4])
+        self.assertEqual(reset_reward, 2.4)
+        self.assertEqual(
+            [record["new_high_water_progress_delta"] for record in records],
+            [20.0, 0.0, 0.0, 20.0, 20.0],
+        )
+        self.assertEqual(
+            [record["previous_progress"] for record in records],
+            [690.0, 710.0, 700.0, 710.0, 690.0],
+        )
+        self.assertTrue(all(record["full_simstate_available"] for record in records))
+
+    def test_stage2_fails_before_reward_when_live_dynamics_are_missing(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=0),
+                state(x=1, z=0, speed=100, race_time=100),
+            ]
+        )
+        env = TrackmaniaEnv(
+            reference_path=self.path,
+            session=session,
+            reward_function=localized_drift_assistance_reward,
+        )
+        env.reset()
+
+        with self.assertRaisesRegex(ValueError, "complete live SimState"):
+            env.step(np.asarray([0.0, 1.0, 0.0], dtype=np.float32))
+        env.close()
+
+    def test_full_simstate_rejects_any_wheel_count_other_than_four(self) -> None:
+        start = state(x=0, z=0, speed=0, race_time=0)
+        driven = add_live_dynamics(state(x=1, z=0, speed=100, race_time=100))
+        driven.simulation_wheels.pop()
+        env = TrackmaniaEnv(
+            reference_path=self.path,
+            session=FakeSession([start, driven]),
+        )
+        env.reset()
+
+        with self.assertRaisesRegex(ProtocolError, "exactly four wheels"):
+            env.step(np.asarray([0.0, 1.0, 0.0], dtype=np.float32))
+        env.close()
 
     def test_invalid_action_is_logged_and_rejected_before_session(self) -> None:
         session = FakeSession([state(x=0, z=0, speed=0, race_time=0)])
