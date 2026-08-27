@@ -10,6 +10,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.game_launch import (
+    DEFAULT_STARTUP_TIMEOUT_SECONDS,
     _bridge_is_listening,
     click_trackmania_client,
     ensure_trackmania_running,
@@ -19,6 +20,9 @@ from trackmania_rl.video_capture import VideoCaptureError, WindowTarget
 
 
 class GameLaunchTests(unittest.TestCase):
+    def test_default_startup_timeout_allows_delayed_bridge_initialization(self) -> None:
+        self.assertEqual(DEFAULT_STARTUP_TIMEOUT_SECONDS, 120.0)
+
     @patch("trackmania_rl.game_launch.psutil.net_connections")
     def test_bridge_listener_check_does_not_open_a_client_connection(
         self,

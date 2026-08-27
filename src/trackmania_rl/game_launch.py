@@ -21,6 +21,7 @@ from trackmania_rl.video_capture import (
 DEFAULT_TMLOADER = Path.home() / "AppData" / "Local" / "TMLoader" / "TMLoader.exe"
 DEFAULT_GAME = "TmForever"
 DEFAULT_PROFILE = "default"
+DEFAULT_STARTUP_TIMEOUT_SECONDS = 120.0
 VK_RETURN = 0x0D
 WM_CLOSE = 0x0010
 PROCESS_TERMINATE = 0x0001
@@ -107,7 +108,7 @@ def ensure_trackmania_running(
     executable: Path = DEFAULT_TMLOADER,
     game: str = DEFAULT_GAME,
     profile: str = DEFAULT_PROFILE,
-    timeout_seconds: float = 60.0,
+    timeout_seconds: float = DEFAULT_STARTUP_TIMEOUT_SECONDS,
     startup_settle_seconds: float = 10.0,
     confirm_existing: bool = False,
 ) -> tuple[WindowTarget, bool]:
