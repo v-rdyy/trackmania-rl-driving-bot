@@ -613,6 +613,69 @@ TensorBoard name: `wr_chase_stage2_localized_drift`. Artifacts use distinct
 `artifacts/replays/wr_chase_stage2/`, and
 `artifacts/analysis/wr_chase_stage2/` roots. Stage 1 evidence is immutable.
 
+### Target-zero direct-live baseline result
+
+The untouched Stage 1 Gate 2 initialization was evaluated once through the
+frozen Stage 2 path before training. This was a comparability and
+instrumentation gate, not checkpoint selection. It completed `9/10` episodes:
+
+- best finish: `24.850s`;
+- mean of the nine finishes: `24.861s`;
+- worst finish: `24.870s`; and
+- one non-finish: stuck termination at `32.600s`, with no fall, off-track, or
+  upside-down event.
+
+The earlier Stage 1 Gate 2 evaluation finished `10/10`. The fresh `9/10`
+result is retained rather than rerun away. The policy is deterministic, so the
+difference is evidence of live simulator/reset-state variability rather than
+stochastic policy sampling. It does not trigger Stage 2's trained-gate safety
+rule because target zero was pre-registered as a baseline only.
+
+There was no pre-existing assisted behavior: both the first-turn and
+final-corner zones had zero candidate windows, zero confirmed windows, zero
+eligible attempt steps, and exactly `0.0` localized bonus. Independent
+reconstruction matched every logged reward and every high-water-progress delta
+with maximum absolute error `0.0`. The result therefore passed the direct-live
+gate with decision `continue`; any later repeated confirmed window can be
+compared against a genuinely zero-attempt baseline. Had target zero already
+shown a repeated confirmed slide in at least `3/10` episodes, the frozen logic
+would have stopped for a baseline-comparability review instead of attributing
+that behavior to Stage 2.
+
+The prerequisite measurements were stable across all ten runs: opening-drop
+airtime was `2,000ms`; the drop chord was `2.30` to `2.41` degrees diagonal to
+the reference; first-turn entry lateral offset was `-11.13` to `-10.77` units;
+and entry speed was `329.53` to `330.51`. Precision remained recognizably V4:
+oscillation was detected in `10/10` episodes, mean significant steering
+reversals were `32.3`, mean p95 absolute lateral offset was `12.209` units, and
+maximum absolute lateral offset was `18.653` units. The stuck episode
+contributed `2.1s` of detected stuck duration; upside-down duration was zero.
+
+Episode zero contained a disclosed 46-row startup/reset prefix, producing 294
+raw action rows for a `24.870s` finish. Lap time comes from the live terminal
+race clock, not row count. Those prefix rows remain included in the exact
+reward audit while the post-restart rows alone feed lap and trajectory metrics.
+
+Evidence:
+
+- evaluation summary SHA-256:
+  `2D4C4B36F85FBFF5E6EC447ADE5732D9EFE87A2769CFC176E140DC58367218C2`;
+- direct-live action log SHA-256:
+  `DE0031B312CE6758DBE32BA71CC670BFC83159958575ACA277FF8C99EB8F11FF`;
+- independent analysis SHA-256:
+  `8FE691694FDE44DF6C70F1187645985F8F3DAAFB6FD2260C954D6276C5E9F9D5`;
+- all ten nonempty input replays were checksum-bound to the evaluation before
+  the gate could continue;
+- clean best (`24.850s`) video SHA-256:
+  `149A12529524FFA774D4BFE231E6097A58C1DD1A801B306483606B0775519462`;
+- clean closest-to-mean (`24.860s`) video SHA-256:
+  `5658BB4778C18FC54CFE33D88BE78DC9FC7322611E1B2E32E91EAB7ACF626BDC`;
+- clean worst (`24.870s`) video SHA-256:
+  `FA715DC67178BE634BDDF782932E2DC37E3B96067F3B466AE13CE5D9B5F01E98`;
+  and
+- every delivered video manifest records H.264, `overlay: false`, and a
+  successful replay finish.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
