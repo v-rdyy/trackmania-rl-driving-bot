@@ -1,6 +1,7 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2 pre-registered; no Stage 2 training result observed
+Status: Stage 2 paused at the pre-registered Gate 1,000,000 safety review;
+no drift induction was observed through the executed `1,001,472` interactions
 
 Date pre-registered: 2026-08-26
 
@@ -740,6 +741,101 @@ Evidence:
   and
 - all three video records are H.264, successful finishes, and
   `overlay: false`.
+
+### Gate 1,000,000 safety-review result
+
+Gate 1,000,000 resumed the checksum-bound Gate 500,000 optimizer state and
+trained for another `499,712` interactions. The cumulative Stage 2 total is
+therefore `1,001,472`, and the model ended at timestep `4,005,888`; both small
+overshoots come from completing PPO rollout boundaries. The resulting
+checkpoint is `checkpoints/wr_chase_stage2/gate_01000000_model.zip`, SHA-256
+`F1FCCB19F80192C7A6528BC183C9CD8317A7F7EAA35472E189A56699A85C92FF`.
+
+The deterministic result was the pre-registered single-gate safety trigger:
+
+- `0/10` finishes and therefore no best, mean, or worst lap time;
+- `10/10` stuck terminations, with `0` falls, off-track terminations, or
+  timeouts;
+- terminal race clocks from `26.800s` to `30.300s`;
+- final reference-path progress from `2167.61` to `2186.19` units, with best
+  maximum progress `2186.25 / 2206.53`, about `20.27` units short; and
+- upside-down periods in `9/10` episodes (`29.0s` total) plus detected stuck
+  periods in all ten (`21.0s` total).
+
+The clean replay review locates the failure at the finish structure rather
+than earlier on the course. The closest run reaches the finish platform but is
+inverted beside the finish trigger; the other preserved representatives are
+wedged against or below the surrounding structure. This supports a final
+alignment/collision failure, but it does not prove that one identical contact
+caused all ten outcomes.
+
+The direct-live reward audit remained exact and used no replay-telemetry
+fallback. In the ten deterministic episodes, both registered zones had zero
+eligible attempt steps, candidate windows, confirmed windows, rewarded steps,
+and exactly `0.0` localized bonus. Reward and progress-high-water
+reconstruction errors were both `0.0`. Gate 1,000,000 therefore provides no
+evidence that Stage 2 induced a drift. The audit does not establish whether an
+eligible bonus event occurred during stochastic training, because training
+interactions were not recorded with the same full direct-live audit.
+
+Reliability and precision worsened across the three direct comparisons:
+
+| Metric | Target zero | Gate 500,000 | Gate 1,000,000 |
+| --- | ---: | ---: | ---: |
+| deterministic finishes | `9/10` | `9/10` | `0/10` |
+| mean p95 absolute lateral offset | `12.209` | `17.770` | `23.585` |
+| maximum absolute lateral offset | `18.653` | `24.176` | `30.594` |
+| mean significant steering reversals | `32.3` | `39.7` | `42.8` |
+| oscillation-detected episodes | `10/10` | `10/10` | `10/10` |
+
+The training rollouts still reported a high stochastic cumulative finish rate
+(`3623/3829`, or `94.62%`; `1769/1902`, or `93.01%`, during this segment),
+while the frozen deterministic policy failed all ten gate episodes. That is a
+real stochastic-versus-deterministic policy-mode divergence, not a reason to
+replace or rerun the registered result.
+
+The opening approach also changed again without producing a slide. All ten
+runs measured `1,900ms` opening-drop airtime, a `1.64..1.74` degree drop chord,
+and `308..313` landing speed. First-turn entry moved back left to
+`-10.48..-10.18` units at `330.70..331.62` displayed speed. Maximum absolute
+slip in either assisted zone remained below `0.367` degrees and no wheel was
+reported sliding there.
+
+Per the frozen `0/10` single-gate trigger, the decision is `safety_review`.
+Gate 1,500,000 was not run. Stage 2 is not supported within the executed
+one-million-interaction portion and failed its safety gate; this is not a claim
+that drift discovery is impossible at greater scale, nor is it the registered
+two-million-interaction time-box conclusion because that endpoint was never
+reached.
+
+Before this segment, one launch attempt ended before training when the original
+`60s` readiness window expired before TMInterface exposed its bridge. Later
+inspection showed port `8478` became available after that cutoff. No model
+interaction occurred, the launcher allowance was raised to `120s` with a
+regression test, and the successful retry loaded the exact same Gate 500,000
+checksum. The failed-before-training record remains preserved rather than
+being hidden.
+
+Evidence:
+
+- training summary SHA-256:
+  `D894BB206BF4ED449CEACE4601FA054576D9342C810FCE0795926E82B0672969`;
+- evaluation summary SHA-256:
+  `F96A762148D448FBDF0D6D4B74EE277791C037527E6FE3DE31C30207CDAF34F1`;
+- direct-live action log SHA-256:
+  `3CB45B494A1695A120F2BB78B69B648E19A9C4BFAB64473A390DC30AAB77E015`;
+- independent analysis SHA-256:
+  `D76B2900A4E0A83753E3B7173E8878BB2BDFA4C3D76FEAAD919AE1D07BCAF6ED`;
+- all ten nonempty input replays were checksum-bound to the evaluation;
+- clean closest-progress failure video SHA-256:
+  `C978EE87D4EA1382C9BC104F2CA844A913BD3EC18D0B859495F07E90320BC1C2`;
+- clean lower-median terminal-progress failure video SHA-256:
+  `E28892ED07A27764F5A6F573F96F02E8693C782E34D4D963487961EF69556428`;
+- clean lowest-terminal-progress failure video SHA-256:
+  `912C30F2063A386E5704A33DCA394ACCC6A4B4915711014E98FA2F84D39C0D80`;
+  and
+- every delivered video record is H.264 and `overlay: false`; none is labeled
+  as a finish because this gate produced no finish.
 
 ## Realistic expectation
 
