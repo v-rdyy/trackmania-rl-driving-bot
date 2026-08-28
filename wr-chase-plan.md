@@ -2,7 +2,8 @@
 
 Status: Stage 2 paused at the pre-registered Gate 1,000,000 safety review;
 the frozen policy-mode diagnostic found an unstable `7/10` stochastic result
-and no drift induction
+and the Gate 750,000 diagnostic located the deterministic regression between
+Gate 500,000 and Gate 750,000; no drift induction was observed
 
 Date pre-registered: 2026-08-26
 
@@ -962,7 +963,7 @@ Evidence:
 - direct-live stochastic action log SHA-256:
   `84C07852D460B328B1087FBE562060FB8AB1340536354489EE5DDCEF2FED7103`;
 - reproducible offline diagnostic SHA-256:
-  `307DB67D1539937779869205D3D329E3A220C5F80B4A05464F5BC4687C5E0E0D`;
+  `6AC632FF2635A62CD86060E6ACC4DBF97C03CEF86A2964DBCEF1D6A899D039A3`;
 - all ten stochastic input replays are checksum-bound in the summary;
 - clean best (`24.810s`) finish video SHA-256:
   `33145B1AE84CBF2ABAA788F97C7C597694A6520F7036BDABC4EE627BF1106E4A`;
@@ -1009,6 +1010,81 @@ Interpretation is frozen before the run:
 In every case, compare lateral offset at progress `2000`, `2100`, `2140`, and
 `2160` against Gate 500,000 and Gate 1,000,000. Report the observed result once;
 do not select a different automatic checkpoint after seeing it.
+
+### Intermediate-checkpoint localization result
+
+The preserved nominal Gate 750,000 checkpoint finished `0/10` deterministic
+episodes. This satisfies the frozen `<=2/10` branch and locates the mean-policy
+regression at or before `751,760` Stage 2 interactions:
+
+- nine stuck terminations and one `45.100s` timeout;
+- no fall or off-track termination;
+- upside-down periods in `5/10` episodes and stuck periods in `9/10`;
+- best maximum progress `2203.80 / 2206.53`, without triggering a finish;
+- mean p95 absolute lateral offset `23.706` and maximum `32.025`;
+- mean `38.1` significant steering reversals; and
+- oscillation detected in `10/10` episodes.
+
+There are no best, mean, or worst finish times because no episode finished.
+The direct-live audit covered all `3,101` actions and matched every terminal
+outcome without replay fallback. Both assisted zones again had zero eligible
+bonus steps and zero sliding-wheel samples.
+
+The localization is visible in the fixed progress comparison:
+
+| Progress | Gate 500,000 | Gate 750,000 | Gate 1,000,000 |
+| ---: | ---: | ---: | ---: |
+| `2000` | `-16.50` | `-15.96` | `-22.48` |
+| `2100` | `-20.72` | `-19.42` | `-27.39` |
+| `2140` | `-20.40` | `-23.03` | `-28.53` |
+| `2160` | `-16.92` | `-25.13` | `-25.20` |
+
+Gate 750,000 still matches or slightly improves on Gate 500,000 through
+progress `2100`, then fails to make Gate 500,000's corrective line change
+between `2140` and `2160`. By progress `2160`, its mean lateral offset is
+already only `0.07` units from Gate 1,000,000's collision line and `8.21` units
+farther negative than Gate 500,000's.
+
+The same impact signature follows. Gate 750,000's largest late speed loss
+averages progress `2166.49` and lateral offset `-24.15`; displayed speed drops
+from mean `323.8` to `91.2` in 100 ms. The action remains mixed rather than a
+planned stop (mean throttle `0.792`, brake `0.275`), and the visual failures
+remain concentrated around the finish structure.
+
+Reconstructed observations reproduce its logged deterministic actions with
+maximum absolute error `5.97e-7`. On its own live states at progress `>=2100`,
+Gate 500,000 versus Gate 750,000 mean absolute action changes are `0.085`
+steering, `0.096` throttle, and `0.144` brake; p95 changes are `0.492`, `0.533`,
+and `0.813`. Thus the checkpoint itself contains a materially different final
+correction policy; this is not reset noise or evaluator mapping error.
+
+Conclusion: the stable mean route broke during the `250,000` interactions
+between the successful Gate 500,000 checkpoint and this automatic checkpoint.
+Gate 1,000,000 made the bad approach appear earlier, but it did not originate
+there. Stage 2 remains stopped, and the checksum-pinned Gate 500,000 checkpoint
+is the last registered reliable base. Any continuation now needs a separate,
+pre-registered optimizer-stability experiment rather than resuming the failed
+run or silently selecting a favorable later checkpoint.
+
+Evidence:
+
+- intermediate summary SHA-256:
+  `2459366EACFA58476CAF8953A204F0C9F2D054AF699DF5636029AAB5C87EF909`;
+- direct-live intermediate action log SHA-256:
+  `E9F88E10492BD5EE01E9E964E4C105A1754573A0A30460778349FB2708B57089`;
+- extended offline diagnostic SHA-256:
+  `6AC632FF2635A62CD86060E6ACC4DBF97C03CEF86A2964DBCEF1D6A899D039A3`;
+- all ten input replays are checksum-bound in the summary;
+- clean closest-progress failure video SHA-256:
+  `11DD61AE40C980842CF48EC41F8F1C6A893FB9F053D3E1E99502DEED4A0BDA4B`;
+- clean source-evaluation lower-median-progress failure video SHA-256:
+  `517BBB4DA98FEF9B0374418186E8CD697D777EE0393718552CA60D375C65D39B`;
+- clean lowest-progress failure video SHA-256:
+  `B117AF36703758BB81F212B4E992FE86060BE44ADE7BBF165A02EBF9E4F149FF`;
+  and
+- all three videos are H.264, `overlay: false`, and visibly preserve a
+  non-finish. Labels use the registered source-evaluation progress ranking;
+  replay inspection was allowed to continue to the full 45-second horizon.
 
 ## Realistic expectation
 
