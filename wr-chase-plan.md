@@ -1,9 +1,11 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2 paused at the pre-registered Gate 1,000,000 safety review;
-the frozen policy-mode diagnostic found an unstable `7/10` stochastic result
-and the Gate 750,000 diagnostic located the deterministic regression between
-Gate 500,000 and Gate 750,000; no drift induction was observed
+Status: Stage 2 paused after its pre-registered Gate 1,000,000 safety review;
+the Gate 750,000 diagnostic located the deterministic regression between Gate
+500,000 and Gate 750,000, and the pre-Stage-2b reachability audit found that the
+binary drift-bonus gate was effectively unreachable by the observed fast
+policies. Stage 2b training has not started and requires a separately approved,
+pre-registered eligibility revision as well as optimizer safeguards.
 
 Date pre-registered: 2026-08-26
 
@@ -1085,6 +1087,99 @@ Evidence:
 - all three videos are H.264, `overlay: false`, and visibly preserve a
   non-finish. Labels use the registered source-evaluation progress ranking;
   replay inspection was allowed to continue to the full 45-second horizon.
+
+### Stage 2 bonus-reachability audit before Stage 2b
+
+Before restarting from the reliable Gate 500,000 checkpoint, the frozen Stage
+2 eligibility rule was audited against every preserved direct-live evaluation
+available at this point: target zero, deterministic Gates 500,000, 750,000,
+and 1,000,000, plus the seeded stochastic Gate 1,000,000 diagnostic. This is
+`50` episode-passes through each assisted zone, with `1,203` first-turn samples
+and `1,286` final-corner samples. All records were terminal-outcome matched,
+required complete live `SimState`, and reproduced the registered reward and
+progress-high-water calculations. No training was performed for this audit.
+
+The position windows were not the blocker. Every one of the `50` episode-passes
+entered both zones, and every in-zone sample made positive new high-water
+progress. The individual threshold results were:
+
+| Condition | First turn | Final corner |
+| --- | ---: | ---: |
+| At least three grounded wheels | `1,201/1,203` (`99.83%`) | `1,285/1,286` (`99.92%`) |
+| Displayed speed `>=350` | `1,093/1,203` (`90.86%`) | `1,173/1,286` (`91.21%`) |
+| Absolute yaw rate `>=0.25` | `1,119/1,203` (`93.02%`) | `1,093/1,286` (`84.99%`) |
+| At least one sliding wheel | `2/1,203` (`0.17%`) | `3/1,286` (`0.23%`) |
+| Absolute slip angle `>=1 degree` | `2/1,203` (`0.17%`) | `2/1,286` (`0.16%`) |
+| All reward conditions together | `0/1,203` | `0/1,286` |
+
+The important result is the joint behavior, not the isolated maxima. Among all
+grounded samples at `>=350` speed, neither zone contained a single sliding
+wheel or a single sample at `>=1 degree` slip. Maximum speed-qualified slip was
+only `0.395 degrees` in the first turn and `0.426 degrees` in the final corner.
+All four deterministic datasets combined contained zero sliding-wheel and zero
+`>=1 degree` slip samples in either assisted zone.
+
+Stochastic exploration produced the only two four-of-five near misses, both in
+the same slow `33.280s` finish and both missing speed only:
+
+- first turn: speed `305`, three grounded wheels, one sliding wheel,
+  `1.562 degrees` slip, and `3.339` yaw rate; and
+- final corner: speed `333`, three grounded wheels, three sliding wheels,
+  `3.118 degrees` slip, and `3.069` yaw rate.
+
+These samples show that the conjunction is not mathematically impossible, but
+the recognized behavior appeared only after the policy had slowed below the
+intended fast-driving regime. Across both zones, `2,031/2,489` samples
+(`81.60%`) already had speed, ground contact, yaw, and positive high-water
+progress but received no partial credit because sliding and slip were absent.
+
+The physics fields themselves are live. Across the complete `13,926`-sample
+evaluation corpus, the logs contain `1,336` sliding-wheel samples, `4,421`
+samples at `>=1 degree` slip, and `20` samples satisfying all five dynamics
+conditions outside the assisted zones. The zero in-zone eligibility count is
+therefore not explained by a dead telemetry field, a parser error, or a zone
+that the car never entered.
+
+Conclusion: the exact sparsity risk pre-registered for Stage 2 materialized.
+The binary bonus requires the policy to have already produced a high-speed
+slide before it receives any shaping signal toward one. This is a reachability
+failure within the measured policy distribution, separate from the
+Gate-500,000-to-750,000 optimizer regression. A conservative KL guard and
+shorter deterministic checkpoint intervals remain necessary for Stage 2b, but
+they are not sufficient: restarting with the unchanged gate would again test a
+bonus that supplied no observed learning signal.
+
+Stage 2b must therefore be a separately pre-registered iteration that revises
+eligibility before training. The recommended direction is to retain the
+original `>=1` sliding-wheel plus `>=1 degree` criteria as the full-drift target
+and measurement, while adding a bounded, continuous in-zone bridge that gives
+partial credit for increasing live slip/yaw at competitive speed before the
+wheel-sliding flag appears. The exact formula and safeguards must be frozen and
+approved before training. Simply lowering the speed or slip thresholds is not
+recommended: the only threshold-passing slide-like samples were slow and could
+turn loss of control into a rewarded behavior.
+
+One useful validation remains before treating the original thresholds as a
+physical ground truth: record a known-good human speedslide through both zones
+with the identical live fields. If it fails the joint gate, the recognition
+thresholds are mis-specified; if it passes, the gate is physically valid but
+still empirically too sparse to teach discovery. This validation is not needed
+to conclude that the frozen Stage 2 bonus failed to provide observed learning
+signal, but it should inform the exact Stage 2b bridge.
+
+Scope limitation: full `SimState` was not retained for every stochastic
+training interaction. This audit proves zero eligibility across the `50`
+preserved evaluation episodes and `2,489` in-zone samples; it does not claim
+that no transient eligible step could have occurred anywhere in training.
+
+Evidence:
+
+- reproducible analysis:
+  `runs/wr_chase_stage2_bonus_reachability/analysis.json`;
+- analysis SHA-256:
+  `4118BF49151461A4AE575FBEB4EB82E49B47F314029A698D54722384617FB924`;
+  and
+- audit implementation and tests: commit `1438dcb`.
 
 ## Realistic expectation
 
