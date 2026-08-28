@@ -981,6 +981,35 @@ the environment's full `45.000s` horizon made both finish at exactly those
 times. The original truncated clips remain disclosed, and the corrected clean
 clips are the delivered evidence.
 
+### Frozen intermediate-checkpoint localization diagnostic
+
+Before changing PPO settings or the reward, evaluate the preserved automatic
+checkpoint at model timestep `3,756,176`, which is `751,760` Stage 2
+interactions beyond the initialization. Its path is
+`checkpoints/wr_chase_stage2/ppo_wr_stage2_3756176_steps.zip`, SHA-256
+`0F0326F84B442D5F506B2FDD6A646D4B1168F9887BF74152B8CD695E3B4635B7`.
+
+Run exactly `10` deterministic episodes at `6x`, using the same live snapshot,
+100 ms action period, reward, stuck cutoff, complete action/SimState audit, and
+raw replay preservation as the registered gates. This is a read-only
+checkpoint-localization diagnostic: it performs no training, does not alter a
+weight, does not replace a gate result, and writes to a separate artifact root.
+
+Interpretation is frozen before the run:
+
+- `>=8/10` finishes means the deterministic route was still reliable at this
+  intermediate checkpoint, locating the collapse after `751,760` Stage 2
+  interactions.
+- `<=2/10` finishes with the same excessively negative final line and impact
+  signature means the deterministic regression was already established by
+  this checkpoint.
+- `3..7/10` finishes means the route was already in an unstable transition at
+  this checkpoint.
+
+In every case, compare lateral offset at progress `2000`, `2100`, `2140`, and
+`2160` against Gate 500,000 and Gate 1,000,000. Report the observed result once;
+do not select a different automatic checkpoint after seeing it.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
