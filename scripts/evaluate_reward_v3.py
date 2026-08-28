@@ -49,12 +49,44 @@ TRACK_LABEL = "A01-Race"
 MAP_TO_LOAD = "A01-Race.Challenge.Gbx"
 REFERENCE_PATH = WORKSPACE_ROOT / "data" / "tracks" / "a01_reference_path.csv"
 EXPECTED_CHECKPOINT_SHA256: str | None = None
+POLICY_DETERMINISTIC = True
+POLICY_RANDOM_SEED: int | None = None
+POLICY_SDE_SAMPLE_FREQ: int | None = None
+
+
+def policy_mode_label() -> str:
+    return "deterministic" if POLICY_DETERMINISTIC else "stochastic"
+
+
+def validate_policy_sampling(model: PPO) -> None:
+    """Reject stochastic diagnostics that do not reproduce PPO's gSDE cadence."""
+    if POLICY_DETERMINISTIC:
+        if POLICY_SDE_SAMPLE_FREQ is not None:
+            raise ProtocolError(
+                "deterministic evaluation cannot specify an SDE sample frequency"
+            )
+        return
+    if POLICY_RANDOM_SEED is None:
+        raise ProtocolError("stochastic evaluation requires a fixed random seed")
+    if POLICY_SDE_SAMPLE_FREQ is None or POLICY_SDE_SAMPLE_FREQ <= 0:
+        raise ProtocolError(
+            "stochastic evaluation requires a positive SDE sample frequency"
+        )
+    if not model.use_sde or not model.policy.use_sde:
+        raise ProtocolError("stochastic diagnostic requires a gSDE policy")
+
+
+def prepare_policy_action(model: PPO, step: int) -> None:
+    """Refresh gSDE noise at the same policy-step cadence used in training."""
+    if not POLICY_DETERMINISTIC and step % int(POLICY_SDE_SAMPLE_FREQ) == 0:
+        model.policy.reset_noise(1)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            f"Evaluate {EXPERIMENT_LABEL} for {EXPECTED_EPISODES} deterministic "
+            f"Evaluate {EXPERIMENT_LABEL} for {EXPECTED_EPISODES} "
+            f"{policy_mode_label()} "
             "episodes at 6x."
         )
     )
@@ -271,7 +303,7 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
         float(episode["trajectory"]["maximum_progress"]) for episode in episodes
     )
     descriptions = [
-        f"Finished {finishes} of {len(episodes)} deterministic episodes.",
+        f"Finished {finishes} of {len(episodes)} {policy_mode_label()} episodes.",
         f"Fixed precision metrics flagged steering oscillation in {oscillation_episodes}, "
         f"inversion in {upside_down_episodes}, and stuck periods in {stuck_episodes} episodes.",
         f"Terminal causes included {falls} falls, {stuck_truncations} stuck "
@@ -282,12 +314,12 @@ def describe_behavior(episodes: list[dict[str, Any]]) -> list[str]:
     ]
     if finishes == 0 and falls == len(episodes):
         descriptions.append(
-            "Every deterministic evaluation ended in a fall; inspect preserved "
+            f"Every {policy_mode_label()} evaluation ended in a fall; inspect preserved "
             "replays for checkpoint-frame contact versus a lower valid jump arc."
         )
     elif finishes == 0:
         descriptions.append(
-            "No deterministic finish was observed; inspect the live view and "
+            f"No {policy_mode_label()} finish was observed; inspect the live view and "
             "preserved input replays for the terminal mechanism."
         )
     return descriptions
@@ -388,6 +420,9 @@ def main() -> int:
             reference_path=reference_path,
         )
         model = PPO.load(args.checkpoint, device="cpu")
+        validate_policy_sampling(model)
+        if POLICY_RANDOM_SEED is not None:
+            model.set_random_seed(POLICY_RANDOM_SEED)
         try:
             for episode in range(args.episodes):
                 observation, reset_info = env.reset()
@@ -397,7 +432,11 @@ def main() -> int:
                 total_reward = 0.0
                 final_info = reset_info
                 while not (finished or truncated):
-                    action, _ = model.predict(observation, deterministic=True)
+                    prepare_policy_action(model, steps)
+                    action, _ = model.predict(
+                        observation,
+                        deterministic=POLICY_DETERMINISTIC,
+                    )
                     observation, reward, finished, truncated, final_info = env.step(
                         action
                     )
@@ -541,7 +580,13 @@ def main() -> int:
         "reference_path_sha256": sha256(REFERENCE_PATH),
         "reference_path_total_length": reference_path.total_length,
         "episodes": args.episodes,
-        "deterministic": True,
+        "deterministic": POLICY_DETERMINISTIC,
+        "policy_sampling": {
+            "mode": policy_mode_label(),
+            "random_seed": POLICY_RANDOM_SEED,
+            "use_sde": not POLICY_DETERMINISTIC,
+            "sde_sample_freq": POLICY_SDE_SAMPLE_FREQ,
+        },
         "simulation_speed": 6.0,
         "checkpoint": str(args.checkpoint.relative_to(WORKSPACE_ROOT)),
         "checkpoint_sha256": checkpoint_hash,

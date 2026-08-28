@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = WORKSPACE_ROOT / "scripts" / "evaluate_reward_v3.py"
@@ -136,6 +137,48 @@ class RewardV3EvaluationTests(unittest.TestCase):
             replay.write_text("0 steer 0\n", encoding="utf-8")
 
             MODULE.wait_for_replay(replay, timeout_seconds=0.01)
+
+    def test_stochastic_policy_refreshes_sde_noise_on_frozen_cadence(self) -> None:
+        original = (
+            MODULE.POLICY_DETERMINISTIC,
+            MODULE.POLICY_RANDOM_SEED,
+            MODULE.POLICY_SDE_SAMPLE_FREQ,
+        )
+        model = Mock()
+        try:
+            MODULE.POLICY_DETERMINISTIC = False
+            MODULE.POLICY_RANDOM_SEED = 20_260_828
+            MODULE.POLICY_SDE_SAMPLE_FREQ = 4
+            for step in range(9):
+                MODULE.prepare_policy_action(model, step)
+        finally:
+            (
+                MODULE.POLICY_DETERMINISTIC,
+                MODULE.POLICY_RANDOM_SEED,
+                MODULE.POLICY_SDE_SAMPLE_FREQ,
+            ) = original
+        self.assertEqual(model.policy.reset_noise.call_count, 3)
+
+    def test_stochastic_policy_requires_gsde(self) -> None:
+        original = (
+            MODULE.POLICY_DETERMINISTIC,
+            MODULE.POLICY_RANDOM_SEED,
+            MODULE.POLICY_SDE_SAMPLE_FREQ,
+        )
+        model = Mock(use_sde=False)
+        model.policy.use_sde = False
+        try:
+            MODULE.POLICY_DETERMINISTIC = False
+            MODULE.POLICY_RANDOM_SEED = 20_260_828
+            MODULE.POLICY_SDE_SAMPLE_FREQ = 4
+            with self.assertRaisesRegex(Exception, "requires a gSDE policy"):
+                MODULE.validate_policy_sampling(model)
+        finally:
+            (
+                MODULE.POLICY_DETERMINISTIC,
+                MODULE.POLICY_RANDOM_SEED,
+                MODULE.POLICY_SDE_SAMPLE_FREQ,
+            ) = original
 
 
 if __name__ == "__main__":
