@@ -26,6 +26,12 @@ DEFAULT_GATE500_CHECKPOINT = (
 DEFAULT_GATE1M_CHECKPOINT = (
     WORKSPACE_ROOT / "checkpoints" / "wr_chase_stage2" / "gate_01000000_model.zip"
 )
+DEFAULT_INTERMEDIATE_CHECKPOINT = (
+    WORKSPACE_ROOT
+    / "checkpoints"
+    / "wr_chase_stage2"
+    / "ppo_wr_stage2_3756176_steps.zip"
+)
 DEFAULT_GATE500_ACTIONS = (
     WORKSPACE_ROOT
     / "runs"
@@ -40,6 +46,12 @@ DEFAULT_GATE1M_ACTIONS = (
     / "gates"
     / "gate_01000000_evaluation_actions.jsonl"
 )
+DEFAULT_INTERMEDIATE_ACTIONS = (
+    WORKSPACE_ROOT
+    / "runs"
+    / "wr_chase_stage2_intermediate"
+    / "gate_00750000_deterministic_actions.jsonl"
+)
 DEFAULT_GATE500_SUMMARY = (
     WORKSPACE_ROOT
     / "runs"
@@ -53,6 +65,12 @@ DEFAULT_GATE1M_SUMMARY = (
     / "wr_chase_stage2"
     / "gates"
     / "gate_01000000_evaluation.json"
+)
+DEFAULT_INTERMEDIATE_SUMMARY = (
+    WORKSPACE_ROOT
+    / "runs"
+    / "wr_chase_stage2_intermediate"
+    / "gate_00750000_deterministic_summary.json"
 )
 DEFAULT_STOCHASTIC_ACTIONS = (
     WORKSPACE_ROOT
@@ -81,10 +99,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gate500-checkpoint", type=Path, default=DEFAULT_GATE500_CHECKPOINT)
     parser.add_argument("--gate1m-checkpoint", type=Path, default=DEFAULT_GATE1M_CHECKPOINT)
+    parser.add_argument(
+        "--intermediate-checkpoint",
+        type=Path,
+        default=DEFAULT_INTERMEDIATE_CHECKPOINT,
+    )
     parser.add_argument("--gate500-actions", type=Path, default=DEFAULT_GATE500_ACTIONS)
     parser.add_argument("--gate1m-actions", type=Path, default=DEFAULT_GATE1M_ACTIONS)
+    parser.add_argument(
+        "--intermediate-actions", type=Path, default=DEFAULT_INTERMEDIATE_ACTIONS
+    )
     parser.add_argument("--gate500-summary", type=Path, default=DEFAULT_GATE500_SUMMARY)
     parser.add_argument("--gate1m-summary", type=Path, default=DEFAULT_GATE1M_SUMMARY)
+    parser.add_argument(
+        "--intermediate-summary", type=Path, default=DEFAULT_INTERMEDIATE_SUMMARY
+    )
     parser.add_argument("--stochastic-actions", type=Path, default=DEFAULT_STOCHASTIC_ACTIONS)
     parser.add_argument("--stochastic-summary", type=Path, default=DEFAULT_STOCHASTIC_SUMMARY)
     parser.add_argument("--monitor", type=Path, default=DEFAULT_MONITOR)
@@ -314,10 +343,13 @@ def main() -> int:
         for name in (
             "gate500_checkpoint",
             "gate1m_checkpoint",
+            "intermediate_checkpoint",
             "gate500_actions",
             "gate1m_actions",
+            "intermediate_actions",
             "gate500_summary",
             "gate1m_summary",
+            "intermediate_summary",
             "stochastic_actions",
             "stochastic_summary",
             "monitor",
@@ -330,14 +362,20 @@ def main() -> int:
     reference = ReferencePath.from_csv(paths["reference_path"])
     gate500_records = read_jsonl(paths["gate500_actions"])
     gate1m_records = read_jsonl(paths["gate1m_actions"])
+    intermediate_records = read_jsonl(paths["intermediate_actions"])
     gate500_summary = read_json(paths["gate500_summary"])
     gate1m_summary = read_json(paths["gate1m_summary"])
+    intermediate_summary = read_json(paths["intermediate_summary"])
     stochastic_summary = read_json(paths["stochastic_summary"])
     gate500_model = PPO.load(paths["gate500_checkpoint"], device="cpu")
     gate1m_model = PPO.load(paths["gate1m_checkpoint"], device="cpu")
+    intermediate_model = PPO.load(paths["intermediate_checkpoint"], device="cpu")
     obs500, actions500, _ = aligned_observations_and_actions(gate500_records, reference)
     obs1m, actions1m, progress1m = aligned_observations_and_actions(
         gate1m_records, reference
+    )
+    obs_intermediate, actions_intermediate, progress_intermediate = (
+        aligned_observations_and_actions(intermediate_records, reference)
     )
     result = {
         "status": "complete",
@@ -351,6 +389,13 @@ def main() -> int:
                 "finishes": gate1m_summary["finishes"],
                 "episodes": gate1m_summary["episodes"],
             },
+            "intermediate_deterministic": {
+                "finishes": intermediate_summary["finishes"],
+                "episodes": intermediate_summary["episodes"],
+                "model_timesteps": intermediate_summary[
+                    "intermediate_checkpoint_diagnostic"
+                ]["source_evidence"]["model_timesteps"],
+            },
             "gate1m_stochastic": {
                 "finishes": stochastic_summary["finishes"],
                 "episodes": stochastic_summary["episodes"],
@@ -361,11 +406,22 @@ def main() -> int:
         "policy": {
             "gate500": policy_metadata(gate500_model),
             "gate1m": policy_metadata(gate1m_model),
+            "intermediate": policy_metadata(intermediate_model),
             "gate500_action_reproduction": action_reproduction(
                 gate500_model, obs500, actions500
             ),
             "gate1m_action_reproduction": action_reproduction(
                 gate1m_model, obs1m, actions1m
+            ),
+            "intermediate_action_reproduction": action_reproduction(
+                intermediate_model, obs_intermediate, actions_intermediate
+            ),
+            "gate500_to_intermediate_action_drift_on_intermediate_states": action_drift(
+                gate500_model,
+                intermediate_model,
+                obs_intermediate,
+                progress_intermediate,
+                minimum_progress=2100.0,
             ),
             "gate500_to_gate1m_action_drift_on_gate1m_states": action_drift(
                 gate500_model,
@@ -378,8 +434,14 @@ def main() -> int:
         "trajectory": {
             "gate500_lateral_landmarks": landmark_lateral_offsets(gate500_records),
             "gate1m_lateral_landmarks": landmark_lateral_offsets(gate1m_records),
+            "intermediate_lateral_landmarks": landmark_lateral_offsets(
+                intermediate_records
+            ),
             "gate500_late_speed_loss": collision_summary(gate500_records),
             "gate1m_late_speed_loss": collision_summary(gate1m_records),
+            "intermediate_late_speed_loss": collision_summary(
+                intermediate_records
+            ),
         },
         "training_monitor": rolling_finish_rates(read_monitor(paths["monitor"])),
         "interpretation_scope": (
