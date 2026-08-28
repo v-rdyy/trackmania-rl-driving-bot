@@ -14,6 +14,9 @@ SPEC.loader.exec_module(MODULE)
 
 
 class RewardReplayInspectionTests(unittest.TestCase):
+    def test_replay_capture_covers_the_full_environment_episode_horizon(self) -> None:
+        self.assertEqual(MODULE.DEFAULT_MAX_RACE_MS, 45_000)
+
     def test_video_label_follows_replay_version(self) -> None:
         self.assertEqual(
             MODULE.replay_experiment_label("reward_v6_final_deadbeef_ep_01"),

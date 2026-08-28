@@ -23,6 +23,7 @@ DEFAULT_REFERENCE_PATH = WORKSPACE_ROOT / "data" / "tracks" / "a01_reference_pat
 DEFAULT_REPLAY_DIR = WORKSPACE_ROOT / "artifacts" / "replays" / "reward_v3_evaluation"
 DEFAULT_TMI_SCRIPTS = Path.home() / "Documents" / "TMInterface" / "Scripts"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / "artifacts" / "videos" / "reward_v3_final_jump"
+DEFAULT_MAX_RACE_MS = 45_000
 
 
 def replay_experiment_label(stem: str) -> str:
@@ -42,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("replays", nargs="+", type=Path)
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--simulation-speed", type=float, default=1.0)
-    parser.add_argument("--max-race-ms", type=int, default=32_000)
+    parser.add_argument("--max-race-ms", type=int, default=DEFAULT_MAX_RACE_MS)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--max-width", type=int, default=960)
     parser.add_argument("--reference-path", type=Path, default=DEFAULT_REFERENCE_PATH)
