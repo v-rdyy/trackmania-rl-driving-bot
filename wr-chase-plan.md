@@ -1,7 +1,8 @@
 # A01 world-record chase: staged discovery plan
 
 Status: Stage 2 paused at the pre-registered Gate 1,000,000 safety review;
-no drift induction was observed through the executed `1,001,472` interactions
+the frozen policy-mode diagnostic found an unstable `7/10` stochastic result
+and no drift induction
 
 Date pre-registered: 2026-08-26
 
@@ -875,6 +876,110 @@ Interpretation is frozen as follows:
 
 This diagnostic does not override the registered Stage 2 safety stop, select a
 new checkpoint, or count toward the two-million-interaction training budget.
+
+### Gate 1,000,000 policy-mode diagnostic result
+
+The single registered batch finished `7/10` stochastic episodes. This is the
+top of the frozen `3..7/10` unstable-boundary range, not the `>=8/10` reliable
+distribution result:
+
+- best finish: `24.810s`;
+- mean of the seven finishes: `29.171s`;
+- worst finish: `37.440s`; and
+- three stuck failures, with no fall, off-track, or timeout termination.
+
+Four finishes remained in the familiar `24.810..24.920s` band, while the other
+three took `33.280..37.440s`. Exploration can move the Gate 1,000,000 policy
+off its deterministic collision line, but it neither makes that route reliable
+nor consistently preserves pace. The stochastic batch still had oscillation
+in `10/10` episodes, mean `47.1` significant steering reversals, mean p95
+absolute lateral offset `15.206`, maximum absolute lateral offset `29.277`,
+two episodes with an upside-down period, and three with a stuck period.
+
+The direct-live audit covered all `2,913` action records, matched every
+terminal outcome, and used no replay fallback. Neither assisted zone contained
+an eligible bonus step, so the diagnostic again observed no localized drift
+reward. It changed no model weight and consumed zero training interactions.
+
+Offline reconstruction rules out an evaluator/checkpoint mismatch. Building
+the documented 26-value observation from each preceding live state reproduced
+the next logged deterministic action with maximum absolute error below
+`7.16e-7` at Gate 1,000,000 (`5.97e-7` at Gate 500,000). The evaluator loaded
+the intended policy and used the intended observation and action mapping.
+
+The actual regression is a late-line shift. At fixed progress landmarks, mean
+lateral offsets changed as follows:
+
+| Progress | Gate 500,000 | Gate 1,000,000 | Additional negative offset |
+| ---: | ---: | ---: | ---: |
+| `2000` | `-16.50` | `-22.48` | `-5.98` |
+| `2100` | `-20.72` | `-27.39` | `-6.67` |
+| `2140` | `-20.40` | `-28.53` | `-8.13` |
+| `2160` | `-16.92` | `-25.20` | `-8.27` |
+
+On Gate 1,000,000's live states at progress `>=2100`, the Gate 500,000 and
+Gate 1,000,000 deterministic means differ on average by `0.099` steering,
+`0.099` throttle, and `0.052` brake; their p95 differences are `0.373`,
+`0.414`, and `0.333`. This is substantial policy drift in the narrow final
+alignment corridor.
+
+The impact signature is correspondingly sharp. The largest late speed loss in
+each deterministic Gate 1,000,000 episode averages progress `2166.58` and
+lateral offset `-22.74`: displayed speed falls from mean `323.8` to `81.4` in
+one 100 ms step, a `242.4` loss, while mean throttle is still `0.874` and brake
+only `0.082`. Nine episodes share the tightly localized collision-like onset;
+one enters the structure already rotating. Combined with the clean visual
+review, the evidence supports a repeatable finish-structure impact caused by
+the excessively negative line, followed by the flip—not deliberate braking or
+an earlier fall.
+
+The exploration distribution did not grow to cause the regression. Mean
+latent gSDE standard deviation changed from Gate 500,000 to Gate 1,000,000 by
+about `-1.2%` for steering, `-32.3%` for throttle, and `-22.1%` for brake.
+However, the noise is state-dependent and persists for four steps, so a sampled
+route can still receive a coherent lateral correction that the deterministic
+mean lacks. PPO's `target_kl` was unset; this fact motivates examining the
+intermediate checkpoint, but does not by itself prove which update caused the
+line shift.
+
+The training monitor remains consistent with this explanation. Its final
+stochastic rollout windows finished `9/10`, `17/20`, `46/50`, `95/100`, and
+`453/500`. Those rows came from evolving pre-update policies and are not a
+post-training test of the saved mean. The frozen stochastic diagnostic supplies
+that missing final-checkpoint measurement and shows a real, but unreliable,
+rescue effect.
+
+Decision: Stage 2 remains stopped. The next safe checkpoint-localization test
+is a deterministic evaluation of the preserved nominal Gate 750,000 checkpoint
+before proposing any optimizer or reward change. That will show whether the
+mean collision line appeared between Gate 500,000 and Gate 750,000 or during
+the final segment to Gate 1,000,000.
+
+Evidence:
+
+- stochastic diagnostic summary SHA-256:
+  `9935EFE934463EAEB8BC1DE280768B45F341E6B368950C62B25AAC10D3EC51E6`;
+- direct-live stochastic action log SHA-256:
+  `84C07852D460B328B1087FBE562060FB8AB1340536354489EE5DDCEF2FED7103`;
+- reproducible offline diagnostic SHA-256:
+  `307DB67D1539937779869205D3D329E3A220C5F80B4A05464F5BC4687C5E0E0D`;
+- all ten stochastic input replays are checksum-bound in the summary;
+- clean best (`24.810s`) finish video SHA-256:
+  `33145B1AE84CBF2ABAA788F97C7C597694A6520F7036BDABC4EE627BF1106E4A`;
+- clean closest-to-mean (`33.280s`) finish video SHA-256:
+  `99C5B70F7036383EC51DD31E5E1EB5296BA60B3DBB77621EACF144406BC0CA5D`;
+- clean worst (`37.440s`) finish video SHA-256:
+  `8A74C10A0BE7D3F35E19C1719B8CFBE1823659E58B6D1C403F5792080AF4913F`;
+  and
+- every delivered finish video is H.264, reports `overlay: false`, and
+  reproduced its original live finish and race clock.
+
+The first preservation attempt stopped the two slow finishes at the replay
+tool's legacy `32.000s` ceiling, making them look like playback failures. Their
+registered live finish times were `33.280s` and `37.440s`; extending capture to
+the environment's full `45.000s` horizon made both finish at exactly those
+times. The original truncated clips remain disclosed, and the corrected clean
+clips are the delivered evidence.
 
 ## Realistic expectation
 
