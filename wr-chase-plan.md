@@ -837,6 +837,45 @@ Evidence:
 - every delivered video record is H.264 and `overlay: false`; none is labeled
   as a finish because this gate produced no finish.
 
+### Frozen Gate 1,000,000 policy-mode diagnostic
+
+The safety review must distinguish a genuinely collapsed final policy from a
+bad deterministic mean action that was masked during training by generalized
+state-dependent exploration (`gSDE`). Training sampled actions with
+`use_sde=True`, a squashed policy, and new exploration noise every four policy
+steps. The registered deterministic gates instead used the policy mean and no
+exploration noise.
+
+Before inspecting a stochastic run, perform exactly one diagnostic batch from
+the frozen Gate 1,000,000 checkpoint:
+
+- run `10` live episodes at `6x` with no training and no reward change;
+- sample the policy stochastically with `gSDE` noise refreshed every `4` policy
+  steps, matching training collection;
+- fix the diagnostic random seed to `20260828`;
+- retain the same `2,000ms` stuck cutoff, action period, snapshot reset,
+  direct-live action/SimState logging, and raw input-replay preservation as the
+  deterministic gate;
+- write to a separate policy-mode diagnostic root and never replace Gate
+  1,000,000 evidence; and
+- report all ten outcomes without selecting or rerunning a favorable seed.
+
+Interpretation is frozen as follows:
+
+- `>=8/10` stochastic finishes after the deterministic `0/10` means the final
+  policy distribution still contains a reliable route but its mean action is a
+  finish-alignment failure. Continued unmodified training is still blocked;
+  the next experiment must address deterministic robustness rather than claim
+  that the whole sampled policy forgot the track.
+- `<=2/10` stochastic finishes means the final sampled policy itself also
+  collapsed, and the high cumulative training finish rate was primarily a
+  historical aggregate rather than evidence about the final checkpoint.
+- `3..7/10` is an unstable boundary result: exploration sometimes rescues the
+  route, but neither policy mode is reliable enough to resume Stage 2.
+
+This diagnostic does not override the registered Stage 2 safety stop, select a
+new checkpoint, or count toward the two-million-interaction training budget.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
