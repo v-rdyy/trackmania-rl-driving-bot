@@ -99,6 +99,20 @@ class WrReferenceSpeedslideTests(unittest.TestCase):
         self.assertFalse(result["accepted_as_wr_reference"])
         self.assertEqual(result["finish_absolute_error_ms"], 230)
 
+    def test_analysis_preserves_an_unentered_zone_as_rejection_evidence(self) -> None:
+        rows = [
+            record(
+                race_time_ms=0,
+                progress=10.0,
+                position=[0.0, 0.0, 0.0],
+                finished=True,
+            )
+        ]
+        result = module.analyze_records(rows, {0: [0.0, 0.0, 0.0]})
+        self.assertFalse(result["zones"]["first_turn"]["entered"])
+        self.assertFalse(result["zones"]["final_corner"]["entered"])
+        self.assertFalse(result["fidelity"]["accepted_as_wr_reference"])
+
     def test_state_record_rejects_incomplete_simstate(self) -> None:
         reference = SimpleNamespace(
             project=lambda position: SimpleNamespace(

@@ -106,6 +106,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--simulation-speed", type=float, default=1.0)
     parser.add_argument("--max-race-ms", type=int, default=45_000)
     parser.add_argument("--reuse-game", action="store_true")
+    parser.add_argument(
+        "--postprocess-existing",
+        action="store_true",
+        help="analyze a preserved telemetry.jsonl after a live-run analysis failure",
+    )
     return parser.parse_args()
 
 
@@ -388,6 +393,26 @@ def summarize_zone(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def summarize_optional_zone(records: list[dict[str, Any]]) -> dict[str, Any]:
+    if not records:
+        return {
+            "entered": False,
+            "samples": 0,
+            "all_condition_windows": [],
+            "condition_counts": {
+                name: 0 for name in ("ground", "speed", "sliding", "slip", "yaw")
+            },
+            "joint_counts": {
+                "ground_and_speed": 0,
+                "ground_speed_sliding": 0,
+                "ground_speed_slip": 0,
+                "all_dynamics_conditions": 0,
+                "positive_bonus_eligible": 0,
+            },
+        }
+    return {"entered": True, **summarize_zone(records)}
+
+
 def fidelity_metrics(
     records: list[dict[str, Any]], source_positions: dict[int, list[float]]
 ) -> dict[str, Any]:
@@ -473,7 +498,7 @@ def analyze_records(
     ):
         raise ProtocolError("WR analysis contains nonfinite telemetry")
     zones = {
-        name: summarize_zone(
+        name: summarize_optional_zone(
             [
                 record
                 for record in records
@@ -591,19 +616,31 @@ def main() -> int:
     args.tmi_scripts_dir = args.tmi_scripts_dir.resolve()
     telemetry_path = args.output_dir / "telemetry.jsonl"
     analysis_path = args.output_dir / "analysis.json"
-    if telemetry_path.exists() or analysis_path.exists():
-        raise ProtocolError("WR reference output already exists")
+    if analysis_path.exists():
+        raise ProtocolError("WR reference analysis already exists")
+    if args.postprocess_existing:
+        if not telemetry_path.is_file():
+            raise ProtocolError("WR reference telemetry does not exist for postprocessing")
+    elif telemetry_path.exists():
+        raise ProtocolError("WR reference telemetry already exists")
     if not args.reference_path.is_file():
         raise FileNotFoundError(args.reference_path)
-    if not args.tmi_scripts_dir.is_dir():
+    if not args.postprocess_existing and not args.tmi_scripts_dir.is_dir():
         raise FileNotFoundError(args.tmi_scripts_dir)
 
     source = load_source_ghost(args.source_replay)
     input_hash = write_or_verify_text(args.extracted_input, source.input_script)
-    external_input = args.tmi_scripts_dir / args.extracted_input.name
-    copy_or_verify(args.extracted_input, external_input)
-    records = capture_live_records(args, external_input)
-    write_jsonl(telemetry_path, records)
+    if args.postprocess_existing:
+        records = [
+            json.loads(line)
+            for line in telemetry_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    else:
+        external_input = args.tmi_scripts_dir / args.extracted_input.name
+        copy_or_verify(args.extracted_input, external_input)
+        records = capture_live_records(args, external_input)
+        write_jsonl(telemetry_path, records)
     analysis = analyze_records(records, source.positions_by_race_time)
     result = {
         "status": (
