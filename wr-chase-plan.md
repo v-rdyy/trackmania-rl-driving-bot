@@ -1181,6 +1181,57 @@ Evidence:
   and
 - audit implementation and tests: commit `1438dcb`.
 
+### External WR reference attempt: rejected by the frozen fidelity gate
+
+An official-record reference was attempted before asking the owner to produce
+a calibration lap. The source was Axell's `23.770s` A01 replay, record
+`12847157`, downloaded from the TMNF-X A01 leaderboard. The source file is
+`39,854` bytes, identifies ghost login `fwo_axell`, contains `815` control
+entries and `268` embedded 100 ms position records, and has SHA-256
+`1A253411D641D26CFC57F428DCD0F5F6EA8557FBEBC8AD30B363623EFA8F644F`.
+The replay reports `TmForeverCompPatch.2.11.26(1.6)`. It is retained locally
+for calibration only; download availability is not treated as permission to
+redistribute the replay or derived footage.
+
+Before the first playback, acceptance was frozen at both of these conditions:
+
+- local finish time within `100 ms` of the source's `23.770s`; and
+- no more than `1.0` world unit of position error at any exact 100 ms source
+  sample, both overall and inside each assisted zone.
+
+The extracted controls were replayed once at 1x through the same live
+`SimState` pipeline used for policy evaluation. The trajectory began at zero
+position error but diverged early, reached only `276.952` reference-progress
+units, and never entered either assisted zone. It timed out unfinished at
+`45.000s`. Across the `238` source timestamps covered by the source ghost, the
+local position error had a `420.172`-unit median, `751.886`-unit p95, and
+`762.970`-unit maximum. The attempt therefore failed both predeclared fidelity
+conditions and is rejected as a physical WR reference.
+
+This is evidence about replay portability, not about speedslide thresholds.
+No slip, speed, wheel-state, or yaw value from the divergent trajectory may be
+used to validate or revise Stage 2. The most practical remaining ground truth
+is a deliberate owner-driven speedslide recorded directly at 20 ms with no
+agent input injection, then viewed both at that diagnostic resolution and at
+the exact 100 ms cadence used by Stage 2. Stage 2b's reward remains untouched
+until that reference is captured and the eligibility redesign is separately
+pre-registered.
+
+Rejected-reference evidence:
+
+- TMNF-X leaderboard:
+  `https://tmnf.exchange/trackreplayshow/2233`;
+- source replay:
+  `https://tmnf.exchange/recordgbx/12847157`;
+- analysis:
+  `artifacts/analysis/wr_reference_speedslide/analysis.json`;
+- analysis SHA-256:
+  `37FFAB61205943AC64BF3A47E1E4A21F0E34D4D8537D959ECA9647C2822FCEC7`;
+- live telemetry SHA-256:
+  `1FFFDBDB8D1AC48C29BB042D789A8C92A7B5BC1E0D91DBBC1A3B09F99099EB5A`;
+  and
+- capture and rejection tooling: commits `5faa24e` and `6ba3c75`.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
