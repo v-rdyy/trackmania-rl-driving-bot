@@ -128,6 +128,15 @@ class ZoneExplorationTests(unittest.TestCase):
         self.assertEqual(info["sentinel"], "unchanged")
         self.assertEqual(float(observation[-1]), 1.0)
 
+    def test_disabled_control_wrapper_never_marks_the_final_zone(self) -> None:
+        env = FinalCornerZoneObservationWrapper(ProgressInfoEnv(), enabled=False)
+        observation, _ = env.reset()
+        self.assertEqual(float(observation[-1]), 0.0)
+        observation, *_ = env.step(
+            np.asarray([0.25, 0.5, 0.75], dtype=np.float32)
+        )
+        self.assertEqual(float(observation[-1]), 0.0)
+
     def test_zone_boost_changes_std_not_deterministic_action_or_value(self) -> None:
         model = make_model(FinalCornerZoneObservationWrapper(ProgressInfoEnv()))
         base = np.linspace(-0.5, 0.5, OBSERVATION_SIZE, dtype=np.float32)

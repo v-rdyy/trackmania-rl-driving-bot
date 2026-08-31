@@ -47,8 +47,11 @@ def final_corner_zone_flag(progress: float) -> np.float32:
 class FinalCornerZoneObservationWrapper(gym.Wrapper):
     """Append a final-corner flag without changing actions, rewards, or info."""
 
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gym.Env, *, enabled: bool = True) -> None:
         super().__init__(env)
+        if not isinstance(enabled, bool):
+            raise TypeError("zone exploration enabled flag must be boolean")
+        self.enabled = enabled
         if not isinstance(env.observation_space, gym.spaces.Box):
             raise TypeError("zone exploration requires a Box observation space")
         if env.observation_space.shape != (OBSERVATION_SIZE,):
@@ -72,8 +75,8 @@ class FinalCornerZoneObservationWrapper(gym.Wrapper):
             dtype=np.float32,
         )
 
-    @staticmethod
     def _with_zone_flag(
+        self,
         observation: np.ndarray,
         info: dict[str, Any],
     ) -> np.ndarray:
@@ -88,7 +91,11 @@ class FinalCornerZoneObservationWrapper(gym.Wrapper):
             (
                 values,
                 np.asarray(
-                    [final_corner_zone_flag(info["progress"])],
+                    [
+                        final_corner_zone_flag(info["progress"])
+                        if self.enabled
+                        else np.float32(0.0)
+                    ],
                     dtype=np.float32,
                 ),
             )
