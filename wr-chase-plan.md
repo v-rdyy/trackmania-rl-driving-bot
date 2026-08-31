@@ -4,8 +4,9 @@ Status: Stage 2 paused after its pre-registered Gate 1,000,000 safety review;
 the Gate 750,000 diagnostic located the deterministic regression between Gate
 500,000 and Gate 750,000, and the pre-Stage-2b reachability audit found that the
 binary drift-bonus gate was effectively unreachable by the observed fast
-policies. Stage 2b training has not started and requires a separately approved,
-pre-registered eligibility revision as well as optimizer safeguards.
+policies. Stage 2b training has not started. A live human speedslide reference
+and a fixed-policy final-zone exploration ablation now precede the separately
+approved, pre-registered eligibility revision and optimizer safeguards.
 
 Date pre-registered: 2026-08-26
 
@@ -1231,6 +1232,141 @@ Rejected-reference evidence:
   `1FFFDBDB8D1AC48C29BB042D789A8C92A7B5BC1E0D91DBBC1A3B09F99099EB5A`;
   and
 - capture and rejection tooling: commits `5faa24e` and `6ba3c75`.
+
+### Stage 2b pre-design final-zone exploration ablation
+
+This diagnostic is added before the graduated Stage 2b bonus is finalized. Its
+purpose is to isolate whether the current PPO/gSDE policy can produce more
+drift-adjacent behavior when exploration is increased only in the known final
+corner, without any reward assistance or weight update. It is not a Stage 2b
+training gate and cannot be reported as learning.
+
+The live owner speedslide reference remains a hard prerequisite. Its genuine
+final-corner signature will define a human-calibrated drift-adjacent detector,
+which must be written here before either arm is run. That detector cannot be
+frozen before the reference exists. Every other sampling, budget, comparison,
+and decision rule below is frozen now and must not be adjusted after the
+ablation starts.
+
+#### Technical design
+
+The reliable source policy is the Stage 2 Gate 500,000 checkpoint:
+
+- path: `checkpoints/wr_chase_stage2/gate_00500000_model.zip`;
+- SHA-256:
+  `8A06E00055886E8E671E988D5D6948C6688B74780EDB32A87C6CC213870C8326`;
+- model timestep: `3,506,176`; and
+- frozen deterministic result: `9/10` finishes, `24.780s` best,
+  `24.816s` mean, and `24.900s` worst.
+
+The checkpoint uses PPO with gSDE, a four-action noise-refresh cadence,
+squashed actions, and a global entropy coefficient of `0.0`. Stock
+Stable-Baselines3 applies one entropy coefficient to the whole minibatch; it
+cannot make that coefficient final-zone-only. Temporarily changing `log_std`
+only during rollout would also be invalid for training because PPO would not
+reproduce the same distribution when recalculating action probabilities.
+
+The diagnostic therefore appends one binary flag to the policy input:
+
+```text
+final_zone_flag = 1 if 1100 <= pre_action_progress <= 1410 else 0
+zone_noise_scale = 1 + final_zone_flag
+```
+
+A parameter-free feature extractor removes the flag before the actor and value
+networks, so both still receive the original 26-value observation and retain
+the checkpoint's exact deterministic mean actions and values. The custom gSDE
+distribution alone multiplies its state-dependent latent noise by
+`zone_noise_scale`. This makes the treatment's action standard deviation
+exactly `2x` inside the inclusive final-corner window and leaves it exactly
+`1x` everywhere else. The same conditional distribution must be used for
+action sampling, action-log-probability calculation, and PPO
+`evaluate_actions`; no action-wrapper or post-sampling perturbation is allowed.
+
+Both arms use this same policy implementation:
+
+- control: the appended flag is fixed to zero for the whole lap; and
+- treatment: the flag follows the exact pre-action progress condition above.
+
+This keeps the learned policy, gSDE refresh timing, and random draws matched;
+only final-zone noise amplitude differs. The original checkpoint remains
+immutable. Each arm loads a fresh in-memory copy, never calls `learn`, never
+saves a model, and uses the unchanged V4
+`signed_progress_efficiency_reward` for logging. The old localized drift bonus
+is not evaluated or paid.
+
+#### Frozen execution protocol
+
+- Run `20` control and `20` treatment episodes at 6x with the existing 100 ms
+  action period.
+- Use the same per-episode seeds in both arms: integers `20,260,830` through
+  `20,260,849`, inclusive.
+- Retain the native gSDE refresh cadence of once every four actions in both
+  arms. The treatment changes amplitude, not refresh frequency.
+- Record complete direct-live `SimState` for every action. Input-replay
+  telemetry is forbidden for the slide conclusion.
+- Verify before and after each arm that checkpoint SHA-256, model timesteps,
+  optimizer state, reward identity, and original 26 actor/value inputs remain
+  unchanged.
+- Report `training_interactions: 0` and `diagnostic_only: true`. There is no
+  TensorBoard run and no output checkpoint.
+- The first-turn zone is a negative control: its exploration scale must remain
+  `1x` in both arms.
+- Any apparent candidate requires visual review to reject wall contact,
+  landing instability, or airborne rotation masquerading as a useful slide.
+
+The primary comparison is the human-calibrated final-zone detector frozen
+after the owner reference. For continuity, the original Stage 2 candidate and
+confirmed-window detectors remain unchanged and are also reported. Each arm
+must additionally report final-zone sliding-wheel samples; p50, p95, and
+maximum absolute slip angle and yaw rate; speed and sustained-window duration;
+distance from the human signature; steering/action variance; finish rate;
+best, mean, and worst finish; fall, stuck, off-track, and upside-down outcomes;
+lateral deviation; and oscillation. First-turn versions of the slide metrics
+are reported as the negative control.
+
+The treatment counts as producing more attempts only if all of these are true:
+
+- human-calibrated drift-adjacent windows occur in at least `3/20` treatment
+  episodes;
+- the treatment has such windows in at least two more episodes than control;
+  and
+- the qualifying windows survive the direct-live and visual collision/airborne
+  review.
+
+Finish-rate or lap-time regression is reported as a separate tradeoff and
+does not redefine the attempt gate. One isolated near miss is documented but
+cannot pass it.
+
+If the gate passes, the exact `2x`, final-zone-only conditional gSDE mechanism
+will be included alongside the graduated bonus in the proposed Stage 2b
+design. If it does not pass, Stage 2b will use the graduated bonus alone and
+the result will be recorded as no demonstrated exploration effect within this
+40-episode budget. In that case, PPO's on-policy, smooth-noise exploration
+remains a plausible contributor to difficult discovery. Intrinsic-motivation
+methods such as Random Network Distillation (RND) and off-policy algorithms
+such as Soft Actor-Critic (SAC) are legitimate more
+disruptive alternatives, but either would break the PPO-based comparability
+across prior versions and requires a deliberate later decision rather than an
+automatic substitution here.
+
+Artifacts are isolated under
+`runs/wr_chase_stage2b_zone_exploration/`,
+`artifacts/analysis/wr_chase_stage2b_zone_exploration/`, and
+`artifacts/replays/wr_chase_stage2b_zone_exploration/{control,boosted}/`.
+All input replays are retained. Each arm also receives clean, overlay-free
+best, closest-to-mean, and worst successful videos; if an arm has no finishes,
+the delivered representatives use high, median, and low maximum progress and
+are labeled as failures.
+
+The resulting sequence is now fixed:
+
+1. capture and freeze the live owner reference signature;
+2. freeze the human-calibrated drift-adjacent detector;
+3. run and report this fixed-policy exploration ablation;
+4. use both results to finalize the graduated Stage 2b eligibility design;
+5. obtain approval for the complete Stage 2b preregistration; and
+6. only then restart training with the approved KL guard and shorter gates.
 
 ## Realistic expectation
 
