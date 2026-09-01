@@ -4,9 +4,10 @@ Status: Stage 2 paused after its pre-registered Gate 1,000,000 safety review;
 the Gate 750,000 diagnostic located the deterministic regression between Gate
 500,000 and Gate 750,000, and the pre-Stage-2b reachability audit found that the
 binary drift-bonus gate was effectively unreachable by the observed fast
-policies. Stage 2b training has not started. A live human speedslide reference
-and a fixed-policy final-zone exploration ablation now precede the separately
-approved, pre-registered eligibility revision and optimizer safeguards.
+policies. Stage 2b training has not started. A fixed-policy final-zone
+exploration ablation, scored with the non-human live-physics contract below,
+now precedes the separately approved, pre-registered eligibility revision and
+optimizer safeguards.
 
 Date pre-registered: 2026-08-26
 
@@ -1160,13 +1161,14 @@ approved before training. Simply lowering the speed or slip thresholds is not
 recommended: the only threshold-passing slide-like samples were slow and could
 turn loss of control into a rewarded behavior.
 
-One useful validation remains before treating the original thresholds as a
-physical ground truth: record a known-good human speedslide through both zones
-with the identical live fields. If it fails the joint gate, the recognition
-thresholds are mis-specified; if it passes, the gate is physically valid but
-still empirically too sparse to teach discovery. This validation is not needed
-to conclude that the frozen Stage 2 bonus failed to provide observed learning
-signal, but it should inform the exact Stage 2b bridge.
+The original `1 degree` and `0.25 rad/s` thresholds remain an operational
+continuity metric, not physical ground truth. The owner cannot perform a
+speedslide, Yosh's public material does not publish a universal telemetry
+angle, and the rejected WR resimulation cannot supply trustworthy dynamics.
+That does not block a test of whether exploration produces slide onset: the
+simulator's direct per-wheel `is_sliding` state can define that narrower event,
+while matched-control speed and time determine whether it helped. Stage 2b's
+graduated reward still requires a separate frozen design after that diagnostic.
 
 Scope limitation: full `SimState` was not retained for every stochastic
 training interaction. This audit proves zero eligibility across the `50`
@@ -1184,8 +1186,8 @@ Evidence:
 
 ### External WR reference attempt: rejected by the frozen fidelity gate
 
-An official-record reference was attempted before asking the owner to produce
-a calibration lap. The source was Axell's `23.770s` A01 replay, record
+An official-record reference was attempted as a possible dynamics-calibration
+source. The source was Axell's `23.770s` A01 replay, record
 `12847157`, downloaded from the TMNF-X A01 leaderboard. The source file is
 `39,854` bytes, identifies ghost login `fwo_axell`, contains `815` control
 entries and `268` embedded 100 ms position records, and has SHA-256
@@ -1210,12 +1212,20 @@ local position error had a `420.172`-unit median, `751.886`-unit p95, and
 conditions and is rejected as a physical WR reference.
 
 This is evidence about replay portability, not about speedslide thresholds.
-No slip, speed, wheel-state, or yaw value from the divergent trajectory may be
-used to validate or revise Stage 2. The most practical remaining ground truth
-is a deliberate owner-driven speedslide recorded directly at 20 ms with no
-agent input injection, then viewed both at that diagnostic resolution and at
-the exact 100 ms cadence used by Stage 2. Stage 2b's reward remains untouched
-until that reference is captured and the eligibility redesign is separately
+No slip, wheel-state, or yaw value from the divergent trajectory may be used to
+validate or revise Stage 2. The original replay's embedded ghost positions and
+controls may still support timing, zone, and approximate-speed facts because
+those do not depend on the rejected local trajectory: its approximately 10 ms
+brake taps occur near reference progress `781` and `1120`, at position-derived
+speeds of roughly `400` and `454`, with near-full steering. They do not reveal
+a trustworthy slip angle or wheel state.
+
+The owner has already stated that they cannot perform the maneuver, so an
+owner-driven reference is not a prerequisite. The replacement below uses live
+engine slide state to recognize onset and paired local performance to recognize
+possible usefulness. It deliberately does not claim to identify a perfect or
+WR-quality speedslide. Stage 2b's reward remains untouched until the
+exploration ablation is reported and the eligibility redesign is separately
 pre-registered.
 
 Rejected-reference evidence:
@@ -1241,12 +1251,68 @@ drift-adjacent behavior when exploration is increased only in the known final
 corner, without any reward assistance or weight update. It is not a Stage 2b
 training gate and cannot be reported as learning.
 
-The live owner speedslide reference remains a hard prerequisite. Its genuine
-final-corner signature will define a human-calibrated drift-adjacent detector,
-which must be written here before either arm is run. That detector cannot be
-frozen before the reference exists. Every other sampling, budget, comparison,
-and decision rule below is frozen now and must not be adjusted after the
-ablation starts.
+No human reference is required. The experiment asks the narrower question
+"does zone-local exploration produce real slide onset?", not "does it reproduce
+an optimal speedslide?" Yosh describes a speed-dependent, precise drift but
+does not publish a universal slip-angle or yaw-rate cutoff. A fixed angle
+invented from that description would therefore be false precision. The primary
+detector instead uses the simulator's direct per-wheel slide state, sustained
+duration, a road-speed regime supported by public mechanics guidance and the
+original WR ghost, and safety guards. Every sampling, budget, comparison, and
+decision rule below is frozen now and must not be adjusted after the ablation
+starts.
+
+#### Frozen non-human scoring contract
+
+A sample is **valid for final-zone slide onset** only when all of these hold:
+
+- reference progress is within `1100-1410`, inclusive;
+- displayed speed is at least `400`;
+- at least three wheels are grounded;
+- new high-water progress is positive;
+- upright cosine is at least `0.8`;
+- absolute heading error is at most `pi/4`; and
+- absolute lateral offset is at most `20` reference units.
+
+The `400` speed floor is not presented as a universal Trackmania constant. It
+is appropriate for this fixed-policy A01 final-zone diagnostic: all `250/250`
+reliable Gate 500,000 final-zone samples are `433-473`, the original WR ghost's
+final-zone brake tap is approximately `454`, and public road-speedslide
+guidance places the technique in roughly the `400+` regime. It therefore
+rejects the earlier slow loss-of-control near misses without making the target
+unreachable for the source policy.
+
+A **drift-adjacent slide-onset window**, the ablation's primary event, is at
+least two consecutive valid 100 ms samples (`>=200ms`) with at least one wheel
+reporting `is_sliding` on every sample and at least two sliding wheels on one or
+more samples. This is engine-defined slide onset; it does not depend on a
+guessed optimal angle. Absolute slip angle and body-up yaw rate are still
+reported for every window but are not primary gates. Yaw cannot stand alone:
+`84.99%` of the audited final-zone samples already exceeded `0.25 rad/s` during
+ordinary cornering.
+
+An **above-envelope kinematic near miss** is at least two consecutive valid
+samples with absolute slip at least `0.50 degrees` but no qualifying slide-onset
+window. The `0.50` boundary is only a diagnostic separator above the complete
+observed fast-policy maximum of `0.426 degrees`; it is not called a physical
+speedslide threshold and cannot pass the ablation's success gate.
+
+The original Stage 1/2 **candidate drift window** and **confirmed telemetry
+slide** definitions remain unchanged as secondary continuity metrics. A
+**locally useful speedslide candidate** requires a primary slide-onset window,
+a safe finish, traversal from progress `1100` through `1410` at least one 100 ms
+step faster than its matched-seed control, and displayed speed at the `1410`
+exit at least as high as that control. This remains a candidate rather than
+proof of WR-quality technique.
+
+Reject a primary or useful window if the window plus one sample on either side
+contains fewer than three grounded wheels, upright cosine below `0.8`, absolute
+heading error above `pi/4`, absolute lateral offset above `20`, non-positive
+high-water progress, any terminal failure, or a one-step displayed-speed loss
+of at least `25`. The `25` guard is beyond the worst `19`-unit in-zone one-step
+loss in the preserved baseline. Every otherwise qualifying window still needs
+direct-live and visual review because the current log has no authoritative
+wall-contact label.
 
 #### Technical design
 
@@ -1315,19 +1381,19 @@ is not evaluated or paid.
 - Any apparent candidate requires visual review to reject wall contact,
   landing instability, or airborne rotation masquerading as a useful slide.
 
-The primary comparison is the human-calibrated final-zone detector frozen
-after the owner reference. For continuity, the original Stage 2 candidate and
-confirmed-window detectors remain unchanged and are also reported. Each arm
-must additionally report final-zone sliding-wheel samples; p50, p95, and
+The primary comparison is the frozen drift-adjacent slide-onset detector above.
+For continuity, the original Stage 2 candidate and confirmed-window detectors
+remain unchanged and are also reported. Each arm must additionally report
+above-envelope near misses; final-zone sliding-wheel samples; p50, p95, and
 maximum absolute slip angle and yaw rate; speed and sustained-window duration;
-distance from the human signature; steering/action variance; finish rate;
-best, mean, and worst finish; fall, stuck, off-track, and upside-down outcomes;
-lateral deviation; and oscillation. First-turn versions of the slide metrics
-are reported as the negative control.
+zone-entry and exit speed; final-zone traversal time; steering/action variance;
+finish rate; best, mean, and worst finish; fall, stuck, off-track, and
+upside-down outcomes; lateral deviation; and oscillation. First-turn versions
+of the slide metrics are reported as the negative control.
 
 The treatment counts as producing more attempts only if all of these are true:
 
-- human-calibrated drift-adjacent windows occur in at least `3/20` treatment
+- drift-adjacent slide-onset windows occur in at least `3/20` treatment
   episodes;
 - the treatment has such windows in at least two more episodes than control;
   and
@@ -1361,12 +1427,11 @@ are labeled as failures.
 
 The resulting sequence is now fixed:
 
-1. capture and freeze the live owner reference signature;
-2. freeze the human-calibrated drift-adjacent detector;
-3. run and report this fixed-policy exploration ablation;
-4. use both results to finalize the graduated Stage 2b eligibility design;
-5. obtain approval for the complete Stage 2b preregistration; and
-6. only then restart training with the approved KL guard and shorter gates.
+1. freeze the non-human live-physics detector above;
+2. run and report this fixed-policy exploration ablation;
+3. use the result to finalize the graduated Stage 2b eligibility design;
+4. obtain approval for the complete Stage 2b preregistration; and
+5. only then restart training with the approved KL guard and shorter gates.
 
 ## Realistic expectation
 
