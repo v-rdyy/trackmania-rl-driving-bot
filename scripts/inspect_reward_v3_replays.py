@@ -191,7 +191,8 @@ def main() -> int:
         close_trackmania()
     _, launched = ensure_trackmania_running(port=args.port, confirm_existing=True)
     print(f"TrackMania ready (launched={launched})", flush=True)
-    restart_trackmania_race()
+    if not launched:
+        restart_trackmania_race()
     session = LiveTmiSession(
         EnvironmentConfig(
             port=args.port,

@@ -129,7 +129,23 @@ def find_trackmania_window() -> WindowTarget:
 def focus_window(target: WindowTarget) -> None:
     user32 = ctypes.windll.user32
     user32.ShowWindow(target.handle, 9)  # SW_RESTORE
-    user32.SetForegroundWindow(target.handle)
+    foreground = user32.GetForegroundWindow()
+    current_thread = ctypes.windll.kernel32.GetCurrentThreadId()
+    foreground_thread = (
+        user32.GetWindowThreadProcessId(foreground, None) if foreground else 0
+    )
+    attached = bool(
+        foreground_thread
+        and foreground_thread != current_thread
+        and user32.AttachThreadInput(current_thread, foreground_thread, True)
+    )
+    try:
+        user32.BringWindowToTop(target.handle)
+        user32.SetForegroundWindow(target.handle)
+        user32.SetFocus(target.handle)
+    finally:
+        if attached:
+            user32.AttachThreadInput(current_thread, foreground_thread, False)
 
 
 def wait_for_foreground(target: WindowTarget, timeout_seconds: float = 1.0) -> None:
