@@ -1433,6 +1433,103 @@ The resulting sequence is now fixed:
 4. obtain approval for the complete Stage 2b preregistration; and
 5. only then restart training with the approved KL guard and shorter gates.
 
+#### Completed result: zone-local exploration did not produce slide onset
+
+The fixed `20` control versus `20` treatment episode ablation is complete.
+Both arms used seeds `20,260,830-20,260,849`, the same four-action gSDE
+refresh cadence, the unchanged V4 reward, and fresh in-memory copies of the
+Stage 2 Gate 500,000 checkpoint. The treatment applied exactly `2x` gSDE
+standard deviation only when pre-action progress was within `1100-1410`;
+the control applied none. There were `510` treatment-zone actions and zero
+control-zone actions. Neither arm called `learn` or wrote a checkpoint, and
+the source checkpoint remained SHA-256
+`8A06E00055886E8E671E988D5D6948C6688B74780EDB32A87C6CC213870C8326`.
+
+The frozen live-wheel detector recorded:
+
+- control: `0/20` episodes and `0` windows with raw wheel-slide onset;
+- treatment: `0/20` episodes and `0` windows with raw wheel-slide onset;
+- treatment-minus-control raw-onset delta: `0` episodes;
+- above-envelope near misses: `0` in both arms;
+- original Stage 1/2 legacy candidates and confirmed windows: `0` in both
+  arms; and
+- first-turn negative-control onset: `0` in both arms.
+
+The pre-registered attempt gate required onset in at least `3/20` treatment
+episodes and at least two more treatment episodes than control. It therefore
+fails before visual review, with decision `no_effect`. This is the raw attempt
+result. It is intentionally separate from usefulness: because treatment
+produced no qualifying onset at all, there were `0` useful candidates and `0`
+genuine useful speedslides. Exit speed, traversal time, finish status, and
+video cannot convert a non-onset into a useful slide.
+
+The distribution stayed inside the previously observed ordinary-cornering
+envelope. Final-zone absolute slip was `0.323 degrees` p50,
+`0.339 degrees` p95, and `0.389 degrees` maximum in control versus
+`0.323`, `0.339`, and `0.390 degrees` in treatment. No final-zone sample in
+either arm reported a sliding wheel. Across the `18` pairs that entered the
+zone within the frozen two-unit comparability tolerance, treatment changed
+mean traversal time by only `-5.6ms` and mean exit speed by `0.0` displayed
+speed units. These paired performance facts are secondary and do not alter
+the zero-onset conclusion.
+
+Safety and lap performance regressed slightly rather than improving:
+
+- control: `17/20` finishes (`85%`), `24.730s` best, `25.412s` mean,
+  `34.920s` worst, one fall, two stuck terminations, three upside-down
+  episodes, and three stuck-detected episodes;
+- treatment: `16/20` finishes (`80%`), `24.740s` best, `26.083s` mean,
+  `34.590s` worst, one fall, three stuck terminations, four upside-down
+  episodes, and four stuck-detected episodes; and
+- oscillation remained universal (`20/20` episodes in both arms), while mean
+  steering total variation increased from `36.80` to `38.11`.
+
+Matched seeds do not make live Trackmania trajectories bit-identical. gSDE is
+state-dependent, so small simulator-state differences before treatment
+changed sampled actions even with the same random seed. Eighteen pairs reached
+the zone within the frozen two-unit tolerance; seeds `20,260,830` and
+`20,260,839` did not and are excluded from paired usefulness attribution.
+They remain in the pre-registered arm-level `20` versus `20` raw-onset result.
+Exact pre-zone action equality was an extra audit attempted by the runner, not
+a pre-registered requirement; treating live action jitter as descriptive
+pairing evidence avoids post-hoc deletion or rerunning of valid randomized
+arms.
+
+All `40` original input replays are retained. Clean overlay-free best and
+worst control videos and best, closest-to-mean, and worst treatment videos
+were reproduced. The closest-to-mean control input replay did not reproduce
+its original finish during later TMInterface playback, and two attempted
+replacement captures aborted the bridge. The original input replay and live
+evaluation record remain hash-pinned; no failed playback is relabeled as a
+successful average video. This replay-rendering limitation is separate from
+the direct-live scoring result.
+
+Evidence:
+
+- comparison: `runs/wr_chase_stage2b_zone_exploration/analysis.json`, SHA-256
+  `84A391EB92CB8B3FF53B969B59A14AEBB79C0BAD5BA07E34233125F396FDFF8E`;
+- representative selection:
+  `runs/wr_chase_stage2b_zone_exploration/representative_selection.json`,
+  SHA-256
+  `FE50AEE6931BA8F7EBC12BC2F60AEE1CDD0FD530C32D472985337698BB1536F2`;
+- control summary SHA-256:
+  `5572F9A54756C38081F77B4EDFE0E1055D4422212D47C37D20DA07B06192A61F`;
+- treatment summary SHA-256:
+  `DA8D02F2201E302385294298B8059FCE74BA3320B355710ADCE94BF35F55DC01`;
+- live-physics scorer and tests: commit `e6ad5f4`;
+- matched zero-learning runner: commit `7746204`;
+- slow-map startup handling: commit `38c8bcc`;
+- live gSDE pairing audit correction: commit `888accb`; and
+- replay-capture hardening: commits `6c4f31a` and `ca36a8b`.
+
+Within this `40`-episode fixed-policy budget, final-zone-only `2x` gSDE
+exploration did not move the car closer to physical slide onset. Per the
+frozen decision rule, it will not be carried into the proposed Stage 2b
+design. The next design proposal should pre-register a graduated bonus alone,
+while recording PPO/gSDE's smooth on-policy exploration as a
+plausible contributor to difficult discovery. RND or SAC remain deliberate
+future alternatives, not automatic changes to this PPO-comparable sequence.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
