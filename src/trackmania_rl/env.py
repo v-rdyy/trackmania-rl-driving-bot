@@ -93,7 +93,14 @@ class LiveTmiSession:
 
     def __init__(self, config: EnvironmentConfig) -> None:
         self.config = config
-        self.client = TmiBridgeClient(port=config.port, timeout_seconds=30.0)
+        client_timeout_seconds = max(
+            30.0,
+            config.bridge_response_timeout_ms / 1_000.0 + 10.0,
+        )
+        self.client = TmiBridgeClient(
+            port=config.port,
+            timeout_seconds=client_timeout_seconds,
+        )
         self._connected = False
         self._pending_step = False
         self._current_state: object | None = None
@@ -107,7 +114,11 @@ class LiveTmiSession:
         self._map_confirmation_stop.clear()
 
         def confirm() -> None:
-            deadline = time.monotonic() + 30.0
+            confirmation_seconds = max(
+                30.0,
+                self.config.bridge_response_timeout_ms / 1_000.0,
+            )
+            deadline = time.monotonic() + confirmation_seconds
             while not self._map_confirmation_stop.wait(0.75):
                 if time.monotonic() >= deadline:
                     return

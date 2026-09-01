@@ -312,6 +312,7 @@ def run_arm(
             map_to_load=MAP_TO_LOAD,
             auto_respawn_on_connect=False,
             wait_for_race_start_on_connect=True,
+            bridge_response_timeout_ms=90_000,
         ),
         reward_function=signed_progress_efficiency_reward,
         action_log_path=paths["action_log"],

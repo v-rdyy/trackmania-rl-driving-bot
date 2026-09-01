@@ -839,6 +839,13 @@ class LiveTmiSessionTests(unittest.TestCase):
             ],
         )
 
+    def test_client_wait_outlasts_slow_map_confirmation_window(self) -> None:
+        session = LiveTmiSession(
+            EnvironmentConfig(bridge_response_timeout_ms=90_000)
+        )
+
+        self.assertEqual(session.client.timeout_seconds, 100.0)
+
     def test_connect_callback_can_load_and_confirm_a_map(self) -> None:
         session = LiveTmiSession(
             EnvironmentConfig(map_to_load="A01-Race.Challenge.Gbx")
