@@ -794,6 +794,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         return {
             "race_time_ms": int(state.race_time),
             "display_speed": int(state.display_speed),
+            "position": np.asarray(state.position, dtype=np.float64).tolist(),
             "progress": diagnostics.progress,
             "lateral_offset": diagnostics.lateral_offset,
             "vertical_offset": diagnostics.vertical_offset,

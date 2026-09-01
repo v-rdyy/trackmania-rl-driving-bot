@@ -183,6 +183,7 @@ class TrackmaniaEnvTests(unittest.TestCase):
             self.assertFalse(truncated)
             self.assertEqual(info["applied_steer"], 32768)
             self.assertEqual(info["applied_gas"], -32768)
+            self.assertEqual(info["position"], [1.0, 0.0, 0.0])
             record = json.loads(log_path.read_text(encoding="utf-8"))
             self.assertEqual(record["raw_action"], [0.5, 0.75, 0.25])
             self.assertEqual(record["input_steer"], 0.5)
