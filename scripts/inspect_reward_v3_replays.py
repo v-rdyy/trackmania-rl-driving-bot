@@ -199,6 +199,7 @@ def main() -> int:
             max_episode_ms=args.max_race_ms,
             map_to_load=args.map_to_load,
             auto_respawn_on_connect=False,
+            bridge_response_timeout_ms=90_000,
         )
     )
     results: list[dict[str, Any]] = []
