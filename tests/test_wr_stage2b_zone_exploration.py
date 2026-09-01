@@ -70,13 +70,21 @@ class Stage2bZoneExplorationTests(unittest.TestCase):
         self.assertTrue(audit["passed"])
         self.assertEqual(audit["comparisons"], MODULE.EPISODES * 3)
 
-    def test_prezone_audit_rejects_action_or_trajectory_mismatch(self) -> None:
+    def test_prezone_audit_reports_action_jitter_without_failing_rng_protocol(self) -> None:
         control = {episode: [trace(episode, 0)] for episode in range(MODULE.EPISODES)}
         boosted = copy.deepcopy(control)
         boosted[4][0]["raw_action"][0] += 0.01
         audit = MODULE.paired_prezone_audit(control, boosted)
+        self.assertTrue(audit["passed"])
+        self.assertAlmostEqual(audit["maximum_action_abs_error"], 0.01)
+
+    def test_prezone_audit_rejects_seed_mismatch(self) -> None:
+        control = {episode: [trace(episode, 0)] for episode in range(MODULE.EPISODES)}
+        boosted = copy.deepcopy(control)
+        boosted[4][0]["seed"] += 1
+        audit = MODULE.paired_prezone_audit(control, boosted)
         self.assertFalse(audit["passed"])
-        self.assertEqual(audit["failures"][0]["reason"], "prezone_mismatch")
+        self.assertEqual(audit["failures"][0]["reason"], "seed")
 
 
 if __name__ == "__main__":

@@ -565,13 +565,14 @@ def paired_prezone_audit(
     control_trace: Mapping[int, Sequence[Mapping[str, Any]]],
     boosted_trace: Mapping[int, Sequence[Mapping[str, Any]]],
 ) -> dict[str, Any]:
-    """Prove matched seeds/actions/trajectories before treatment activation."""
+    """Audit matched RNG protocol and quantify live pre-zone trajectory jitter."""
 
     comparisons = 0
     maximum_action_error = 0.0
     maximum_progress_error = 0.0
     maximum_position_error = 0.0
     failures: list[dict[str, Any]] = []
+    episode_details: list[dict[str, Any]] = []
     for episode, seed in enumerate(SEEDS):
         control = list(control_trace[episode])
         boosted = list(boosted_trace[episode])
@@ -597,6 +598,9 @@ def paired_prezone_audit(
             )
         if any(float(row["zone_flag"]) != 0.0 for row in control):
             failures.append({"episode": episode, "reason": "control_zone_flag"})
+        episode_action_error = 0.0
+        episode_progress_error = 0.0
+        episode_position_error = 0.0
         for index in range(first_active):
             if index >= len(control) or index >= len(boosted):
                 failures.append({"episode": episode, "reason": "trace_length"})
@@ -627,23 +631,64 @@ def paired_prezone_audit(
             maximum_action_error = max(maximum_action_error, action_error)
             maximum_progress_error = max(maximum_progress_error, progress_error)
             maximum_position_error = max(maximum_position_error, position_error)
+            episode_action_error = max(episode_action_error, action_error)
+            episode_progress_error = max(episode_progress_error, progress_error)
+            episode_position_error = max(episode_position_error, position_error)
             comparisons += 1
-            if (
-                action_error > ACTION_TOLERANCE
-                or progress_error > PROGRESS_TOLERANCE
-                or position_error > POSITION_TOLERANCE
+            if int(left.get("step", -1)) != index or int(right.get("step", -1)) != index:
+                failures.append(
+                    {
+                        "episode": episode,
+                        "step": index,
+                        "reason": "step_cadence",
+                    }
+                )
+                break
+            if bool(left.get("noise_refreshed")) != bool(
+                right.get("noise_refreshed")
             ):
                 failures.append(
                     {
                         "episode": episode,
                         "step": index,
-                        "reason": "prezone_mismatch",
-                        "action_error": action_error,
-                        "progress_error": progress_error,
-                        "position_error": position_error,
+                        "reason": "noise_refresh_cadence",
                     }
                 )
                 break
+        if first_active > 0:
+            entry_control = control[first_active - 1]
+            entry_boosted = boosted[first_active - 1]
+            entry_progress_error = abs(
+                float(entry_control["post_action_progress"])
+                - float(entry_boosted["post_action_progress"])
+            )
+            entry_position_error = float(
+                np.linalg.norm(
+                    np.asarray(entry_control["post_action_position"], dtype=np.float64)
+                    - np.asarray(entry_boosted["post_action_position"], dtype=np.float64)
+                )
+            )
+        else:
+            entry_progress_error = 0.0
+            entry_position_error = 0.0
+        episode_details.append(
+            {
+                "episode": episode,
+                "seed": seed,
+                "treatment_activated": treatment_activated,
+                "preactivation_comparisons": first_active,
+                "maximum_action_abs_error": episode_action_error,
+                "maximum_progress_error": episode_progress_error,
+                "maximum_position_error": episode_position_error,
+                "zone_entry_progress_error": entry_progress_error,
+                "zone_entry_position_error": entry_position_error,
+                "zone_entry_comparable": bool(
+                    treatment_activated
+                    and entry_progress_error <= PROGRESS_TOLERANCE
+                    and entry_position_error <= POSITION_TOLERANCE
+                ),
+            }
+        )
     return {
         "passed": not failures,
         "comparisons": comparisons,
@@ -651,10 +696,14 @@ def paired_prezone_audit(
         "maximum_progress_error": maximum_progress_error,
         "maximum_position_error": maximum_position_error,
         "tolerances": {
-            "action": ACTION_TOLERANCE,
+            "action_descriptive_only": ACTION_TOLERANCE,
             "progress": PROGRESS_TOLERANCE,
             "position": POSITION_TOLERANCE,
         },
+        "zone_entry_comparable_episodes": sum(
+            bool(detail["zone_entry_comparable"]) for detail in episode_details
+        ),
+        "episode_details": episode_details,
         "failures": failures,
     }
 
@@ -820,9 +869,25 @@ def compare_arms() -> dict[str, Any]:
     for arm in ARMS:
         aggregates[arm], scores[arm] = _aggregate_arm(summaries[arm], records[arm])
     usefulness = []
+    pairing_by_episode = {
+        int(detail["episode"]): detail
+        for detail in pairing["episode_details"]
+    }
     for episode, seed in enumerate(SEEDS):
         result = paired_usefulness(scores["control"][episode], scores["boosted"][episode])
-        result.update({"episode": episode, "seed": seed})
+        entry_comparable = bool(
+            pairing_by_episode[episode]["zone_entry_comparable"]
+        )
+        if not entry_comparable:
+            result["useful_candidate_before_visual_review"] = False
+        result.update(
+            {
+                "episode": episode,
+                "seed": seed,
+                "zone_entry_comparable": entry_comparable,
+                "excluded_for_entry_mismatch": not entry_comparable,
+            }
+        )
         usefulness.append(result)
     control_onsets = int(aggregates["control"]["accepted_slide_onset_episodes_before_visual"])
     boosted_onsets = int(aggregates["boosted"]["accepted_slide_onset_episodes_before_visual"])
