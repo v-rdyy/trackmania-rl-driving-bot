@@ -106,7 +106,7 @@ def configure_evaluator(target: int, gate: dict[str, Any]) -> dict[str, Path]:
     slug = gate_slug(target)
     action_log = RUN_DIR / "gates" / f"{slug}_evaluation_actions.jsonl"
     summary = RUN_DIR / "gates" / f"{slug}_evaluation.json"
-    replay_dir = WORKSPACE_ROOT / "artifacts" / "replays" / "wr_chase_stage2" / slug
+    replay_dir = WORKSPACE_ROOT / "artifacts" / "replays" / EXPERIMENT_SLUG / slug
     evaluator.EXPERIMENT_LABEL = f"WR-chase {RUN_LABEL} {slug}"
     evaluator.EXPERIMENT_SLUG = EXPERIMENT_SLUG
     evaluator.PROTOCOL_LABEL = PROTOCOL_LABEL

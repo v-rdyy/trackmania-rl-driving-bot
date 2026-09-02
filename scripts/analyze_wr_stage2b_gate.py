@@ -333,12 +333,21 @@ def main() -> int:
         for index, record in enumerate(grouped[episode]):
             if "previous_display_speed" not in record:
                 raise base.AnalysisError("Stage 2b row is missing previous_display_speed")
-            if index == 0 and record["previous_display_speed"] is not None:
-                raise base.AnalysisError("first Stage 2b row must not have a previous speed")
-            if index > 0 and int(record["previous_display_speed"]) != int(
-                grouped[episode][index - 1]["display_speed"]
+            previous_speed = record["previous_display_speed"]
+            if previous_speed is not None and (
+                not math.isfinite(float(previous_speed)) or int(previous_speed) < 0
             ):
-                raise base.AnalysisError("previous_display_speed breaks live continuity")
+                raise base.AnalysisError("previous_display_speed is invalid")
+            if index > 0:
+                expected_speed = (
+                    None
+                    if bool(record.get("race_clock_boundary", False))
+                    else int(grouped[episode][index - 1]["display_speed"])
+                )
+                if previous_speed != expected_speed:
+                    raise base.AnalysisError(
+                        "previous_display_speed breaks live continuity"
+                    )
 
     reward_audit = reward_and_precursor_audit(grouped)
     episode_scores, onset = onset_summary(active)

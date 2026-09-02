@@ -100,6 +100,7 @@ class WrStage2bEvaluationTests(unittest.TestCase):
             )
             self.assertIn("wr_chase_stage2b", str(paths["summary"]))
             self.assertIn("gate_00000000", str(paths["replay_dir"]))
+            self.assertIn("wr_chase_stage2b", str(paths["replay_dir"]))
         finally:
             for name, value in evaluator_original.items():
                 setattr(MODULE.evaluator, name, value)
