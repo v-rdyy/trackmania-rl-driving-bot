@@ -6,7 +6,6 @@ import argparse
 import json
 import math
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -52,14 +51,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--reuse-game", action="store_true")
-    parser.add_argument(
-        "--video-only-after-disconnect",
-        action="store_true",
-        help=(
-            "continue clean capture through the known replay horizon if "
-            "loading inputs closes the telemetry bridge"
-        ),
-    )
     return parser.parse_args()
 
 
@@ -104,7 +95,6 @@ def inspect_replay(
     fps: int,
     max_width: int,
     simulation_speed: float,
-    video_only_after_disconnect: bool,
 ) -> dict[str, Any]:
     local_replay = resolve_replay_path(replay)
     if not local_replay.is_file():
@@ -116,8 +106,6 @@ def inspect_replay(
     if sha256(external_replay) != local_hash:
         raise ProtocolError(f"TMInterface replay differs from preserved copy: {local_replay.name}")
 
-    if video_only_after_disconnect:
-        session.client.set_response_timeout(5_000)
     session.client.execute_command("unload")
     session.client.execute_command(f"load {external_replay.name}")
     state = session.reset(reset_diagnostics)
@@ -141,40 +129,27 @@ def inspect_replay(
         progress=initial["progress"],
     )
     recorder.start()
-    playback_started_at = time.perf_counter()
     recorder_stopped = False
     race_finished = False
-    playback_disconnect: str | None = None
     try:
-        try:
-            while True:
-                step = session.advance_playback()
-                record = telemetry_record(step.state, reference, step.race_time_ms)
-                if not all(
-                    math.isfinite(float(record[key]))
-                    for key in ("progress", "lateral_offset", "vertical_offset", "upright_cosine")
-                ):
-                    raise ProtocolError("replay inspection produced nonfinite telemetry")
-                records.append(record)
-                race_finished = bool(step.race_finished)
-                recorder.update(
-                    state="FINISH" if race_finished else "PLAYBACK",
-                    elapsed_ms=record["race_time_ms"],
-                    display_speed=record["display_speed"],
-                    progress=record["progress"],
-                )
-                if race_finished or step.race_time_ms >= max_race_ms:
-                    break
-        except OSError as error:
-            if not video_only_after_disconnect:
-                raise
-            playback_disconnect = repr(error)
-            target_wall_seconds = max_race_ms / 1000.0 / simulation_speed
-            remaining = target_wall_seconds - (
-                time.perf_counter() - playback_started_at
+        while True:
+            step = session.advance_playback()
+            record = telemetry_record(step.state, reference, step.race_time_ms)
+            if not all(
+                math.isfinite(float(record[key]))
+                for key in ("progress", "lateral_offset", "vertical_offset", "upright_cosine")
+            ):
+                raise ProtocolError("replay inspection produced nonfinite telemetry")
+            records.append(record)
+            race_finished = bool(step.race_finished)
+            recorder.update(
+                state="FINISH" if race_finished else "PLAYBACK",
+                elapsed_ms=record["race_time_ms"],
+                display_speed=record["display_speed"],
+                progress=record["progress"],
             )
-            if remaining > 0.0:
-                time.sleep(remaining)
+            if race_finished or step.race_time_ms >= max_race_ms:
+                break
         video = recorder.stop()
         recorder_stopped = True
     finally:
@@ -191,23 +166,12 @@ def inspect_replay(
         "replay": str(local_replay.relative_to(WORKSPACE_ROOT)),
         "replay_sha256": local_hash,
         "race_finished": race_finished,
-        "terminal_race_time_ms": (
-            None if playback_disconnect is not None else terminal["race_time_ms"]
-        ),
-        "terminal_progress": (
-            None if playback_disconnect is not None else terminal["progress"]
-        ),
-        "terminal_lateral_offset": (
-            None if playback_disconnect is not None else terminal["lateral_offset"]
-        ),
-        "terminal_vertical_offset": (
-            None if playback_disconnect is not None else terminal["vertical_offset"]
-        ),
+        "terminal_race_time_ms": terminal["race_time_ms"],
+        "terminal_progress": terminal["progress"],
+        "terminal_lateral_offset": terminal["lateral_offset"],
+        "terminal_vertical_offset": terminal["vertical_offset"],
         "minimum_vertical_offset": min(float(row["vertical_offset"]) for row in records),
         "minimum_upright_cosine": min(float(row["upright_cosine"]) for row in records),
-        "telemetry_complete": playback_disconnect is None,
-        "video_only_after_bridge_disconnect": playback_disconnect is not None,
-        "playback_disconnect": playback_disconnect,
         "video": {**video, "path": str(video_path.relative_to(WORKSPACE_ROOT))},
         "telemetry": str(telemetry_path.relative_to(WORKSPACE_ROOT)),
         "telemetry_sha256": sha256(telemetry_path),
@@ -256,13 +220,11 @@ def main() -> int:
                 fps=args.fps,
                 max_width=args.max_width,
                 simulation_speed=args.simulation_speed,
-                video_only_after_disconnect=args.video_only_after_disconnect,
             )
             results.append(result)
             print(
                 f"inspected {Path(result['replay']).name}: "
-                f"finished={result['race_finished']} "
-                f"progress={result['terminal_progress']}",
+                f"finished={result['race_finished']} progress={result['terminal_progress']:.1f}",
                 flush=True,
             )
     finally:
