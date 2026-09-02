@@ -170,6 +170,9 @@ class PpoActionAuditTests(unittest.TestCase):
         self.assertIn("train/approx_kl", logged)
         self.assertLessEqual(logged["train/std_min"], logged["train/std"])
         self.assertGreaterEqual(logged["train/std_max"], logged["train/std"])
+        self.assertEqual(len(model.kl_update_audit), 1)
+        self.assertEqual(model.kl_update_audit[0]["epochs_completed"], 3)
+        self.assertEqual(model.kl_update_audit[0]["model_timesteps"], 2)
 
 
 if __name__ == "__main__":

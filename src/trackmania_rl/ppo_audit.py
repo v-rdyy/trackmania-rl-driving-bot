@@ -138,11 +138,16 @@ class AuditedKlPPO(PPO):
             self.rollout_buffer.values.flatten(),
             self.rollout_buffer.returns.flatten(),
         )
-        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
-        self.logger.record("train/value_loss", np.mean(value_losses))
-        self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
-        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        entropy_loss_mean = float(np.mean(entropy_losses))
+        policy_loss_mean = float(np.mean(pg_losses))
+        value_loss_mean = float(np.mean(value_losses))
+        approx_kl_mean = float(np.mean(approx_kl_divs))
+        clip_fraction_mean = float(np.mean(clip_fractions))
+        self.logger.record("train/entropy_loss", entropy_loss_mean)
+        self.logger.record("train/policy_gradient_loss", policy_loss_mean)
+        self.logger.record("train/value_loss", value_loss_mean)
+        self.logger.record("train/approx_kl", approx_kl_mean)
+        self.logger.record("train/clip_fraction", clip_fraction_mean)
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var)
         self.logger.record("train/epochs_started", epochs_started)
@@ -156,11 +161,40 @@ class AuditedKlPPO(PPO):
             "train/kl_early_stop_approx_kl",
             0.0 if early_stop_approx_kl is None else early_stop_approx_kl,
         )
+        standard_deviation_mean: float | None = None
+        standard_deviation_minimum: float | None = None
+        standard_deviation_maximum: float | None = None
         if hasattr(self.policy, "log_std"):
             standard_deviation = th.exp(self.policy.log_std)
-            self.logger.record("train/std", standard_deviation.mean().item())
-            self.logger.record("train/std_min", standard_deviation.min().item())
-            self.logger.record("train/std_max", standard_deviation.max().item())
+            standard_deviation_mean = standard_deviation.mean().item()
+            standard_deviation_minimum = standard_deviation.min().item()
+            standard_deviation_maximum = standard_deviation.max().item()
+            self.logger.record("train/std", standard_deviation_mean)
+            self.logger.record("train/std_min", standard_deviation_minimum)
+            self.logger.record("train/std_max", standard_deviation_maximum)
+
+        if not hasattr(self, "kl_update_audit"):
+            self.kl_update_audit: list[dict[str, Any]] = []
+        self.kl_update_audit.append(
+            {
+                "rollout_update": len(self.kl_update_audit) + 1,
+                "model_timesteps": int(self.num_timesteps),
+                "epochs_scheduled": int(self.n_epochs),
+                "epochs_started": epochs_started,
+                "epochs_completed": epochs_completed,
+                "kl_early_stop": not continue_training,
+                "kl_early_stop_epoch": early_stop_epoch,
+                "kl_early_stop_approx_kl": early_stop_approx_kl,
+                "approx_kl": approx_kl_mean,
+                "clip_fraction": clip_fraction_mean,
+                "policy_gradient_loss": policy_loss_mean,
+                "value_loss": value_loss_mean,
+                "entropy_loss": entropy_loss_mean,
+                "action_distribution_std_mean": standard_deviation_mean,
+                "action_distribution_std_minimum": standard_deviation_minimum,
+                "action_distribution_std_maximum": standard_deviation_maximum,
+            }
+        )
 
         self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
         self.logger.record("train/clip_range", clip_range)

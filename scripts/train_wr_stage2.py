@@ -362,7 +362,8 @@ def main() -> int:
     )
     model.target_kl = TARGET_KL
     starting_timesteps = int(model.num_timesteps)
-    starting_updates = int(model._n_updates)
+    starting_optimizer_epochs = int(model._n_updates)
+    starting_audit_records = len(getattr(model, "kl_update_audit", []))
     target_model_timesteps = INITIAL_MODEL_TIMESTEPS + args.target_additional_steps
     previous_nominal_target = INITIAL_MODEL_TIMESTEPS + (
         args.target_additional_steps - GATE_SIZE
@@ -402,6 +403,10 @@ def main() -> int:
             reset_num_timesteps=False,
             progress_bar=False,
         )
+        # SB3 normally flushes update N while beginning rollout N+1.  A gate
+        # ends immediately after its final update, so explicitly persist that
+        # last audit row before closing the logger.
+        model.logger.dump(step=model.num_timesteps)
         model.save(output_checkpoint.with_suffix(""))
     except Exception as error:
         wall_seconds = time.perf_counter() - wall_started
@@ -442,9 +447,15 @@ def main() -> int:
         "actual_stage2_additional_timesteps": int(model.num_timesteps)
         - INITIAL_MODEL_TIMESTEPS,
         "actual_gate_interactions": int(model.num_timesteps) - starting_timesteps,
-        "starting_optimizer_updates": starting_updates,
-        "final_optimizer_updates": int(model._n_updates),
-        "optimizer_updates_this_gate": int(model._n_updates) - starting_updates,
+        "starting_optimizer_epochs": starting_optimizer_epochs,
+        "final_optimizer_epochs": int(model._n_updates),
+        "optimizer_epochs_started_this_gate": int(model._n_updates)
+        - starting_optimizer_epochs,
+        "rollout_updates_this_gate": (
+            int(model.num_timesteps) - starting_timesteps
+        )
+        // int(model.n_steps),
+        "ppo_update_audit_this_gate": getattr(model, "kl_update_audit", [])[starting_audit_records:],
         "target_kl": model.target_kl,
         "ppo_class": type(model).__name__,
         "reward_function": REWARD_FUNCTION_NAME,
