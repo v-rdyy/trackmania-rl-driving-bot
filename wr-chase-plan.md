@@ -1,11 +1,9 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2b reward and optimizer contract pre-registered; awaiting owner
-approval before implementation or training. Stage 2's binary bonus was
-unreachable, and the fixed `20` versus `20` final-zone exploration ablation
-produced zero wheel-slide onset in both arms. Stage 2b therefore tests a
-bounded graduated precursor bonus alone, initialized from the reliable Stage 2
-Gate 500,000 checkpoint with the optimizer safeguards below.
+Status: Stage 2b approved and running. The frozen graduated reward, audited
+`target_kl = 0.01` optimizer guard, 50,000-interaction gates, and live stop-rule
+analyzer are implemented. The target-zero instrumentation baseline passed at
+`9/10` finishes with zero accepted onset, so Gate 50,000 is authorized.
 
 Date pre-registered: 2026-08-26
 
@@ -1740,10 +1738,51 @@ TensorBoard run name:
 `artifacts/videos/wr_chase_stage2b/`. Stage 1, Stage 2, and the exploration
 ablation remain immutable.
 
-Implementation and training remain blocked until the owner approves this
-exact Stage 2b contract. After approval, implementation is one isolated reward
+At preregistration time, implementation and training remained blocked until
+the owner approved this exact Stage 2b contract. After approval, implementation is one isolated reward
 function plus the transition fields and gate runner needed to enforce this
 preregistration; no reward coefficient may be changed mid-run.
+
+#### Stage 2b target-zero instrumentation baseline
+
+The owner approved the frozen Stage 2b contract on 2026-09-02. Before any
+learning, the checksum-pinned Stage 2 Gate 500,000 checkpoint was evaluated for
+10 fresh deterministic episodes through the Stage 2b live pipeline:
+
+- `9/10` finishes, with `24.790s` best, `24.838s` mean, and `24.980s` worst;
+- zero raw or accepted slide-onset episodes and zero final-zone
+  sliding-wheel samples;
+- precursor score `0.1623` p50, `0.1687` p95, and `0.1690` maximum over the
+  frozen valid final-zone envelope;
+- `10.1652` total graduated bonus across all ten episodes, proving the shaped
+  precursor credit is reachable before wheel-slide onset;
+- steering oscillation in `10/10` episodes, no inversion, and one stuck
+  episode; and
+- exact reconstruction of the logged Stage 2b reward, with maximum absolute
+  error below `1e-6`.
+
+The baseline decision is `continue`. Its zero accepted-onset count and p95
+precursor score are the frozen reference for the first 50,000-interaction gate.
+No learning or checkpoint selection occurred during this baseline.
+
+The first attempted baseline exposed a tooling-only artifact-path defect: the
+shared evaluator still contained one literal Stage 2 replay directory. That
+run was not analyzed or used as evidence. Its run and all ten replay exports
+were preserved under `wr_chase_stage2b_path_mismatch_20260902` archives, the
+literal was replaced with the experiment slug, and the complete baseline was
+rerun once under the correct isolated roots.
+
+Evidence:
+
+- implementation commits `29dbd97`, `3560a97`, and `f3a1509`;
+- live-baseline path correction commit `2704189`;
+- evaluation summary SHA-256:
+  `42FC6890470A23116DE984A23EFD0110D85F7F67F859D95CEBE11A147DD3B406`;
+- direct-live action log SHA-256:
+  `D86C871CF696E2BFFDBDBC00F03194B54107967BE13E6EEF006C222319C4D451`;
+  and
+- analysis summary SHA-256:
+  `0F98307D67492A6B76C1D612C23C717F8ACB5A7A0C8DDEF48BE6EEEE094C9C67`.
 
 ## Realistic expectation
 
