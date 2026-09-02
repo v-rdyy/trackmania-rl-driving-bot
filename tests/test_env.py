@@ -22,6 +22,7 @@ from trackmania_rl.observations import ReferencePath
 from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     clustered_reversal_frequency_reward,
+    graduated_final_corner_assistance_reward,
     localized_drift_assistance_reward,
     sparse_finish_reward,
     steering_rate_smoothness_reward,
@@ -303,6 +304,42 @@ class TrackmaniaEnvTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete live SimState"):
             env.step(np.asarray([0.0, 1.0, 0.0], dtype=np.float32))
         env.close()
+
+    def test_stage2b_uses_previous_speed_and_live_safety_state(self) -> None:
+        reference = ReferencePath(
+            distances=np.asarray([0.0, 1_500.0]),
+            points=np.asarray([[0.0, 0.0, 0.0], [1_500.0, 0.0, 0.0]]),
+        )
+        start = add_live_dynamics(
+            state(x=1_180, z=0, speed=420, race_time=0),
+            sliding_wheels=0,
+            slip_angle_degrees=0.0,
+        )
+        driven = add_live_dynamics(
+            state(x=1_200, z=0, speed=424, race_time=100),
+            sliding_wheels=2,
+            slip_angle_degrees=1.0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "stage2b_actions.jsonl"
+            env = TrackmaniaEnv(
+                reference_path=reference,
+                session=FakeSession([start, driven]),
+                action_log_path=log_path,
+                reward_function=graduated_final_corner_assistance_reward,
+            )
+            env.reset()
+            _, reward, _, _, info = env.step(
+                np.asarray([0.0, 1.0, 0.0], dtype=np.float32)
+            )
+            env.close()
+            record = json.loads(log_path.read_text(encoding="utf-8"))
+
+        self.assertAlmostEqual(reward, 2.4)
+        self.assertEqual(info["previous_display_speed"], 420)
+        self.assertEqual(record["previous_display_speed"], 420)
+        self.assertEqual(record["upright_cosine"], 1.0)
+        self.assertEqual(record["sliding_wheel_count"], 2)
 
     def test_full_simstate_rejects_any_wheel_count_other_than_four(self) -> None:
         start = state(x=0, z=0, speed=0, race_time=0)

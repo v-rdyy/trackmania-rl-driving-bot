@@ -13,6 +13,8 @@ from trackmania_rl.rewards import (
     clamped_forward_progress_reward,
     clustered_reversal_frequency_reward,
     dense_speed_reward,
+    graduated_final_corner_assistance_reward,
+    graduated_final_corner_precursor_bonus,
     localized_drift_assistance_reward,
     localized_drift_bonus,
     phase1_smoke_reward,
@@ -33,6 +35,10 @@ def transition(
     off_track: bool = False,
     fallen: bool = False,
     stuck: bool = False,
+    previous_display_speed: int | None = None,
+    upright_cosine: float = 1.0,
+    lateral_offset: float = 0.0,
+    heading_error: float = 0.0,
     steering_rate_change: float = 0.0,
     steering_slope_reversal: bool = False,
     steering_reversals_in_window: int = 0,
@@ -45,14 +51,14 @@ def transition(
 ) -> RewardTransition:
     previous_diagnostics = ObservationDiagnostics(
         progress=previous_progress,
-        lateral_offset=0.0,
-        heading_error=0.0,
+        lateral_offset=lateral_offset,
+        heading_error=heading_error,
         segment_index=1,
     )
     diagnostics = ObservationDiagnostics(
         progress=progress,
-        lateral_offset=0.0,
-        heading_error=0.0,
+        lateral_offset=lateral_offset,
+        heading_error=heading_error,
         segment_index=1,
     )
     return RewardTransition(
@@ -66,6 +72,8 @@ def transition(
         off_track=off_track,
         fallen=fallen,
         stuck=stuck,
+        previous_display_speed=previous_display_speed,
+        upright_cosine=upright_cosine,
         steering_rate_change=steering_rate_change,
         steering_slope_reversal=steering_slope_reversal,
         steering_reversals_in_window=steering_reversals_in_window,
@@ -475,6 +483,161 @@ class RewardTests(unittest.TestCase):
         ):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 localized_drift_bonus(transition(**(base | {field: value})))
+
+    def test_stage2b_graduates_slip_and_wheel_credit_exactly(self) -> None:
+        base = {
+            "display_speed": 400,
+            "previous_display_speed": 400,
+            "previous_progress": 1180.0,
+            "progress": 1200.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+        }
+        current_policy = transition(
+            **base,
+            sliding_wheel_count=0,
+            slip_angle_degrees=0.323,
+        )
+        self.assertAlmostEqual(
+            graduated_final_corner_precursor_bonus(current_policy),
+            0.08075,
+        )
+
+        slip_target = transition(
+            **base,
+            sliding_wheel_count=0,
+            slip_angle_degrees=-1.0,
+        )
+        self.assertAlmostEqual(
+            graduated_final_corner_precursor_bonus(slip_target),
+            0.25,
+        )
+
+        full_target = transition(
+            **base,
+            sliding_wheel_count=2,
+            slip_angle_degrees=1.0,
+        )
+        self.assertAlmostEqual(
+            graduated_final_corner_precursor_bonus(full_target),
+            0.5,
+        )
+        self.assertAlmostEqual(
+            graduated_final_corner_assistance_reward(full_target),
+            signed_progress_efficiency_reward(full_target) + 0.5,
+        )
+
+    def test_stage2b_caps_extreme_slide_state_without_extra_reward(self) -> None:
+        stronger = transition(
+            display_speed=500,
+            previous_display_speed=500,
+            previous_progress=1180.0,
+            progress=1220.0,
+            new_high_water_progress_delta=40.0,
+            full_simstate_available=True,
+            ground_contact_count=4,
+            sliding_wheel_count=4,
+            slip_angle_degrees=20.0,
+            body_up_yaw_rate=10.0,
+        )
+        self.assertAlmostEqual(
+            graduated_final_corner_precursor_bonus(stronger),
+            0.5,
+        )
+
+    def test_stage2b_enforces_every_frozen_safety_gate(self) -> None:
+        qualifying = {
+            "display_speed": 424,
+            "previous_display_speed": 448,
+            "previous_progress": 1180.0,
+            "progress": 1200.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 3,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 1.0,
+        }
+        self.assertAlmostEqual(
+            graduated_final_corner_precursor_bonus(transition(**qualifying)),
+            0.5,
+        )
+        failing = (
+            {"progress": 1099.999},
+            {"display_speed": 399},
+            {"ground_contact_count": 2},
+            {"new_high_water_progress_delta": 0.0},
+            {"upright_cosine": 0.799},
+            {"heading_error": 0.7853981633974483 + 0.001},
+            {"lateral_offset": 20.001},
+            {"previous_display_speed": 449},
+            {"terminated": True},
+            {"truncated": True},
+        )
+        for override in failing:
+            with self.subTest(override=override):
+                candidate = transition(**(qualifying | override))
+                self.assertEqual(
+                    graduated_final_corner_precursor_bonus(candidate),
+                    0.0,
+                )
+
+    def test_stage2b_first_transition_and_repeated_progress_get_no_bonus(self) -> None:
+        base = {
+            "display_speed": 420,
+            "previous_progress": 1180.0,
+            "progress": 1200.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 1.0,
+        }
+        self.assertEqual(
+            graduated_final_corner_precursor_bonus(transition(**base)),
+            0.0,
+        )
+        self.assertEqual(
+            graduated_final_corner_precursor_bonus(
+                transition(
+                    **(
+                        base
+                        | {
+                            "previous_display_speed": 420,
+                            "new_high_water_progress_delta": 0.0,
+                        }
+                    )
+                )
+            ),
+            0.0,
+        )
+
+    def test_stage2b_requires_finite_complete_live_dynamics(self) -> None:
+        base = {
+            "display_speed": 420,
+            "previous_display_speed": 420,
+            "previous_progress": 1180.0,
+            "progress": 1200.0,
+            "new_high_water_progress_delta": 20.0,
+            "full_simstate_available": True,
+            "ground_contact_count": 4,
+            "sliding_wheel_count": 2,
+            "slip_angle_degrees": 1.0,
+        }
+        with self.assertRaisesRegex(ValueError, "complete live SimState"):
+            graduated_final_corner_precursor_bonus(
+                transition(**(base | {"full_simstate_available": False}))
+            )
+        for field, value in (
+            ("sliding_wheel_count", 5),
+            ("slip_angle_degrees", float("nan")),
+            ("upright_cosine", float("inf")),
+            ("lateral_offset", float("nan")),
+        ):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                graduated_final_corner_precursor_bonus(
+                    transition(**(base | {field: value}))
+                )
 
 
 if __name__ == "__main__":

@@ -23,6 +23,8 @@ class RewardTransition:
     off_track: bool
     fallen: bool = False
     stuck: bool = False
+    previous_display_speed: int | None = None
+    upright_cosine: float = 1.0
     steering_rate_change: float = 0.0
     steering_slope_reversal: bool = False
     steering_reversals_in_window: int = 0
@@ -55,6 +57,16 @@ WR_STAGE2_MIN_SLIDING_WHEELS = 1
 WR_STAGE2_MIN_ABS_SLIP_ANGLE_DEGREES = 1.0
 WR_STAGE2_MIN_ABS_BODY_UP_YAW_RATE = 0.25
 WR_STAGE2_BONUS_COEFFICIENT = 0.50
+WR_STAGE2B_FINAL_ZONE = (1100.0, 1410.0)
+WR_STAGE2B_MIN_DISPLAY_SPEED = 400
+WR_STAGE2B_MIN_GROUND_CONTACTS = 3
+WR_STAGE2B_MIN_UPRIGHT_COSINE = 0.8
+WR_STAGE2B_MAX_ABS_HEADING_ERROR = math.pi / 4.0
+WR_STAGE2B_MAX_ABS_LATERAL_OFFSET = 20.0
+WR_STAGE2B_MAX_SPEED_LOSS = 25
+WR_STAGE2B_SLIP_TARGET_DEGREES = 1.0
+WR_STAGE2B_SLIDING_WHEEL_TARGET = 2
+WR_STAGE2B_BONUS_COEFFICIENT = 0.50
 
 
 def phase1_smoke_reward(transition: RewardTransition) -> float:
@@ -173,3 +185,78 @@ def localized_drift_assistance_reward(transition: RewardTransition) -> float:
     return signed_progress_efficiency_reward(transition) + localized_drift_bonus(
         transition
     )
+
+
+def graduated_final_corner_precursor_bonus(
+    transition: RewardTransition,
+) -> float:
+    """Return the frozen Stage 2b graduated final-corner bonus."""
+    if not transition.full_simstate_available:
+        raise ValueError(
+            "WR-chase Stage 2b requires complete live SimState dynamics"
+        )
+    if not (
+        0 <= transition.ground_contact_count <= 4
+        and 0 <= transition.sliding_wheel_count <= 4
+    ):
+        raise ValueError("live SimState wheel counts must be between zero and four")
+    dynamics = (
+        transition.new_high_water_progress_delta,
+        transition.slip_angle_degrees,
+        transition.body_up_yaw_rate,
+        transition.upright_cosine,
+        transition.diagnostics.progress,
+        transition.diagnostics.heading_error,
+        transition.diagnostics.lateral_offset,
+    )
+    if not all(math.isfinite(value) for value in dynamics):
+        raise ValueError("WR-chase Stage 2b dynamics must be finite")
+    if transition.previous_display_speed is None:
+        return 0.0
+
+    speed_loss = transition.previous_display_speed - transition.display_speed
+    zone_start, zone_end = WR_STAGE2B_FINAL_ZONE
+    eligible = bool(
+        zone_start <= transition.diagnostics.progress <= zone_end
+        and transition.display_speed >= WR_STAGE2B_MIN_DISPLAY_SPEED
+        and transition.ground_contact_count >= WR_STAGE2B_MIN_GROUND_CONTACTS
+        and transition.new_high_water_progress_delta > 0.0
+        and transition.upright_cosine >= WR_STAGE2B_MIN_UPRIGHT_COSINE
+        and abs(transition.diagnostics.heading_error)
+        <= WR_STAGE2B_MAX_ABS_HEADING_ERROR
+        and abs(transition.diagnostics.lateral_offset)
+        <= WR_STAGE2B_MAX_ABS_LATERAL_OFFSET
+        and speed_loss < WR_STAGE2B_MAX_SPEED_LOSS
+        and not transition.terminated
+        and not transition.truncated
+    )
+    if not eligible:
+        return 0.0
+
+    new_progress_fraction = min(
+        max(transition.new_high_water_progress_delta, 0.0),
+        WR_STAGE2_PROGRESS_CLAMP_UNITS,
+    ) / WR_STAGE2_PROGRESS_CLAMP_UNITS
+    slip_progress = min(
+        abs(transition.slip_angle_degrees) / WR_STAGE2B_SLIP_TARGET_DEGREES,
+        1.0,
+    )
+    wheel_slide_progress = min(
+        transition.sliding_wheel_count / WR_STAGE2B_SLIDING_WHEEL_TARGET,
+        1.0,
+    )
+    precursor_score = (slip_progress + wheel_slide_progress) / 2.0
+    return (
+        WR_STAGE2B_BONUS_COEFFICIENT
+        * new_progress_fraction
+        * precursor_score
+    )
+
+
+def graduated_final_corner_assistance_reward(
+    transition: RewardTransition,
+) -> float:
+    """WR-chase Stage 2b: V4 plus bounded graduated precursor credit."""
+    return signed_progress_efficiency_reward(
+        transition
+    ) + graduated_final_corner_precursor_bonus(transition)
