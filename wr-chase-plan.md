@@ -1,17 +1,17 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2 paused after its pre-registered Gate 1,000,000 safety review;
-the Gate 750,000 diagnostic located the deterministic regression between Gate
-500,000 and Gate 750,000, and the pre-Stage-2b reachability audit found that the
-binary drift-bonus gate was effectively unreachable by the observed fast
-policies. Stage 2b training has not started. A fixed-policy final-zone
-exploration ablation, scored with the non-human live-physics contract below,
-now precedes the separately approved, pre-registered eligibility revision and
-optimizer safeguards.
+Status: Stage 2b reward and optimizer contract pre-registered; awaiting owner
+approval before implementation or training. Stage 2's binary bonus was
+unreachable, and the fixed `20` versus `20` final-zone exploration ablation
+produced zero wheel-slide onset in both arms. Stage 2b therefore tests a
+bounded graduated precursor bonus alone, initialized from the reliable Stage 2
+Gate 500,000 checkpoint with the optimizer safeguards below.
 
 Date pre-registered: 2026-08-26
 
 Stage 2 date pre-registered: 2026-08-27
+
+Stage 2b date pre-registered: 2026-09-02
 
 This plan is a sibling to `reward-comparison-v1-v4.md`. Stage 1 deliberately
 continued the exact V4 reward so the project could distinguish techniques
@@ -1529,6 +1529,221 @@ design. The next design proposal should pre-register a graduated bonus alone,
 while recording PPO/gSDE's smooth on-policy exploration as a
 plausible contributor to difficult discovery. RND or SAC remain deliberate
 future alternatives, not automatic changes to this PPO-comparable sequence.
+
+### Stage 2b pre-registration: graduated final-corner precursor reward
+
+Stage 2b is a separate reward iteration, not a continuation whose rules can be
+changed in response to intermediate results. Training has not started. The
+formula, initialization, measurement contract, optimizer guard, gates, and
+time box below are frozen for owner review before any implementation or live
+training.
+
+The exploration ablation produced zero wheel-slide onset in both `20`-episode
+arms. Within that fixed-policy, final-zone, `2x` gSDE experiment, insufficient
+randomness is therefore ruled out as the primary barrier. This is not a claim
+that no larger or fundamentally different exploration method could ever find
+the maneuver. It means more of the same PPO/gSDE noise is not the supported
+next lever. The current V4 reward pays progress and time efficiency but gives
+no preference at all to a `0.4-degree` slide precursor over a `0.3-degree`
+ordinary cornering state. A shaped, graduated approach signal is now the
+primary remaining lever rather than secondary assistance layered on an
+exploration change.
+
+#### Exact frozen reward addition
+
+Stage 2b retains `signed_progress_efficiency_reward` exactly, including signed
+centerline progress clipped to `[-20, 20]` then divided by `10`, the `-0.10`
+per-step time cost, `+50` finish bonus, and `-250` verified-failure penalty.
+There is no exploration multiplier, first-turn bonus, finish-bonus change, or
+other reward term.
+
+For every 100 ms transition, let:
+
+```text
+new_progress_fraction = (
+    clip(new_high_water_progress_delta, 0, 20) / 20
+)
+
+abs_slip = abs(slip_angle_degrees)
+slip_progress = clip(abs_slip / 1.0, 0, 1)
+wheel_slide_progress = clip(sliding_wheel_count / 2, 0, 1)
+
+precursor_score = (
+    slip_progress + wheel_slide_progress
+) / 2
+
+speed_loss = previous_display_speed - displayed_speed
+
+safe_final_zone_step = (
+    1100 <= current_progress <= 1410
+    and displayed_speed >= 400
+    and ground_contact_count >= 3
+    and new_high_water_progress_delta > 0
+    and upright_cosine >= 0.8
+    and abs(heading_error) <= pi / 4
+    and abs(lateral_offset) <= 20
+    and speed_loss < 25
+    and not terminated
+    and not truncated
+)
+
+graduated_final_corner_bonus = (
+    0.50 * new_progress_fraction * precursor_score
+    if safe_final_zone_step
+    else 0.0
+)
+
+stage2b_reward = (
+    signed_progress_efficiency_reward
+    + graduated_final_corner_bonus
+)
+```
+
+`previous_display_speed` is the live displayed speed from the immediately
+preceding policy transition. The first transition without a preceding speed
+cannot earn this bonus. All position, orientation, speed, contact, slide, and
+slip fields must come from the same direct-live `SimState` transition used to
+calculate the reward. Missing, incomplete, nonfinite, or non-four-wheel state
+is a hard instrumentation failure. Input-replay telemetry is never a reward
+fallback.
+
+The operational precursor target is `1.0 degree` absolute velocity slip and
+two sliding wheels. The `1.0-degree` value preserves continuity with Stage 2;
+it is not asserted to be a universal or physically optimal speedslide angle.
+The simulator's wheel flags, not this angle, remain the primary onset detector.
+Both component scores saturate at `1.0`: angles above `1.0 degree` and more
+than two sliding wheels earn no additional credit. This removes any direct
+incentive to seek progressively more extreme, crash-prone slip.
+
+Equal weighting is deliberate and minimizes new knobs. The continuous slip
+half supplies reward before any binary wheel-slide flag appears; the wheel
+half then distinguishes actual engine-reported slide state from kinematic
+yaw. The current final-zone median slip of approximately `0.323 degrees` with
+zero sliding wheels would have a precursor score of approximately `0.162`, so
+the source policy begins inside a nonzero reward slope instead of behind
+another binary gate.
+
+The coefficient and progress scaling retain Stage 2's original maximum of
+`0.50` per step. Across the `310`-unit final zone, the high-water rule bounds
+the approximate one-pass maximum to `7.75`. A car that maintains the current
+`0.323-degree`, zero-wheel state would earn only about `1.25` across a complete
+first traversal; a `1.0-degree`, zero-wheel precursor is capped near `3.875`;
+and the full two-wheel target is capped near `7.75`. These are trajectory-level
+bounds, subject to the per-step `20`-unit clamp. Reversing or repeatedly
+crossing the zone cannot repay the same progress. Slowing creates additional
+V4 time cost, and a verified failure still costs `250`, so the graduated term
+cannot make a near-finish crash net positive.
+
+The safety gate mirrors the frozen non-human scoring envelope and adds the
+same `25`-speed-unit sudden-loss guard used to reject collisions. It is a
+reward eligibility guard, not a declaration that every rewarded step is a
+useful speedslide. No yaw-rate threshold is used in the reward because ordinary
+final-corner driving already satisfied the old yaw threshold on `84.99%` of
+audited samples. Yaw remains logged as a secondary diagnostic.
+
+#### Pre-registered Stage 2b hypothesis
+
+> A bounded, continuous final-corner reward for increasing high-speed slip angle and sliding-wheel count, added to V4 without an exploration boost, is expected to move the reliable Gate 500,000 policy beyond its approximately 0.4-degree ordinary-cornering envelope and produce frozen-contract wheel-slide onset in at least 3 of 10 deterministic episodes within 500,000 interactions. Early onset attempts are expected to be imprecise and may worsen lap time or finish rate before becoming useful. A speedslide will be called genuinely useful only if it separately passes the frozen exit-speed, traversal-time, safe-finish, and visual checks. If precursor score rises but onset remains below 3 of 10, the reward shaped approach behavior without demonstrating repeatable slide induction; if precursor score does not rise, the graduated formula is ineffective within this budget.
+
+This hypothesis tests induction first and usefulness second. A higher bonus,
+slip angle, yaw rate, or sliding-wheel count is not itself a lap-time success.
+The outcome is reported honestly even if the learned attempts are slower,
+unsafe, or visually unlike a real speedslide.
+
+#### Initialization and optimizer guard
+
+Stage 2b initializes from the last reliable optimizer-bearing Stage 2 model:
+
+- checkpoint: `checkpoints/wr_chase_stage2/gate_00500000_model.zip`;
+- SHA-256:
+  `8A06E00055886E8E671E988D5D6948C6688B74780EDB32A87C6CC213870C8326`;
+- model timestep: `3,506,176`; and
+- frozen deterministic result: `9/10` finishes, `24.780s` best,
+  `24.816s` mean, and `24.900s` worst.
+
+The saved PPO policy, value function, optimizer moments, learning rate
+`0.0003`, `2,048`-step rollouts, batch size `64`, `10` PPO epochs, gamma
+`0.99`, GAE lambda `0.95`, clip range `0.2`, entropy coefficient `0.0`, value
+coefficient `0.5`, gradient-norm cap `0.5`, gSDE enabled, and four-action gSDE
+refresh cadence remain unchanged. The only optimizer safeguard added is
+Stable-Baselines3 `target_kl = 0.01`. With the pinned local SB3 `2.9.0`
+implementation, remaining PPO epochs for an update stop when minibatch
+approximate KL exceeds `1.5 * target_kl`, or `0.015`. The prior Stage 2 run had
+no KL target and logged median update KL near `0.054`; this is intentionally a
+conservative guard against another rapid mean-policy shift.
+
+Every update must log approximate KL, completed PPO epochs, clip fraction,
+policy loss, value loss, entropy, and action-distribution statistics. A KL
+early-stop is not a failed gate and does not change the `50,000`-interaction
+evaluation cadence; it only limits that update's optimization epochs.
+
+#### Short gates, frozen measurement, and stop rules
+
+- Before learning, reconstruct the exact Stage 2b reward and precursor score
+  over the preserved direct-live Gate 500,000 deterministic evaluation. If any
+  required field is absent, run one fresh 10-episode deterministic target-zero
+  evaluation instead. This is an instrumentation baseline, not checkpoint
+  selection.
+- Train at 100x with the existing 100 ms action period in nominal `50,000`
+  interaction segments. PPO rollout overshoot is retained and exact model
+  timesteps are reported.
+- Save a complete optimizer-bearing checkpoint at every segment boundary.
+- At every boundary, run `10` deterministic episodes at 6x through the same
+  direct-live pipeline. Preserve all action logs and input replays. Produce
+  clean overlay-free best, closest-to-mean, and worst successful videos; if a
+  gate has no finishes, use high-, median-, and low-progress failures and label
+  them as failures.
+- The initial time box is `500,000` additional interactions, or ten nominal
+  segments. There is no automatic extension and no coefficient change inside
+  this iteration.
+- Raw induction uses the frozen primary detector: within progress `1100-1410`
+  at speed `>=400`, at least two consecutive valid 100 ms samples must have at
+  least one engine-reported sliding wheel on every sample and at least two
+  sliding wheels on one sample. All frozen grounded, progress, upright,
+  heading, lateral, sudden-speed-loss, terminal, direct-live, and visual
+  rejection rules remain in force.
+- Pause and report immediately when accepted onset occurs in at least `3/10`
+  deterministic episodes. Do not continue training while visual or usefulness
+  review is pending.
+- On induction, run the frozen matched-control usefulness protocol against the
+  unchanged Gate 500,000 base: `20` base and `20` candidate deterministic
+  episodes at 6x, paired on seeds `20,260,830-20,260,849`, with the same 100 ms
+  cadence and frozen two-unit zone-entry comparability tolerance. A candidate
+  must finish safely, traverse progress `1100-1410` at least `100ms` faster
+  than its comparable control, exit at progress `1410` with displayed speed
+  at least as high, and survive visual rejection of wall contact, airborne
+  rotation, or loss of control. Report raw onset count and genuine-useful
+  count separately.
+- Pause for safety review after any single gate with `<=7/10` finishes, any
+  `0/10` gate, or a repeated fixed-location collision/stuck failure in at least
+  `3/10` episodes. This is deliberately stricter than Stage 2's old two-gate
+  rule. Lap-time or reliability regression is never hidden by improved
+  precursor metrics.
+- If no gate reaches repeated induction by `500,000`, stop and report the
+  formula as not demonstrating repeatable slide induction within the frozen
+  budget. A rising precursor score is a secondary finding, not permission to
+  move the success threshold or extend training automatically.
+
+Every gate reports bonus total; precursor-score p50, p95, and maximum; slip
+and yaw distributions; sliding-wheel samples; above-envelope near misses;
+accepted onset windows; final-zone entry/exit speed and traversal time; finish
+rate; best, mean, and worst lap; failure causes; lateral deviation;
+oscillation; upside-down and stuck duration; and comparison against the
+`24.500s` owner PB and `23.770s` benchmark. The first-turn zone is retained as
+an unassisted negative control in measurement only.
+
+TensorBoard run name:
+`wr_chase_stage2b_graduated_final_corner`. Artifacts are isolated under
+`runs/wr_chase_stage2b/`, `checkpoints/wr_chase_stage2b/`,
+`artifacts/replays/wr_chase_stage2b/`,
+`artifacts/analysis/wr_chase_stage2b/`, and
+`artifacts/videos/wr_chase_stage2b/`. Stage 1, Stage 2, and the exploration
+ablation remain immutable.
+
+Implementation and training remain blocked until the owner approves this
+exact Stage 2b contract. After approval, implementation is one isolated reward
+function plus the transition fields and gate runner needed to enforce this
+preregistration; no reward coefficient may be changed mid-run.
 
 ## Realistic expectation
 
