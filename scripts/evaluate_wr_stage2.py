@@ -34,6 +34,12 @@ from trackmania_rl.tmi_bridge import ProtocolError
 
 EXPECTED_EPISODES = 10
 EVALUATION_SPEED = 6.0
+GATE_SIZE = 500_000
+RUN_LABEL = "Stage 2"
+EXPERIMENT_SLUG = "wr_chase_stage2"
+PROTOCOL_LABEL = "wr-chase-plan.md Stage 2"
+REWARD_FUNCTION = localized_drift_assistance_reward
+REWARD_FUNCTION_NAME = "localized_drift_assistance_reward"
 REQUIRED_LIVE_FIELDS = (
     "full_simstate_available",
     "previous_progress",
@@ -58,9 +64,11 @@ def parse_gate_args() -> tuple[argparse.Namespace, list[str]]:
 
 def validate_evaluation_target(target: int) -> None:
     if target < 0:
-        raise ValueError("Stage 2 evaluation target cannot be negative")
-    if target % 500_000:
-        raise ValueError("Stage 2 evaluation target must be 0 or a 500000-step gate")
+        raise ValueError(f"{RUN_LABEL} evaluation target cannot be negative")
+    if target % GATE_SIZE:
+        raise ValueError(
+            f"{RUN_LABEL} evaluation target must be 0 or a {GATE_SIZE}-step gate"
+        )
     if target > TIMEBOX:
         raise ValueError(f"Stage 2 evaluation target exceeds the {TIMEBOX} time box")
 
@@ -99,10 +107,10 @@ def configure_evaluator(target: int, gate: dict[str, Any]) -> dict[str, Path]:
     action_log = RUN_DIR / "gates" / f"{slug}_evaluation_actions.jsonl"
     summary = RUN_DIR / "gates" / f"{slug}_evaluation.json"
     replay_dir = WORKSPACE_ROOT / "artifacts" / "replays" / "wr_chase_stage2" / slug
-    evaluator.EXPERIMENT_LABEL = f"WR-chase Stage 2 {slug}"
-    evaluator.EXPERIMENT_SLUG = "wr_chase_stage2"
-    evaluator.PROTOCOL_LABEL = "wr-chase-plan.md Stage 2"
-    evaluator.REWARD_FUNCTION = localized_drift_assistance_reward
+    evaluator.EXPERIMENT_LABEL = f"WR-chase {RUN_LABEL} {slug}"
+    evaluator.EXPERIMENT_SLUG = EXPERIMENT_SLUG
+    evaluator.PROTOCOL_LABEL = PROTOCOL_LABEL
+    evaluator.REWARD_FUNCTION = REWARD_FUNCTION
     evaluator.RUN_DIR = RUN_DIR
     evaluator.DEFAULT_CHECKPOINT = gate_checkpoint(target)
     evaluator.DEFAULT_ACTION_LOG = action_log
@@ -161,7 +169,7 @@ def validate_direct_live_records(
             raise ProtocolError(
                 f"Stage 2 direct-live record {index} has incomplete SimState"
             )
-        if record.get("reward_function") != "localized_drift_assistance_reward":
+        if record.get("reward_function") != REWARD_FUNCTION_NAME:
             raise ProtocolError(
                 f"Stage 2 record {index} used the wrong reward function"
             )
