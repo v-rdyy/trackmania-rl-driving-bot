@@ -28,7 +28,7 @@ from train_reward_v3 import (
 )
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
 from trackmania_rl.game_launch import close_trackmania, ensure_trackmania_running
-from trackmania_rl.ppo_audit import BoundedPpoActionStatsCallback
+from trackmania_rl.ppo_audit import AuditedKlPPO, BoundedPpoActionStatsCallback
 from trackmania_rl.rewards import localized_drift_assistance_reward
 from trackmania_rl.tmi_bridge import ProtocolError
 
@@ -54,6 +54,13 @@ CHECKPOINT_INTERVAL = 250_000
 TIMEBOX = 2_000_000
 SIMULATION_SPEED = 100.0
 TENSORBOARD_RUN_NAME = "wr_chase_stage2_localized_drift"
+REWARD_FUNCTION = localized_drift_assistance_reward
+REWARD_FUNCTION_NAME = "localized_drift_assistance_reward"
+RUN_LABEL = "WR Stage 2"
+CHECKPOINT_NAME_PREFIX = "ppo_wr_stage2"
+PPO_CLASS: type[PPO] = PPO
+TARGET_KL: float | None = None
+INITIAL_SOURCE = "Stage 1 Gate 2"
 REWARD_CONTRACT = (
     "V4 + 0.50 * clip(new high-water progress, 0, 20) / 20 only at "
     "progress 680..930 or 1100..1410 when live SimState reports >=3 "
@@ -120,7 +127,7 @@ def verify_initial_checkpoint() -> dict[str, Any]:
         "sha256": actual_hash,
         "size_bytes": INITIAL_CHECKPOINT.stat().st_size,
         "num_timesteps": INITIAL_MODEL_TIMESTEPS,
-        "source": "Stage 1 Gate 2",
+        "source": INITIAL_SOURCE,
     }
 
 
@@ -131,7 +138,7 @@ def new_manifest(initialization: dict[str, Any]) -> dict[str, Any]:
         "status": "awaiting_baseline_evaluation",
         "started_at_utc": created_at,
         "stage2_initialization": initialization,
-        "reward_function": "localized_drift_assistance_reward",
+        "reward_function": REWARD_FUNCTION_NAME,
         "reward_contract": REWARD_CONTRACT,
         "reward_base": "signed_progress_efficiency_reward (V4 unchanged)",
         "gate_size_nominal": GATE_SIZE,
@@ -142,6 +149,8 @@ def new_manifest(initialization: dict[str, Any]) -> dict[str, Any]:
         "evaluation_episodes": 10,
         "step_period_ms": 100,
         "tensorboard_run_name": TENSORBOARD_RUN_NAME,
+        "target_kl": TARGET_KL,
+        "ppo_class": PPO_CLASS.__name__,
         "protocol_doc": str(PROTOCOL_DOC.relative_to(WORKSPACE_ROOT)),
         "protocol_doc_sha256_before_training": sha256(PROTOCOL_DOC),
         "telemetry_source_required": "direct_live_evaluation_simstate",
@@ -328,7 +337,7 @@ def main() -> int:
             auto_respawn_on_connect=False,
             wait_for_race_start_on_connect=True,
         ),
-        reward_function=localized_drift_assistance_reward,
+        reward_function=REWARD_FUNCTION,
     )
     monitored_env = Monitor(
         base_env,
@@ -345,13 +354,15 @@ def main() -> int:
         ),
         override_existing=not any(RUN_DIR.glob("*.monitor.csv")),
     )
-    model = PPO.load(
+    model = PPO_CLASS.load(
         load_path,
         env=monitored_env,
         device="cpu",
         tensorboard_log=str(TENSORBOARD_ROOT),
     )
+    model.target_kl = TARGET_KL
     starting_timesteps = int(model.num_timesteps)
+    starting_updates = int(model._n_updates)
     target_model_timesteps = INITIAL_MODEL_TIMESTEPS + args.target_additional_steps
     previous_nominal_target = INITIAL_MODEL_TIMESTEPS + (
         args.target_additional_steps - GATE_SIZE
@@ -371,14 +382,14 @@ def main() -> int:
             CheckpointCallback(
                 save_freq=CHECKPOINT_INTERVAL,
                 save_path=str(CHECKPOINT_DIR),
-                name_prefix="ppo_wr_stage2",
+                name_prefix=CHECKPOINT_NAME_PREFIX,
             ),
             action_stats,
             PeriodicProgressCallback(),
         ]
     )
     print(
-        f"WR Stage 2 gate started: model={starting_timesteps}, "
+        f"{RUN_LABEL} gate started: model={starting_timesteps}, "
         f"nominal_target={target_model_timesteps}, remaining={remaining}",
         flush=True,
     )
@@ -431,7 +442,12 @@ def main() -> int:
         "actual_stage2_additional_timesteps": int(model.num_timesteps)
         - INITIAL_MODEL_TIMESTEPS,
         "actual_gate_interactions": int(model.num_timesteps) - starting_timesteps,
-        "reward_function": "localized_drift_assistance_reward",
+        "starting_optimizer_updates": starting_updates,
+        "final_optimizer_updates": int(model._n_updates),
+        "optimizer_updates_this_gate": int(model._n_updates) - starting_updates,
+        "target_kl": model.target_kl,
+        "ppo_class": type(model).__name__,
+        "reward_function": REWARD_FUNCTION_NAME,
         "reward_contract": REWARD_CONTRACT,
         "episodes_cumulative": len(rows),
         "finishes_cumulative": len(race_times),
@@ -480,7 +496,7 @@ def main() -> int:
             del manifest[key]
     write_json(MANIFEST_PATH, manifest)
     print(
-        f"WR Stage 2 gate complete: nominal={args.target_additional_steps}, "
+        f"{RUN_LABEL} gate complete: nominal={args.target_additional_steps}, "
         f"actual={summary['actual_stage2_additional_timesteps']}, "
         f"checkpoint={output_checkpoint}",
         flush=True,

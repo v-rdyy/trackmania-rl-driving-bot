@@ -14,6 +14,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
 from trackmania_rl.ppo_audit import (
+    AuditedKlPPO,
     BoundedPpoActionStatsCallback,
     RawPpoActionAuditCallback,
     audit_action_pair,
@@ -145,6 +146,30 @@ class PpoActionAuditTests(unittest.TestCase):
         self.assertTrue(summary["all_finite_in_range_and_affine"])
         self.assertFalse(summary["hidden_clipping"])
         self.assertEqual(len(summary["environment_action_minimum"]), 3)
+
+    def test_audited_ppo_logs_completed_epochs_and_distribution_range(self) -> None:
+        model = AuditedKlPPO(
+            "MlpPolicy",
+            TinyContinuousEnv(),
+            n_steps=2,
+            batch_size=2,
+            n_epochs=3,
+            target_kl=None,
+            use_sde=True,
+            policy_kwargs={"squash_output": True},
+            seed=7,
+            device="cpu",
+            verbose=0,
+        )
+        model.learn(total_timesteps=2)
+
+        logged = model.logger.name_to_value
+        self.assertEqual(logged["train/epochs_started"], 3)
+        self.assertEqual(logged["train/epochs_completed"], 3)
+        self.assertEqual(logged["train/kl_early_stop"], 0.0)
+        self.assertIn("train/approx_kl", logged)
+        self.assertLessEqual(logged["train/std_min"], logged["train/std"])
+        self.assertGreaterEqual(logged["train/std_max"], logged["train/std"])
 
 
 if __name__ == "__main__":
