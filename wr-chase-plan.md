@@ -1913,6 +1913,25 @@ blocking useful slide-exit adaptations. This is a feasibility assessment only:
 no anchor coefficient or boundary has been selected, no loss was implemented,
 and training remains paused under the existing safety gate.
 
+#### New direction: continuous overnight pure discovery, not started
+
+On 2026-09-04 the owner redirected the next experiment away from Stage 2b
+bonus/anchoring work to a substantially longer uninterrupted run with unchanged
+V4 reward. The [overnight preflight](docs/overnight-pure-discovery-preflight.md)
+records the proposed separate run, suggested reliable Stage 1 Gate 2 base,
+250k checkpoint spacing without evaluation/approval pauses, and a standalone
+local process requiring no overnight Codex monitoring or API usage.
+
+Power-setting read-back now confirms automatic sleep/hibernate, hybrid sleep,
+display-off, and disk-idle are disabled on AC/DC; prior changed values are
+preserved for restoration. Disk headroom is approximately 478 GiB. Historical
+full-PPO pure-discovery throughput is about 379 interactions/s, supporting a
+planning estimate of 8.6-10.9 million additional interactions over eight hours.
+This is not a fresh benchmark or a claim of proven overnight uptime: a live
+100x warm-up remains required. The owner has not yet confirmed launch readiness
+or an overnight duration/stop time. No overnight training has begun, and this
+new experiment must not overwrite or resume the failed Stage 2b evidence.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
