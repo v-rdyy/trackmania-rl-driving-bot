@@ -1,5 +1,11 @@
 # Continuous pure-discovery launch
 
+Final status: failed on 2026-09-04 after `1,835,008` additional interactions
+when PPO's policy mean became NaN during optimization. The failure was not
+caused by sleep, monitor-off behavior, a stop request, or TMInterface. Training
+has not been restarted. See the
+[full checkpoint retrospective](continuous-pure-discovery-retrospective.md).
+
 Launched on 2026-09-04 following the owner's explicit readiness confirmation.
 Run: `wr_pure_continuous_20260904_062051`.
 

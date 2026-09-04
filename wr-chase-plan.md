@@ -1,10 +1,10 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2b paused at the first trained gate under the frozen safety rule.
-The target-zero baseline finished `9/10`, but Gate 50,000 finished `0/10`; all
-ten deterministic episodes became stuck at the same final-structure approach.
-Accepted slide onset and precursor p95 both remained flat. Gate 100,000 is not
-authorized while this safety result is under review.
+Status: the later continuous pure-discovery extension ended in PPO numerical
+failure after `1,835,008` additional interactions. Its final checkpoint
+finished `10/10` at 6x, but no checkpoint produced a confirmed slide and
+checkpoint quality was highly unstable. Training has not been restarted. The
+earlier Stage 2b safety pause and evidence remain unchanged.
 
 Date pre-registered: 2026-08-26
 
@@ -1936,6 +1936,37 @@ boundaries, and supports a local clean stop independent of Codex. The preflight
 document freezes the carried-forward hypothesis and implementation details.
 Actual launch results must be recorded after observation; this experiment must
 not overwrite or resume the failed Stage 2b evidence.
+
+#### Continuous pure-discovery observed result
+
+The separate run started at 02:21:54 EDT on 2026-09-04 and failed at 03:58:13
+EDT after `1,835,008` additional interactions. PPO's approximate KL diverged
+and its action-distribution mean became NaN during an optimizer update. Host
+power remained configured correctly, the game and status heartbeat were
+continuous, and no stop request existed; this was not another sleep-triggered
+socket failure.
+
+All seven periodic checkpoints were retained and evaluated for ten
+deterministic episodes each at the established 6x speed, alongside the base
+checkpoint. Finish counts by increasing interaction count were `10/10`,
+`0/10`, `10/10`, `10/10`, `2/10`, `9/10`, `10/10`, and `10/10`. The final
+checkpoint produced `24.820s` best and `24.823s` mean, but this did not beat
+the project's preserved `24.730s` lap. The last clearly pre-divergence
+checkpoint finished `10/10` only by slowing to a `34.184s` mean. No checkpoint
+produced a confirmed live-SimState slide in either registered zone or anywhere
+else on the track, and oscillation remained present in every evaluated episode.
+
+The same checkpoints had misleadingly produced `80/80` finishes during an
+initial 100x audit. The base alone shifted from `24.840s` best at 6x to
+`25.490s` at 100x, and the 250k model shifted from `0/10` at 6x to `10/10` at
+100x. The 100x data are retained as simulation-speed sensitivity evidence;
+formal lap and reliability comparisons use 6x.
+
+The [full retrospective](docs/continuous-pure-discovery-retrospective.md)
+records the per-checkpoint table, failure diagnosis, checksums, replay roots,
+and resume recommendation. The emergency model contains NaNs, while the last
+periodic optimizer was saved after divergence began. Neither is approved for
+resumed training.
 
 ## Realistic expectation
 
