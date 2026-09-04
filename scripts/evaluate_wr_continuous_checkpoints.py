@@ -19,7 +19,7 @@ from train_reward_v3 import sha256, write_json
 from trackmania_rl.rewards import signed_progress_efficiency_reward
 
 SOURCE_RUN = "wr_pure_continuous_20260904_062051"
-RUN_DIR = ROOT / "runs" / SOURCE_RUN / "retrospective"
+RUN_DIR = ROOT / "runs" / SOURCE_RUN / "retrospective_live"
 CHECKPOINT_DIR = ROOT / "checkpoints" / SOURCE_RUN
 BASE = ROOT / "checkpoints/wr_chase_stage1/gate_01000000_model.zip"
 BASE_SHA256 = "BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044"
@@ -74,7 +74,7 @@ def configure(item: dict[str, Any]) -> dict[str, Path]:
     output = RUN_DIR / label
     paths = {"action_log": output / "actions.jsonl",
              "summary": output / "evaluation.json",
-             "replay_dir": ROOT / "artifacts/replays" / SOURCE_RUN / "retrospective" / label}
+             "replay_dir": ROOT / "artifacts/replays" / SOURCE_RUN / "retrospective_live" / label}
     evaluator.EXPERIMENT_LABEL = f"continuous pure-discovery {label}"
     evaluator.EXPERIMENT_SLUG = "wr_pure_continuous"
     evaluator.PROTOCOL_LABEL = "continuous-pure-discovery-launch.md"

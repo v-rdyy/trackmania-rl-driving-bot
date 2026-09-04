@@ -658,6 +658,13 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         observation, diagnostics = self._observation(result.state)
         full_simstate = self._full_simstate_log(result.state)
         elapsed_ms = max(0, result.race_time_ms - self._episode_start_race_time)
+        # A snapshot rewind may replay TMNF's negative race-countdown clock.
+        # Stuck termination measures active driving time, never countdown time.
+        stuck_elapsed_ms = (
+            max(0, result.race_time_ms)
+            if self._episode_start_race_time < 0
+            else elapsed_ms
+        )
         timed_out = elapsed_ms >= self.config.max_episode_ms
         off_track = abs(diagnostics.lateral_offset) > self.config.max_lateral_offset
         below_reference = (
@@ -666,7 +673,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
         terminated = bool(result.race_finished)
         stuck_candidate, stuck_progress_gain, stuck_world_distance = (
             self._stuck_status(
-                elapsed_ms=elapsed_ms,
+                elapsed_ms=stuck_elapsed_ms,
                 state=result.state,
                 diagnostics=diagnostics,
             )
@@ -735,6 +742,7 @@ class TrackmaniaEnv(gym.Env[np.ndarray, np.ndarray]):
                 "stuck": stuck,
                 "stuck_window_progress_gain": stuck_progress_gain,
                 "stuck_window_world_distance": stuck_world_distance,
+                "stuck_elapsed_ms": stuck_elapsed_ms,
                 "race_finished": terminated,
                 "reward_function": self.reward_name,
                 "steering_rate_change": steering_rate_change,

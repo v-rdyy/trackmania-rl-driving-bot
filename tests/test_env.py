@@ -691,6 +691,39 @@ class TrackmaniaEnvTests(unittest.TestCase):
         self.assertEqual(info["stuck_window_progress_gain"], 0.0)
         self.assertEqual(info["stuck_window_world_distance"], 0.0)
 
+    def test_countdown_time_does_not_trigger_stuck_before_race_start(self) -> None:
+        session = FakeSession(
+            [
+                state(x=0, z=0, speed=0, race_time=time_ms)
+                for time_ms in range(-2_500, 2_100, 100)
+            ]
+        )
+        env = TrackmaniaEnv(
+            config=EnvironmentConfig(stuck_window_ms=2_000),
+            reference_path=self.path,
+            session=session,
+            reward_function=clamped_forward_progress_reward,
+        )
+        env.reset()
+
+        at_start = None
+        for _ in range(25):
+            at_start = env.step(np.zeros(3, dtype=np.float32))
+        assert at_start is not None
+        self.assertEqual(at_start[4]["race_time_ms"], 0)
+        self.assertEqual(at_start[4]["stuck_elapsed_ms"], 0)
+        self.assertFalse(at_start[3])
+
+        final = None
+        for _ in range(20):
+            final = env.step(np.zeros(3, dtype=np.float32))
+        env.close()
+        assert final is not None
+        self.assertEqual(final[4]["race_time_ms"], 2_000)
+        self.assertEqual(final[4]["stuck_elapsed_ms"], 2_000)
+        self.assertTrue(final[3])
+        self.assertTrue(final[4]["stuck"])
+
     def test_v3_world_motion_prevents_false_stuck_truncation(self) -> None:
         session = FakeSession(
             [
