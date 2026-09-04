@@ -19,11 +19,12 @@ from train_reward_v3 import sha256, write_json
 from trackmania_rl.rewards import signed_progress_efficiency_reward
 
 SOURCE_RUN = "wr_pure_continuous_20260904_062051"
-RUN_DIR = ROOT / "runs" / SOURCE_RUN / "retrospective_live"
+RUN_DIR = ROOT / "runs" / SOURCE_RUN / "retrospective_6x"
 CHECKPOINT_DIR = ROOT / "checkpoints" / SOURCE_RUN
 BASE = ROOT / "checkpoints/wr_chase_stage1/gate_01000000_model.zip"
 BASE_SHA256 = "BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044"
 EXPECTED_EPISODES = 10
+EVALUATION_SPEED = 6.0
 
 
 def checkpoint_inventory() -> list[dict[str, Any]]:
@@ -74,7 +75,7 @@ def configure(item: dict[str, Any]) -> dict[str, Path]:
     output = RUN_DIR / label
     paths = {"action_log": output / "actions.jsonl",
              "summary": output / "evaluation.json",
-             "replay_dir": ROOT / "artifacts/replays" / SOURCE_RUN / "retrospective_live" / label}
+             "replay_dir": ROOT / "artifacts/replays" / SOURCE_RUN / "retrospective_6x" / label}
     evaluator.EXPERIMENT_LABEL = f"continuous pure-discovery {label}"
     evaluator.EXPERIMENT_SLUG = "wr_pure_continuous"
     evaluator.PROTOCOL_LABEL = "continuous-pure-discovery-launch.md"
@@ -90,7 +91,7 @@ def configure(item: dict[str, Any]) -> dict[str, Path]:
     evaluator.POLICY_DETERMINISTIC = True
     evaluator.POLICY_RANDOM_SEED = None
     evaluator.POLICY_SDE_SAMPLE_FREQ = None
-    evaluator.SIMULATION_SPEED = 100.0
+    evaluator.SIMULATION_SPEED = EVALUATION_SPEED
     evaluator.MAP_TO_LOAD = None
     evaluator.AUTO_RESPAWN_ON_CONNECT = True
     evaluator.WAIT_FOR_RACE_START_ON_CONNECT = False
@@ -156,7 +157,8 @@ def main() -> int:
     if (RUN_DIR / "retrospective.json").exists():
         raise FileExistsError(f"refusing to overwrite completed retrospective: {RUN_DIR}")
     results = [evaluate_item(item) for item in inventory]
-    aggregate = {"source_run": SOURCE_RUN, "evaluation_protocol": "10 deterministic episodes each at 100x",
+    aggregate = {"source_run": SOURCE_RUN,
+                 "evaluation_protocol": f"10 deterministic episodes each at {EVALUATION_SPEED:g}x",
                  "checkpoints": results,
                  "stochastic_training_windows": training_windows([x["additional_interactions"] for x in inventory[1:]])}
     write_json(RUN_DIR / "retrospective.json", aggregate)
