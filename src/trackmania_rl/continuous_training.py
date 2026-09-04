@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import copy
 import hashlib
 import json
 import os
@@ -14,7 +15,188 @@ from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
+import torch
 from stable_baselines3.common.callbacks import BaseCallback
+
+
+class OptimizerDivergenceError(RuntimeError):
+    """An optimizer update was rolled back after violating a safety invariant."""
+
+    def __init__(self, message: str, event: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.event = event
+
+
+def _nonfinite_tensor_paths(value: Any, prefix: str) -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, torch.Tensor):
+        if not value.detach().isfinite().all():
+            paths.append(prefix)
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            paths.extend(_nonfinite_tensor_paths(child, f"{prefix}.{key}"))
+    elif isinstance(value, (list, tuple)):
+        for index, child in enumerate(value):
+            paths.extend(_nonfinite_tensor_paths(child, f"{prefix}[{index}]"))
+    return paths
+
+
+class OptimizerUpdateGuard:
+    """Rollback one PPO update if state, metrics, or policy output diverges.
+
+    The snapshot is held in memory for only the current update. A violating
+    update is restored exactly, verified again, and handed to the runner for a
+    unique recovery checkpoint and a controlled stop.
+    """
+
+    FINITE_METRICS = (
+        "train/approx_kl",
+        "train/clip_fraction",
+        "train/entropy_loss",
+        "train/explained_variance",
+        "train/loss",
+        "train/policy_gradient_loss",
+        "train/value_loss",
+    )
+
+    def __init__(self, *, maximum_mean_kl: float) -> None:
+        if not np.isfinite(maximum_mean_kl) or maximum_mean_kl <= 0:
+            raise ValueError("maximum_mean_kl must be positive and finite")
+        self.maximum_mean_kl = float(maximum_mean_kl)
+        self.last_event: dict[str, Any] | None = None
+
+    @staticmethod
+    def _snapshot(model: Any) -> dict[str, Any]:
+        return {
+            "policy": copy.deepcopy(model.policy.state_dict()),
+            "optimizer": copy.deepcopy(model.policy.optimizer.state_dict()),
+            "n_updates": int(model._n_updates),
+        }
+
+    @staticmethod
+    def _restore(model: Any, snapshot: dict[str, Any]) -> None:
+        model.policy.load_state_dict(snapshot["policy"])
+        model.policy.optimizer.load_state_dict(snapshot["optimizer"])
+        model._n_updates = int(snapshot["n_updates"])
+
+    @staticmethod
+    def _rollout_nonfinite(model: Any) -> list[str]:
+        paths: list[str] = []
+        for name in (
+            "observations",
+            "actions",
+            "rewards",
+            "returns",
+            "advantages",
+            "values",
+            "log_probs",
+        ):
+            value = getattr(model.rollout_buffer, name, None)
+            if value is not None and not np.isfinite(value).all():
+                paths.append(f"rollout_buffer.{name}")
+        return paths
+
+    @staticmethod
+    def _state_nonfinite(model: Any) -> list[str]:
+        paths = _nonfinite_tensor_paths(model.policy.state_dict(), "policy")
+        paths.extend(
+            _nonfinite_tensor_paths(
+                model.policy.optimizer.state_dict(),
+                "policy.optimizer",
+            )
+        )
+        return paths
+
+    @staticmethod
+    def _policy_output_nonfinite(model: Any) -> list[str]:
+        observations = np.asarray(model.rollout_buffer.observations)
+        if observations.size == 0:
+            return ["policy.output.missing_probe_observation"]
+        probe = observations.reshape((-1, *model.observation_space.shape))[:64]
+        actions, _ = model.predict(probe, deterministic=True)
+        return [] if np.isfinite(actions).all() else ["policy.output.action"]
+
+    def _post_update_violations(self, model: Any) -> tuple[list[str], float | None]:
+        paths = self._state_nonfinite(model)
+        try:
+            paths.extend(self._policy_output_nonfinite(model))
+        except Exception as error:
+            paths.append(f"policy.output.exception:{type(error).__name__}")
+        logger_values = model.logger.name_to_value
+        approx_kl: float | None = None
+        for name in self.FINITE_METRICS:
+            if name not in logger_values:
+                paths.append(f"logger.missing:{name}")
+                continue
+            value = float(logger_values[name])
+            if not np.isfinite(value):
+                paths.append(f"logger.nonfinite:{name}")
+            if name == "train/approx_kl":
+                approx_kl = value
+        if approx_kl is not None and approx_kl > self.maximum_mean_kl:
+            paths.append(
+                f"logger.kl_spike:{approx_kl:.9g}>{self.maximum_mean_kl:.9g}"
+            )
+        return paths, approx_kl
+
+    def validate_initial_state(self, model: Any) -> None:
+        violations = self._state_nonfinite(model)
+        if violations:
+            raise ValueError(
+                "refusing training with nonfinite initial model state: "
+                + ", ".join(violations[:10])
+            )
+
+    def run_update(self, model: Any) -> None:
+        rollout_violations = self._rollout_nonfinite(model)
+        if rollout_violations:
+            raise ValueError(
+                "refusing optimizer update with nonfinite rollout: "
+                + ", ".join(rollout_violations)
+            )
+        self.validate_initial_state(model)
+        snapshot = self._snapshot(model)
+        attempted_update_count = int(model._n_updates)
+        try:
+            model.train()
+            violations, approx_kl = self._post_update_violations(model)
+        except Exception as error:
+            violations = [f"optimizer.exception:{type(error).__name__}:{error}"]
+            approx_kl = None
+        if not violations:
+            return
+
+        self._restore(model, snapshot)
+        rollback_violations = self._state_nonfinite(model)
+        try:
+            rollback_violations.extend(self._policy_output_nonfinite(model))
+        except Exception as error:
+            rollback_violations.append(
+                f"policy.output.exception:{type(error).__name__}:{error}"
+            )
+        event = {
+            "reason": "optimizer_update_rejected",
+            "model_timesteps_after_rollout": int(model.num_timesteps),
+            "n_updates_before_attempt": attempted_update_count,
+            "n_updates_after_rollback": int(model._n_updates),
+            "target_kl": model.target_kl,
+            "maximum_mean_kl": self.maximum_mean_kl,
+            "observed_mean_kl": approx_kl,
+            "violations": violations,
+            "rollback_verified": not rollback_violations,
+            "rollback_violations": rollback_violations,
+            "detected_at_unix": time.time(),
+        }
+        self.last_event = event
+        if rollback_violations:
+            raise RuntimeError(
+                "optimizer divergence rollback failed verification: "
+                + ", ".join(rollback_violations[:10])
+            )
+        raise OptimizerDivergenceError(
+            "optimizer update violated safety guard and was rolled back",
+            event,
+        )
 
 
 def atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -100,6 +282,7 @@ def learn_until_stopped(
     after_update: Callable[[], None],
     *,
     run_name: str,
+    optimizer_guard: OptimizerUpdateGuard | None = None,
 ) -> None:
     """SB3 2.9's rollout/update loop, with a stop request instead of a step cap.
 
@@ -108,6 +291,8 @@ def learn_until_stopped(
     A stop during collection discards the partial rollout, not learned weights.
     """
     require_constant_schedules(model)
+    if optimizer_guard is not None:
+        optimizer_guard.validate_initial_state(model)
     _, callback = model._setup_learn(
         model.n_steps, callback, False, run_name, False,
     )
@@ -122,7 +307,10 @@ def learn_until_stopped(
                 break
             iteration += 1
             model._current_progress_remaining = 1.0
-            model.train()
+            if optimizer_guard is None:
+                model.train()
+            else:
+                optimizer_guard.run_update(model)
             after_update()
             # Log after optimization so the latest update is not omitted at stop.
             model.dump_logs(iteration)

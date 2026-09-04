@@ -216,6 +216,30 @@ class PpoActionAuditTests(unittest.TestCase):
         for key in results[0]:
             torch.testing.assert_close(results[0][key], results[1][key], rtol=0, atol=0)
 
+    def test_nonfinite_gradient_is_rejected_before_optimizer_step(self) -> None:
+        model = AuditedKlPPO(
+            "MlpPolicy",
+            TinyContinuousEnv(),
+            n_steps=2,
+            batch_size=2,
+            n_epochs=1,
+            target_kl=0.2,
+            seed=19,
+            device="cpu",
+            verbose=0,
+        )
+        with patch(
+            "trackmania_rl.ppo_audit.th.nn.utils.clip_grad_norm_",
+            return_value=torch.tensor(float("nan")),
+        ), patch.object(
+            model.policy.optimizer,
+            "step",
+            wraps=model.policy.optimizer.step,
+        ) as optimizer_step:
+            with self.assertRaisesRegex(FloatingPointError, "gradient norm"):
+                model.learn(total_timesteps=2)
+            self.assertEqual(optimizer_step.call_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

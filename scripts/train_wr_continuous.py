@@ -26,16 +26,19 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from train_reward_v3 import close_model_logger, parse_power_setting_indices
 from trackmania_rl.continuous_training import (
     ContinuousControl, KeepAwake, atomic_json, file_sha256,
-    learn_until_stopped, require_constant_schedules, save_checkpoint,
+    OptimizerDivergenceError, OptimizerUpdateGuard, learn_until_stopped,
+    require_constant_schedules, save_checkpoint,
 )
 from trackmania_rl.env import EnvironmentConfig, TrackmaniaEnv
-from trackmania_rl.ppo_audit import BoundedPpoActionStatsCallback
+from trackmania_rl.ppo_audit import AuditedKlPPO, BoundedPpoActionStatsCallback
 from trackmania_rl.rewards import signed_progress_efficiency_reward
 
 BASE = ROOT / "checkpoints/wr_chase_stage1/gate_01000000_model.zip"
 BASE_HASH = "BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044"
 BASE_STEPS = 3_004_416
 REWARD = "clip(progress_delta, -20, 20) / 10 - 0.10 + 50 on finish - 250 on verified failure"
+TARGET_KL = 0.20
+MAXIMUM_MEAN_KL = 0.50
 
 
 def verify_power() -> dict:
@@ -167,6 +170,7 @@ def main() -> int:
                 "core_sha256": file_sha256(ROOT / "src/trackmania_rl/continuous_training.py")}
     atomic_json(run_dir / "run_manifest.json", manifest)
     env = model = None
+    optimizer_guard = OptimizerUpdateGuard(maximum_mean_kl=MAXIMUM_MEAN_KL)
     audit = BoundedPpoActionStatsCallback()
     def interrupt(*_):
         control.stop_reason = "interrupt_requested"
@@ -187,10 +191,11 @@ def main() -> int:
                 map_to_load=None, auto_respawn_on_connect=True,
             ), reward_function=signed_progress_efficiency_reward)
             env = base_env
-            model = PPO.load(BASE, device="cpu")
+            model = AuditedKlPPO.load(BASE, device="cpu")
             require_constant_schedules(model)
             if model.num_timesteps != BASE_STEPS or model.target_kl is not None:
                 raise ValueError("unexpected base timestep or KL setting")
+            model.target_kl = TARGET_KL
             if not model.use_sde or not model.policy.squash_output:
                 raise ValueError("expected bounded gSDE PPO")
             manifest["warmup"] = warmup(model, env, control, 60.0)
@@ -219,15 +224,45 @@ def main() -> int:
                 "sde_sample_freq", "max_grad_norm",
             )}
             manifest["ppo"]["clip_range"] = float(model.clip_range(1))
+            manifest["optimizer_protection"] = {
+                "implementation": "pre-update in-memory snapshot, post-update finite-state/output/metric validation, exact rollback and controlled stop",
+                "target_kl": TARGET_KL,
+                "built_in_minibatch_early_stop_threshold": 1.5 * TARGET_KL,
+                "maximum_mean_kl": MAXIMUM_MEAN_KL,
+                "historical_selection_basis": (
+                    "stable-prefix approximate-KL p99 was 0.254; the failed run "
+                    "first exceeded 1 before exploding"
+                ),
+            }
             atomic_json(run_dir / "run_manifest.json", manifest)
             learn_until_stopped(model, CallbackList([audit, control]),
                                 control.should_stop, control.after_update,
-                                run_name=args.run_name)
+                                run_name=args.run_name,
+                                optimizer_guard=optimizer_guard)
             control.latest_checkpoint = save_checkpoint(
                 model, checkpoints / "final_model.zip", learned_through=control.learned_through,
             )
             control.write_status("stopped", action_validation=audit.summary() if audit.records_checked else None)
             manifest["status"] = "stopped"
+    except OptimizerDivergenceError as error:
+        control.stop_reason = "optimizer_guard_rollback"
+        rollback = save_checkpoint(
+            model,
+            checkpoints / "rollback_model.zip",
+            learned_through=control.learned_through,
+        )
+        control.latest_checkpoint = rollback
+        control.write_status(
+            "guarded_stop",
+            guard_event=error.event,
+            rollback_checkpoint=rollback,
+        )
+        manifest.update(
+            status="guarded_stop",
+            guard_event=error.event,
+            rollback_checkpoint=rollback,
+        )
+        return 2
     except BaseException as error:
         extra = {"error": repr(error)}
         if model is not None and control.updates > 0:

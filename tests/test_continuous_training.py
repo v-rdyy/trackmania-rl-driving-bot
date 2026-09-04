@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from trackmania_rl.continuous_training import (
     ContinuousControl, atomic_json, file_sha256, learn_until_stopped,
-    require_constant_schedules, save_checkpoint,
+    OptimizerDivergenceError, OptimizerUpdateGuard, require_constant_schedules,
+    save_checkpoint,
 )
 
 
@@ -93,6 +94,93 @@ class ContinuousTests(unittest.TestCase):
         model.lr_schedule = lambda remaining: 0.001 * remaining
         with self.assertRaises(ValueError):
             require_constant_schedules(model)
+
+    def test_guard_rolls_back_rejected_update_exactly(self):
+        model = make_model()
+        before_policy = {
+            key: value.clone() for key, value in model.policy.state_dict().items()
+        }
+        original_train = model.train
+
+        def divergent_train():
+            original_train()
+            model.logger.record("train/approx_kl", 9.0)
+            with torch.no_grad():
+                next(model.policy.parameters()).fill_(torch.nan)
+
+        model.train = divergent_train
+        guard = OptimizerUpdateGuard(maximum_mean_kl=0.5)
+        with self.assertRaises(OptimizerDivergenceError) as raised:
+            learn_until_stopped(
+                model,
+                KeepGoing(),
+                lambda: False,
+                lambda: None,
+                run_name="test",
+                optimizer_guard=guard,
+            )
+        self.assertTrue(raised.exception.event["rollback_verified"])
+        self.assertTrue(
+            any("policy" in value for value in raised.exception.event["violations"])
+        )
+        for key, expected in before_policy.items():
+            torch.testing.assert_close(
+                model.policy.state_dict()[key], expected, rtol=0, atol=0
+            )
+
+    def test_guard_rejects_nonfinite_rollout_before_optimizer(self):
+        model = make_model()
+        guard = OptimizerUpdateGuard(maximum_mean_kl=0.5)
+        _, callback = model._setup_learn(  # noqa: SLF001 - guard unit fixture
+            model.n_steps, KeepGoing(), False, "test", False
+        )
+        callback.on_training_start(locals(), globals())
+        try:
+            self.assertTrue(
+                model.collect_rollouts(
+                    model.env,
+                    callback,
+                    model.rollout_buffer,
+                    n_rollout_steps=model.n_steps,
+                )
+            )
+            model.rollout_buffer.advantages[0] = np.nan
+            with self.assertRaisesRegex(ValueError, "nonfinite rollout"):
+                guard.run_update(model)
+        finally:
+            callback.on_training_end()
+
+    def test_guard_rolls_back_finite_kl_spike(self):
+        model = make_model()
+        before_policy = {
+            key: value.clone() for key, value in model.policy.state_dict().items()
+        }
+        original_train = model.train
+
+        def high_kl_train():
+            original_train()
+            model.logger.record("train/approx_kl", 0.75)
+
+        model.train = high_kl_train
+        guard = OptimizerUpdateGuard(maximum_mean_kl=0.5)
+        with self.assertRaises(OptimizerDivergenceError) as raised:
+            learn_until_stopped(
+                model,
+                KeepGoing(),
+                lambda: False,
+                lambda: None,
+                run_name="test",
+                optimizer_guard=guard,
+            )
+        self.assertTrue(raised.exception.event["rollback_verified"])
+        self.assertEqual(raised.exception.event["observed_mean_kl"], 0.75)
+        self.assertTrue(
+            any("kl_spike" in value for value in raised.exception.event["violations"])
+        )
+        for key, expected in before_policy.items():
+            torch.testing.assert_close(
+                model.policy.state_dict()[key], expected, rtol=0, atol=0
+            )
 
     def test_low_disk_fails_before_checkpoint(self):
         with tempfile.TemporaryDirectory() as tmp:

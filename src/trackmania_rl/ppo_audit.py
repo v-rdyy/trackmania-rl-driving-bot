@@ -97,6 +97,10 @@ class AuditedKlPPO(PPO):
                     + self.ent_coef * entropy_loss
                     + self.vf_coef * value_loss
                 )
+                if not th.isfinite(loss):
+                    raise FloatingPointError(
+                        "nonfinite PPO loss before optimizer step"
+                    )
 
                 with th.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
@@ -122,10 +126,14 @@ class AuditedKlPPO(PPO):
 
                 self.policy.optimizer.zero_grad()
                 loss.backward()
-                th.nn.utils.clip_grad_norm_(
+                gradient_norm = th.nn.utils.clip_grad_norm_(
                     self.policy.parameters(),
                     self.max_grad_norm,
                 )
+                if not th.isfinite(gradient_norm):
+                    raise FloatingPointError(
+                        "nonfinite PPO gradient norm before optimizer step"
+                    )
                 self.policy.optimizer.step()
 
             self._n_updates += 1
