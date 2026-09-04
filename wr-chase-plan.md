@@ -1865,6 +1865,26 @@ Evidence:
 - analysis summary SHA-256:
   `575233C8ABB78978B49159B7DD002338510BCCE626175F1338BCC53056D473C4`.
 
+#### Stage 2b post-pause alignment diagnosis
+
+The 2026-09-03 read-only diagnosis is recorded in
+[the alignment and KL report](docs/stage2b-alignment-diagnosis.md).
+Saved direct-live trajectories show a changed launch direction for the long
+final jump: approximately 0.59 degrees of horizontal velocity heading and
+29% greater lateral velocity at takeoff, followed by a worse landing line and
+an abrupt near-stop at the final structure. Bonus-zone speed and bonus yield
+remain essentially unchanged. The bonus is not proven to have caused the
+line change; the policies already differ before entering its zone.
+
+An offline test confirms the KL guard matches stock PPO's early-stop behavior.
+It reduced optimization to 159 minibatch steps, but does not roll back earlier
+steps or constrain cumulative distance from the original reliable policy.
+Saved policy probes demonstrate cumulative drift; they cannot establish that
+all 25 updates moved in a consistently harmful direction. Stochastic training
+still finished 184/195 episodes, unlike the final deterministic 0/10 result.
+No new training, zone change, bonus retuning, or KL change is authorized by this
+diagnosis. The original safety pause and registered reward remain unchanged.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
