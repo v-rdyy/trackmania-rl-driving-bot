@@ -55,17 +55,21 @@ excluded from that estimate. Retain original checkpoints and all new intervals.
 An abrupt crash can still lose interactions since the last valid checkpoint;
 250k spacing bounds that normal recovery gap to roughly 11-14 minutes.
 
-## Proposed launch contract, awaiting readiness confirmation
+## Approved launch contract
 
-- Suggested base: the last reliable pure-discovery checkpoint, Stage 1 Gate 2,
+The owner subsequently approved running **until they request stop**, not until a
+fixed morning time, and confirmed readiness to launch on 2026-09-04. The start
+still depends on the current-host live preflight succeeding.
+
+- Selected base: the last reliable pure-discovery checkpoint, Stage 1 Gate 2,
   `checkpoints/wr_chase_stage1/gate_01000000_model.zip`, rather than either
   Stage 2b model. It was trained with V4 reward only and measured 10/10
-  deterministic finishes. This is a proposed base, not a newly selected
+  deterministic finishes. This is a pre-run selection, not a newly selected
   checkpoint after overnight results.
   SHA-256: `BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044`.
 - Keep the original Stage 1 PPO/gSDE settings and V4 reward. Do not silently
   inherit the Stage 2b graduated bonus, anchor, or optimizer changes.
-- Use a separate run directory and a continuous time-bounded learner, not the
+- Use a separate run directory and a continuous stop-request-controlled learner, not the
   existing gate runner (which intentionally requires evaluation between gates).
 - Save every nominal 250k interactions without evaluation pauses; include
   optimizer state, hashes, and completed-update timing. Also save on clean exit.
@@ -84,9 +88,53 @@ An abrupt crash can still lose interactions since the last valid checkpoint;
   service is needed overnight. Codex usage is for setup and later analysis,
   not the local PPO computation itself. Keep the host and game running.
 
-The owner still needs to confirm readiness and the intended duration/morning
-stop time. No overnight runner has been implemented or launched in this
-preflight turn, and no fresh throughput or overnight stability result is claimed.
+## Continuous implementation and frozen hypothesis
+
+Hypothesis carried forward unchanged: "Given sufficient training time, the
+existing progress-based reward may be sufficient for the agent to discover
+slip-angle/drift behavior near the first turn and/or final corner unassisted,
+similar to Yosh's AI, but is expected to plateau below world-record pace without
+targeted assistance."
+
+This extends the budget, not the reward or observation/action definitions. The
+prior 2M-interaction plateau remains a valid budget-limited result. No guaranteed
+discovery, lap-time target, or training-performance stopping threshold is added.
+
+`scripts/train_wr_continuous.py` uses a separate run directory and the unmodified
+stock PPO rollout collector and optimizer in an end-condition-free loop. Fixed
+learning rate 0.0003, clip 0.2, 2048 rollout steps, batch 64, 10 epochs, gamma 0.99,
+GAE 0.95, entropy coefficient 0, value coefficient 0.5, gradient norm 0.5,
+gSDE refresh every 4 steps, and target_kl=None are inherited from the pinned base.
+Nonconstant schedules are rejected because an indefinite run has no percentage
+of budget remaining. No Stage 2b optimizer guard is inherited.
+
+Periodic saves occur immediately after the update crossing each nominal 250k
+boundary (at most 2047 interactions late). Archives include optimizer state,
+are CRC-checked, and have SHA-256 sidecars recording collected versus actually
+learned-through timesteps. A stop during rollout preserves learned weights and
+records the discarded, unlearned partial rollout honestly. Checkpoint writes use
+a temporary archive before publishing the finished file; older evidence is never
+overwritten. A health failure attempts a distinctly labeled emergency save,
+without automatically restarting or rolling back.
+
+The 60-second no-learning live warm-up requires at least 20 completed episodes,
+at least one finish, finite data, and successful reset/rewind cycles at 100x.
+This verifies present operation, not guaranteed overnight stability. Game/A01
+setup occurs before the runner, so the long-running process needs no UI inputs.
+
+`stop-training.cmd` in the project root locates the one matching live trainer
+and writes its stop request. The owner can double-click it without Codex. A
+chat request to stop will use the same mechanism; neither method force-kills
+Python. Local `status.json` is refreshed every 30 seconds, with compact Monitor
+and TensorBoard logs. There is no recurring Codex task or overnight API call.
+
+Selected real game input replays are saved before reset: improving finishes in
+each 250k block, a sample every 1000 episodes, and the first failure per block.
+These support later videos, not slide verification. Future discovery evaluation
+still requires the frozen direct-live SimState contract; stochastic training
+finishes or input replay telemetry alone cannot prove a beneficial slide.
+
+Launch status and fresh results will be recorded below only after observation.
 
 ## Notable moments
 

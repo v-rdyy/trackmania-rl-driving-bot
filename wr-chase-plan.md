@@ -1913,7 +1913,7 @@ blocking useful slide-exit adaptations. This is a feasibility assessment only:
 no anchor coefficient or boundary has been selected, no loss was implemented,
 and training remains paused under the existing safety gate.
 
-#### New direction: continuous overnight pure discovery, not started
+#### New direction: continuous pure discovery until owner stop
 
 On 2026-09-04 the owner redirected the next experiment away from Stage 2b
 bonus/anchoring work to a substantially longer uninterrupted run with unchanged
@@ -1928,9 +1928,14 @@ preserved for restoration. Disk headroom is approximately 478 GiB. Historical
 full-PPO pure-discovery throughput is about 379 interactions/s, supporting a
 planning estimate of 8.6-10.9 million additional interactions over eight hours.
 This is not a fresh benchmark or a claim of proven overnight uptime: a live
-100x warm-up remains required. The owner has not yet confirmed launch readiness
-or an overnight duration/stop time. No overnight training has begun, and this
-new experiment must not overwrite or resume the failed Stage 2b evidence.
+100x warm-up remains required. The owner subsequently approved running until
+they request stop and confirmed readiness to launch. The separate continuous
+runner retains original V4/Stage 1 PPO settings, checks current-host power and
+the live connection before learning, saves after updates crossing nominal 250k
+boundaries, and supports a local clean stop independent of Codex. The preflight
+document freezes the carried-forward hypothesis and implementation details.
+Actual launch results must be recorded after observation; this experiment must
+not overwrite or resume the failed Stage 2b evidence.
 
 ## Realistic expectation
 
