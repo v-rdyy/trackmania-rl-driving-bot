@@ -4,10 +4,12 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
+import torch
 from stable_baselines3 import PPO
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
@@ -173,6 +175,46 @@ class PpoActionAuditTests(unittest.TestCase):
         self.assertEqual(len(model.kl_update_audit), 1)
         self.assertEqual(model.kl_update_audit[0]["epochs_completed"], 3)
         self.assertEqual(model.kl_update_audit[0]["model_timesteps"], 2)
+
+    def test_kl_stop_matches_sb3_skips_triggering_batch_without_rollback(self) -> None:
+        """A controlled second-batch overshoot retains batch one's Adam step.
+
+        This is an offline toy-environment guard test, not Trackmania training.
+        Compare all resulting weights against the installed SB3 implementation.
+        """
+        results = []
+        for model_class in (PPO, AuditedKlPPO):
+            model = model_class(
+                "MlpPolicy", TinyContinuousEnv(), n_steps=4, batch_size=2,
+                n_epochs=3, target_kl=.01, seed=91, device="cpu", verbose=0,
+                ent_coef=.01,
+            )
+            before = {k: v.clone() for k, v in model.policy.state_dict().items()}
+            original_evaluate = model.policy.evaluate_actions
+            calls = 0
+
+            def controlled_evaluate(*args, **kwargs):
+                nonlocal calls
+                calls += 1
+                values, log_prob, entropy = original_evaluate(*args, **kwargs)
+                if calls == 2:
+                    log_prob = log_prob + 1.0  # Known above-threshold KL.
+                return values, log_prob, entropy
+
+            with patch.object(model.policy, "evaluate_actions", side_effect=controlled_evaluate), patch.object(
+                model.policy.optimizer, "step", wraps=model.policy.optimizer.step
+            ) as optimizer_step:
+                model.learn(total_timesteps=4)
+                self.assertEqual(calls, 2)
+                self.assertEqual(optimizer_step.call_count, 1)
+            after = {k: v.clone() for k, v in model.policy.state_dict().items()}
+            self.assertTrue(any(not torch.equal(before[k], after[k]) for k in before))
+            if isinstance(model, AuditedKlPPO):
+                self.assertTrue(model.kl_update_audit[0]["kl_early_stop"])
+                self.assertEqual(model.kl_update_audit[0]["epochs_completed"], 0)
+            results.append(after)
+        for key in results[0]:
+            torch.testing.assert_close(results[0][key], results[1][key], rtol=0, atol=0)
 
 
 if __name__ == "__main__":
