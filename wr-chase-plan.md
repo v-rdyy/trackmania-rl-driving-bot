@@ -1885,6 +1885,34 @@ still finished 184/195 episodes, unlike the final deterministic 0/10 result.
 No new training, zone change, bonus retuning, or KL change is authorized by this
 diagnosis. The original safety pause and registered reward remain unchanged.
 
+#### Stage 2b finer-checkpoint audit and recurring final-alignment fragility
+
+The 2026-09-04 [sub-checkpoint and anchoring review](docs/stage2b-subcheckpoint-and-anchor-review.md)
+found no historical 10k, 20k, 30k, or 40k policies: the accepted run saved every
+50k interactions. Its surviving periodic snapshot contains 24 completed updates
+(49,152 interactions learned through), and already shows pre-zone action drift
+on identical baseline states. The final 25th update did not originate that
+action difference, but gradual versus sudden onset earlier in the run is
+unresolved. These offline probes are not an intermediate driven trajectory.
+Scalar logs and rejected-attempt checkpoints cannot fill the missing timeline.
+
+This is the **third distinct recurrence of fragility in the same final-alignment
+section** in the requested sequence: V3's original collision/low-hoop issue,
+Stage 2's optimizer-associated collapse, and now Stage 2b's changed launch line.
+Treat this as recurring structural fragility in that part of the policy, not
+three unrelated incidents or proof of one shared cause. Preserve the important
+V3 qualification: its original finish deficit was confounded by the fall
+detector, and the unchanged model finished 20/20 after correction. The recurrent
+precision concern must not be rewritten as three identical verified collapses.
+
+A frozen-Gate-500k action-matching auxiliary loss is technically feasible as a
+candidate mitigation, but protecting only the late airborne approach would not
+address the measured launch-direction error. The review discusses protected
+grounded setup plus final correction, fixed rehearsal states, and the risk of
+blocking useful slide-exit adaptations. This is a feasibility assessment only:
+no anchor coefficient or boundary has been selected, no loss was implemented,
+and training remains paused under the existing safety gate.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop
