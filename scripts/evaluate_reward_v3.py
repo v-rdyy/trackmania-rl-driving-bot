@@ -52,6 +52,9 @@ EXPECTED_CHECKPOINT_SHA256: str | None = None
 POLICY_DETERMINISTIC = True
 POLICY_RANDOM_SEED: int | None = None
 POLICY_SDE_SAMPLE_FREQ: int | None = None
+SIMULATION_SPEED = 6.0
+AUTO_RESPAWN_ON_CONNECT = False
+WAIT_FOR_RACE_START_ON_CONNECT = True
 
 
 def policy_mode_label() -> str:
@@ -406,14 +409,14 @@ def main() -> int:
         env = TrackmaniaEnv(
             config=EnvironmentConfig(
                 port=args.port,
-                simulation_speed=6.0,
+                simulation_speed=SIMULATION_SPEED,
                 stuck_window_ms=2_000,
                 stuck_progress_gain_units=1.0,
                 stuck_world_distance_units=2.0,
                 legacy_reversed_pedal_mapping=False,
                 map_to_load=MAP_TO_LOAD,
-                auto_respawn_on_connect=False,
-                wait_for_race_start_on_connect=True,
+                auto_respawn_on_connect=AUTO_RESPAWN_ON_CONNECT,
+                wait_for_race_start_on_connect=WAIT_FOR_RACE_START_ON_CONNECT,
             ),
             reward_function=REWARD_FUNCTION,
             action_log_path=args.action_log,
