@@ -119,14 +119,21 @@ def slide_summary(action_log: Path) -> dict[str, Any]:
 
 def evaluate_item(item: dict[str, Any], *, postprocess: bool = False) -> dict[str, Any]:
     paths = configure(item)
-    sys.argv = [sys.argv[0], "--checkpoint", str(item["path"]),
-                "--episodes", str(EXPECTED_EPISODES), "--action-log", str(paths["action_log"]),
-                "--summary", str(paths["summary"]), "--replay-dir", str(paths["replay_dir"]),
-                "--run-tag", item["label"], "--reuse-game"]
-    if postprocess:
-        sys.argv.append("--postprocess-existing")
-    if evaluator.main() != 0:
-        raise RuntimeError(f"evaluation failed: {item['label']}")
+    replay_count = len(list(paths["replay_dir"].glob("*.txt")))
+    completed = paths["summary"].is_file() and paths["action_log"].is_file()
+    if completed != (replay_count == EXPECTED_EPISODES):
+        raise RuntimeError(f"partial evaluation needs manual review: {item['label']}")
+    if not completed:
+        sys.argv = [sys.argv[0], "--checkpoint", str(item["path"]),
+                    "--episodes", str(EXPECTED_EPISODES), "--action-log", str(paths["action_log"]),
+                    "--summary", str(paths["summary"]), "--replay-dir", str(paths["replay_dir"]),
+                    "--run-tag", item["label"], "--reuse-game"]
+        if postprocess:
+            sys.argv.append("--postprocess-existing")
+        if evaluator.main() != 0:
+            raise RuntimeError(f"evaluation failed: {item['label']}")
+    else:
+        print(f"reusing completed evaluation: {item['label']}", flush=True)
     summary = json.loads(paths["summary"].read_text(encoding="utf-8"))
     return {"label": item["label"],
             "additional_interactions": item["additional_interactions"],
@@ -135,7 +142,7 @@ def evaluate_item(item: dict[str, Any], *, postprocess: bool = False) -> dict[st
             "best_finish_time_ms": summary["best_finish_time_ms"],
             "average_finish_time_ms": summary["average_finish_time_ms"],
             "worst_finish_time_ms": summary["worst_finish_time_ms"],
-            "precision": summary["precision_metrics"],
+            "precision": summary["precision_summary"],
             "episodes_detail": summary["episodes_detail"],
             "slide_detection": slide_summary(paths["action_log"]),
             "evaluation_summary": str(paths["summary"].relative_to(ROOT)),
@@ -146,8 +153,8 @@ def evaluate_item(item: dict[str, Any], *, postprocess: bool = False) -> dict[st
 
 def main() -> int:
     inventory = checkpoint_inventory()
-    if RUN_DIR.exists():
-        raise FileExistsError(f"refusing to overwrite retrospective: {RUN_DIR}")
+    if (RUN_DIR / "retrospective.json").exists():
+        raise FileExistsError(f"refusing to overwrite completed retrospective: {RUN_DIR}")
     results = [evaluate_item(item) for item in inventory]
     aggregate = {"source_run": SOURCE_RUN, "evaluation_protocol": "10 deterministic episodes each at 100x",
                  "checkpoints": results,

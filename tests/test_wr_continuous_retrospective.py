@@ -30,6 +30,13 @@ class RetrospectiveTests(unittest.TestCase):
         self.assertFalse(MODULE.evaluator.WAIT_FOR_RACE_START_ON_CONNECT)
         self.assertIs(MODULE.evaluator.REWARD_FUNCTION, MODULE.signed_progress_efficiency_reward)
 
+    def test_completed_base_evaluation_can_resume_without_overwrite(self):
+        base = MODULE.checkpoint_inventory()[0]
+        result = MODULE.evaluate_item(base)
+        self.assertEqual(result["label"], "base")
+        self.assertEqual(result["finishes"], 10)
+        self.assertIn("oscillation_detected_episodes", result["precision"])
+
 
 if __name__ == "__main__":
     unittest.main()
