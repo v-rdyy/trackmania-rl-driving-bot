@@ -1,9 +1,10 @@
 # A01 world-record chase: staged discovery plan
 
-Status: Stage 2b approved and running. The frozen graduated reward, audited
-`target_kl = 0.01` optimizer guard, 50,000-interaction gates, and live stop-rule
-analyzer are implemented. The target-zero instrumentation baseline passed at
-`9/10` finishes with zero accepted onset, so Gate 50,000 is authorized.
+Status: Stage 2b paused at the first trained gate under the frozen safety rule.
+The target-zero baseline finished `9/10`, but Gate 50,000 finished `0/10`; all
+ten deterministic episodes became stuck at the same final-structure approach.
+Accepted slide onset and precursor p95 both remained flat. Gate 100,000 is not
+authorized while this safety result is under review.
 
 Date pre-registered: 2026-08-26
 
@@ -1777,12 +1778,92 @@ Evidence:
 - implementation commits `29dbd97`, `3560a97`, and `f3a1509`;
 - live-baseline path correction commit `2704189`;
 - evaluation summary SHA-256:
-  `42FC6890470A23116DE984A23EFD0110D85F7F67F859D95CEBE11A147DD3B406`;
+  `AA07F4F545710BFD7B41ADE4E96039FED91396A491AAF82C8D42BBE905E9556F`;
 - direct-live action log SHA-256:
   `D86C871CF696E2BFFDBDBC00F03194B54107967BE13E6EEF006C222319C4D451`;
   and
 - analysis summary SHA-256:
   `0F98307D67492A6B76C1D612C23C717F8ACB5A7A0C8DDEF48BE6EEEE094C9C67`.
+
+The evaluation-summary checksum above identifies the final file after the
+Stage 2b wrapper binds its audit metadata, correcting the earlier recorded
+checksum of the generic evaluator's intermediate output.
+
+#### Stage 2b Gate 50,000: immediate safety pause
+
+The first accepted training gate ran for `51,200` actual interactions, the
+minimum 25 complete 2,048-step rollouts that pass the nominal 50,000 boundary.
+It loaded the exact registered Stage 2 Gate 500,000 checkpoint and saved a new
+optimizer-bearing checkpoint at model timestep `3,557,376`.
+
+The conservative optimizer guard was active rather than nominal. All `25/25`
+rollout updates tripped the KL early-stop during the first scheduled PPO epoch;
+no update completed a full epoch, versus ten scheduled epochs without the
+guard. The triggering minibatch KL values ranged from `0.01562` to `0.04337`,
+while SB3's logged per-update final-epoch mean approximate KL ranged from
+`0.00434` to `0.01145`. Every update has a matching embedded audit row and
+TensorBoard scalar row, including the final update.
+
+The frozen deterministic evaluation nevertheless failed the safety gate:
+
+- `0/10` finishes, so there are no best, mean, or worst finish times;
+- all ten episodes terminated as stuck, with no fall or off-track termination;
+- all ten failures share the registered fixed-location signature
+  `stuck@progress_2150_2175`, reaching maximum progress `2161.92-2169.23` and
+  terminal lateral offset `-19.08` to `-27.09`;
+- accepted and raw slide onset stayed flat at `0/10`, with zero final-corner
+  sliding-wheel samples and zero above-envelope near misses;
+- precursor score was `0.1606` p50, `0.1681` p95, and `0.1685` maximum, versus
+  baseline `0.1623`, `0.1687`, and `0.1690`;
+- total graduated bonus was `10.1598`, versus baseline `10.1652`;
+- final-zone traversal remained `2.500s` in every episode, with sampled entry
+  speed `434` and exit speed `475-476`; and
+- oscillation remained present in `10/10`, mean p95 absolute lateral offset
+  worsened to `22.50`, one episode inverted, and all ten contained a detected
+  stuck period totaling `21.0s`.
+
+Thus the reward did not move the measured precursor distribution before the
+mean policy lost its reliable final alignment. The result satisfies two
+independent frozen pause conditions: `0/10` finishes and a repeated
+fixed-location stuck failure in `10/10`. Stage 2b stops at Gate 50,000; Gate
+100,000 must not run without a separately approved response to this result.
+
+One earlier Gate 50,000 attempt was rejected before evaluation because its
+final PPO update remained buffered instead of being written to TensorBoard.
+That model was not selected or evaluated. Its model, monitor, training summary,
+TensorBoard log, and manifest snapshot are preserved under
+`wr_chase_stage2b_invalid_missing_final_audit_20260902` archives. The accepted
+rerun added an explicit final logger flush and an embedded per-update audit,
+then restarted from the original registered base.
+
+The high-, median-, and low-progress input replays are preserved as episodes
+1, 7, and 4 respectively. Clean MP4 rendering was attempted only after the
+safety result. A process inventory found two leftover TMNF instances during
+failed capture retries; whether they caused the earlier socket aborts remains
+unresolved, because capture also failed after restarting with a single instance.
+Matching the capture duration to the replay end did not resolve the abort,
+either. A proposed bridge-disconnect capture mode then recorded the user's
+foreground app while TMNF was tabbed out. Sampled frames verified that capture
+problem, but did not establish why the bridge disconnected. That accidental
+foreground footage and sampled frames were removed rather than retained. The failed capture mode remains
+visible in commits `ec11e53` and `682dfef`, but is not active. Clean MP4s remain
+pending resolution of the capture failure and a short interval in which TMNF
+can stay foreground; this does not affect the direct-live result or replay evidence.
+
+Evidence:
+
+- complete per-update audit fix: commit `431c991`;
+- Gate 50,000 checkpoint SHA-256:
+  `1FD54344AA00DD4283FEF3F64150429806927F625CC93055D8D45F47EEE17425`;
+- training summary SHA-256:
+  `1E774950E9D029A20C9C832B71CDFD1F9C8C0C8BB5641BD34C1EDADE7B1F3F4E`;
+- deterministic evaluation summary SHA-256:
+  `B3CA91BFC1595A2387BFFA1956B514500E5B33251F76A637B8F96CEA66A0894C`;
+- direct-live action log SHA-256:
+  `54D10399FB290325DBADA58A5CD3C3FA0110F355C533600396C033103E3AF009`;
+  and
+- analysis summary SHA-256:
+  `575233C8ABB78978B49159B7DD002338510BCCE626175F1338BCC53056D473C4`.
 
 ## Realistic expectation
 
