@@ -128,7 +128,7 @@ def evaluate_item(item: dict[str, Any], *, postprocess: bool = False) -> dict[st
         sys.argv = [sys.argv[0], "--checkpoint", str(item["path"]),
                     "--episodes", str(EXPECTED_EPISODES), "--action-log", str(paths["action_log"]),
                     "--summary", str(paths["summary"]), "--replay-dir", str(paths["replay_dir"]),
-                    "--run-tag", item["label"], "--reuse-game"]
+                    "--run-tag", f"{item['label']}_{EVALUATION_SPEED:g}x", "--reuse-game"]
         if postprocess:
             sys.argv.append("--postprocess-existing")
         if evaluator.main() != 0:
