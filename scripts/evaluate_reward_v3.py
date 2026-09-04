@@ -590,7 +590,7 @@ def main() -> int:
             "use_sde": not POLICY_DETERMINISTIC,
             "sde_sample_freq": POLICY_SDE_SAMPLE_FREQ,
         },
-        "simulation_speed": 6.0,
+        "simulation_speed": float(SIMULATION_SPEED),
         "checkpoint": str(args.checkpoint.relative_to(WORKSPACE_ROOT)),
         "checkpoint_sha256": checkpoint_hash,
         "run_tag": args.run_tag,
