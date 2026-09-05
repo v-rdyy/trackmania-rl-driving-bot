@@ -3,7 +3,9 @@
 Date completed: 2026-09-05
 
 Status: both infrastructure blockers from the failed continuous run are fixed.
-Training has not been restarted.
+After this report and a fresh owner approval, the separate
+[verified-2x replacement run](continuous-pure-discovery-verified2x-launch.md)
+launched from the original reliable base; the failed run itself was not resumed.
 
 ## Physics result
 

@@ -8,7 +8,8 @@ stop at each checkpoint. Training must not start until the owner confirms readin
 and is complete, not resumable. The replacement runner is pinned to live-
 verified `2x` physics and has transactional optimizer rollback protection. See
 [the fidelity and hardening report](simulation-speed-fidelity.md). No replacement
-training has started; fresh owner readiness is still required.
+training had started at the time of that report. The owner subsequently approved
+the [verified-2x launch](continuous-pure-discovery-verified2x-launch.md).
 
 ## Host checks before launch
 

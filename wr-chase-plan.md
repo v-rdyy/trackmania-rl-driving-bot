@@ -1988,6 +1988,13 @@ run remains preserved as an infrastructure-confounded attempt, not evidence
 that a genuinely long pure-discovery budget cannot work. No replacement
 training was started during this fix.
 
+After the owner explicitly approved the repaired setup, the separate
+[verified-2x continuous run](docs/continuous-pure-discovery-verified2x-launch.md)
+launched on 2026-09-05. Its second 20-lap preflight passed, and the first guarded
+PPO update completed with finite mean KL `0.019714`. It runs for one uninterrupted
+eight-hour session unless a safety guard ends it first; deterministic slide and
+progression evaluation follows the graceful stop.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop

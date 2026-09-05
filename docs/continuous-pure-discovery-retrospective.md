@@ -13,8 +13,9 @@ length pure-discovery hypothesis. Only its finite prefix is usable, and its
 `100x` training/evaluation domain is not playable-physics faithful. The
 [live fidelity and numerical-hardening report](simulation-speed-fidelity.md)
 pins the replacement runner to `2x` and adds exact pre-update rollback. Pure
-discovery remains the approved experiment direction after a fresh launch
-confirmation; no replacement training has started.
+discovery remained the approved experiment direction; after a fresh launch
+confirmation it began as the separate
+[verified-2x run](continuous-pure-discovery-verified2x-launch.md).
 
 ## Outcome
 
