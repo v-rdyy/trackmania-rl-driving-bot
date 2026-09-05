@@ -15,7 +15,6 @@ from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
-from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CallbackList
 from stable_baselines3.common.monitor import Monitor
 
@@ -39,6 +38,41 @@ BASE_STEPS = 3_004_416
 REWARD = "clip(progress_delta, -20, 20) / 10 - 0.10 + 50 on finish - 250 on verified failure"
 TARGET_KL = 0.20
 MAXIMUM_MEAN_KL = 0.50
+VERIFIED_SPEED_CONFIG = ROOT / "config/verified_simulation_speed.json"
+MAXIMUM_VERIFIED_SIMULATION_SPEED = 2.0
+
+
+def load_verified_speed_config(
+    config_path: Path = VERIFIED_SPEED_CONFIG,
+    *,
+    evidence_root: Path = ROOT,
+) -> dict:
+    """Load the pinned live-fidelity result and reject unverified acceleration."""
+    value = json.loads(config_path.read_text(encoding="utf-8"))
+    speed = float(value["verified_simulation_speed"])
+    if int(value.get("schema_version", -1)) != 1:
+        raise ValueError("unsupported verified-speed config schema")
+    if speed != MAXIMUM_VERIFIED_SIMULATION_SPEED:
+        raise ValueError(
+            f"runner is pinned to verified {MAXIMUM_VERIFIED_SIMULATION_SPEED:g}x, "
+            f"not {speed:g}x"
+        )
+    root = evidence_root.resolve()
+    evidence = (root / value["study_summary"]).resolve()
+    try:
+        evidence.relative_to(root)
+    except ValueError as error:
+        raise ValueError("verified-speed evidence must stay inside the workspace") from error
+    if not evidence.is_file():
+        raise FileNotFoundError(f"verified-speed evidence is missing: {evidence}")
+    observed_hash = file_sha256(evidence)
+    if observed_hash != value["study_summary_sha256"]:
+        raise ValueError("verified-speed evidence hash changed")
+    summary = json.loads(evidence.read_text(encoding="utf-8"))
+    if float(summary["verified_simulation_speed"]) != speed:
+        raise ValueError("verified-speed evidence does not support configured speed")
+    value["evidence_absolute_path"] = str(evidence)
+    return value
 
 
 def verify_power() -> dict:
@@ -118,9 +152,27 @@ class ReplayEvidence(gym.Wrapper):
         return result
 
 
-def warmup(model, env, control, seconds: float) -> dict:
+def warmup_timeout_budget(
+    seconds: float,
+    simulation_speed: float,
+    *,
+    minimum_episodes: int = 20,
+    maximum_episode_ms: int = 45_000,
+) -> float:
+    if seconds <= 0 or simulation_speed <= 0:
+        raise ValueError("warm-up duration and simulation speed must be positive")
+    if minimum_episodes <= 0 or maximum_episode_ms <= 0:
+        raise ValueError("warm-up episode requirements must be positive")
+    episode_budget = minimum_episodes * maximum_episode_ms / (
+        1_000.0 * simulation_speed
+    )
+    return max(seconds + 120.0, episode_budget + 60.0)
+
+
+def warmup(model, env, control, seconds: float, simulation_speed: float) -> dict:
     obs, _ = env.reset()
     start = time.monotonic()
+    timeout_budget = warmup_timeout_budget(seconds, simulation_speed)
     steps = episodes = finishes = 0
     while time.monotonic() - start < seconds or episodes < 20:
         if control.should_stop():
@@ -134,14 +186,15 @@ def warmup(model, env, control, seconds: float) -> dict:
             episodes += 1
             finishes += int(terminated)
             obs, _ = env.reset()
-        if time.monotonic() - start > seconds + 120:
+        if time.monotonic() - start > timeout_budget:
             raise TimeoutError("warm-up could not complete 20 episodes")
     if not finishes:
         raise RuntimeError("warm-up produced no finishes; refusing unattended launch")
     elapsed = time.monotonic() - start
     return {"steps": steps, "episodes": episodes, "finishes": finishes,
             "wall_seconds": elapsed, "inference_steps_per_second": steps / elapsed,
-            "optimizer_updates": 0, "simulation_speed": 100,
+            "optimizer_updates": 0, "simulation_speed": simulation_speed,
+            "timeout_budget_seconds": timeout_budget,
             "scope": "short current-host validation, not proof of overnight uptime"}
 
 
@@ -153,6 +206,8 @@ def main() -> int:
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z0-9_]+", args.run_name):
         raise ValueError("use lowercase letters, digits, and underscores in run name")
+    speed_config = load_verified_speed_config()
+    simulation_speed = float(speed_config["verified_simulation_speed"])
     run_dir = ROOT / "runs" / args.run_name
     checkpoints = ROOT / "checkpoints" / args.run_name
     # Exclusive creation prevents duplicate trainers or accidental overwritten runs.
@@ -163,6 +218,8 @@ def main() -> int:
                 "started_at_unix": time.time(), "reward": REWARD,
                 "base_checkpoint": str(BASE), "base_sha256": BASE_HASH,
                 "checkpoint_interval_nominal": 250_000,
+                "simulation_speed": simulation_speed,
+                "simulation_speed_verification": speed_config,
                 "duration": "until owner stop or health failure", "evaluation_gates": False,
                 "no_api_or_codex_calls": True,
                 "protocol_sha256": file_sha256(ROOT / "docs/overnight-pure-discovery-preflight.md"),
@@ -184,7 +241,7 @@ def main() -> int:
             raise ValueError("starting checkpoint hash changed")
         with KeepAwake():
             base_env = TrackmaniaEnv(config=EnvironmentConfig(
-                port=args.port, simulation_speed=100.0,
+                port=args.port, simulation_speed=simulation_speed,
                 stuck_window_ms=2000, stuck_progress_gain_units=1.0,
                 stuck_world_distance_units=2.0, legacy_reversed_pedal_mapping=False,
                 # A01 is opened during preflight; no blind UI automation in trainer.
@@ -198,7 +255,13 @@ def main() -> int:
             model.target_kl = TARGET_KL
             if not model.use_sde or not model.policy.squash_output:
                 raise ValueError("expected bounded gSDE PPO")
-            manifest["warmup"] = warmup(model, env, control, 60.0)
+            manifest["warmup"] = warmup(
+                model,
+                env,
+                control,
+                60.0,
+                simulation_speed,
+            )
             if file_sha256(BASE) != BASE_HASH or model.num_timesteps != BASE_STEPS:
                 raise ValueError("warm-up unexpectedly changed the base")
             manifest["status"] = "preflight_passed"

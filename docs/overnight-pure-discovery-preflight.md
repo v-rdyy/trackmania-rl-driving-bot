@@ -4,6 +4,12 @@ Date: 2026-09-04. Requested direction: uninterrupted overnight training with
 the unchanged V4 reward; no localized bonus, action anchor, or approval/evaluation
 stop at each checkpoint. Training must not start until the owner confirms readiness.
 
+2026-09-05 amendment: the original `100x` launch was infrastructure-confounded
+and is complete, not resumable. The replacement runner is pinned to live-
+verified `2x` physics and has transactional optimizer rollback protection. See
+[the fidelity and hardening report](simulation-speed-fidelity.md). No replacement
+training has started; fresh owner readiness is still required.
+
 ## Host checks before launch
 
 Read-only checks found the High Performance plan active. Automatic sleep and
@@ -55,6 +61,13 @@ excluded from that estimate. Retain original checkpoints and all new intervals.
 An abrupt crash can still lose interactions since the last valid checkpoint;
 250k spacing bounds that normal recovery gap to roughly 11-14 minutes.
 
+Those estimates are retained as the historical basis for the first attempt and
+are superseded for any replacement run. The live `2x` no-learning preflight
+measured `19.933` interactions/second across `20/20` finishes. Plan for roughly
+`0.52-0.57M` interactions in eight hours after PPO overhead, with a nominal
+250k checkpoint approximately every 3.5-3.9 hours rather than every 11-14
+minutes.
+
 ## Approved launch contract
 
 The owner subsequently approved running **until they request stop**, not until a
@@ -69,6 +82,8 @@ still depends on the current-host live preflight succeeding.
   SHA-256: `BA056E0B42D7CAEE4D02B6AB8E0D592BE6A363068E75AAEBC3ED8487791B4044`.
 - Keep the original Stage 1 PPO/gSDE settings and V4 reward. Do not silently
   inherit the Stage 2b graduated bonus, anchor, or optimizer changes.
+- Use the checksum-pinned `2x` simulation-speed contract. `100x` is prohibited
+  because the same checkpoint changed from `0/5` at `1x` to `5/5` at `100x`.
 - Use a separate run directory and a continuous stop-request-controlled learner, not the
   existing gate runner (which intentionally requires evaluation between gates).
 - Save every nominal 250k interactions without evaluation pauses; include
@@ -100,13 +115,16 @@ This extends the budget, not the reward or observation/action definitions. The
 prior 2M-interaction plateau remains a valid budget-limited result. No guaranteed
 discovery, lap-time target, or training-performance stopping threshold is added.
 
-`scripts/train_wr_continuous.py` uses a separate run directory and the unmodified
-stock PPO rollout collector and optimizer in an end-condition-free loop. Fixed
+`scripts/train_wr_continuous.py` uses a separate run directory and the stock PPO
+rollout collector in an end-condition-free loop. Fixed
 learning rate 0.0003, clip 0.2, 2048 rollout steps, batch 64, 10 epochs, gamma 0.99,
 GAE 0.95, entropy coefficient 0, value coefficient 0.5, gradient norm 0.5,
-gSDE refresh every 4 steps, and target_kl=None are inherited from the pinned base.
-Nonconstant schedules are rejected because an indefinite run has no percentage
-of budget remaining. No Stage 2b optimizer guard is inherited.
+and gSDE refresh every 4 steps are inherited from the pinned base. Nonconstant
+schedules are rejected because an indefinite run has no percentage of budget
+remaining. The runner now sets `target_kl=0.20`, rejects a mean KL above `0.50`,
+and transactionally restores the pre-update policy and optimizer if finite/KL
+validation fails. This is a new infrastructure guard, not the Stage 2b reward
+or its aggressive `0.01` early stop.
 
 Periodic saves occur immediately after the update crossing each nominal 250k
 boundary (at most 2047 interactions late). Archives include optimizer state,
@@ -117,9 +135,11 @@ a temporary archive before publishing the finished file; older evidence is never
 overwritten. A health failure attempts a distinctly labeled emergency save,
 without automatically restarting or rolling back.
 
-The 60-second no-learning live warm-up requires at least 20 completed episodes,
-at least one finish, finite data, and successful reset/rewind cycles at 100x.
-This verifies present operation, not guaranteed overnight stability. Game/A01
+The no-learning live warm-up requires at least 60 seconds and 20 completed
+episodes, at least one finish, finite data, and successful reset/rewind cycles
+at the pinned `2x`. Its wall-clock timeout scales with simulation speed. The
+observed preflight completed `20/20` in `248.828s`. This verifies present
+operation, not guaranteed overnight stability. Game/A01
 setup occurs before the runner, so the long-running process needs no UI inputs.
 
 `stop-training.cmd` in the project root locates the one matching live trainer
@@ -142,6 +162,10 @@ The previous Stage 2b KL early-stop greatly reduced optimizer work; its rate
 would not be a defensible estimate for restored full-PPO training. The estimate
 above uses the original pure-discovery workload. The 100x setting is a simulation
 target, not a promise of 1000 interactions/second end-to-end.
+
+That statement is historical only. The live fidelity study proved `100x` can
+change outcomes and trajectories, so the replacement run deliberately trades
+most of that throughput for the verified `2x` domain.
 
 Skipping evaluation gates meets the requested uninterrupted experiment but
 removes early detection of deterministic collapse. Preserving every checkpoint

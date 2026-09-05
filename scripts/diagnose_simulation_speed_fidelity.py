@@ -40,6 +40,11 @@ CHECKPOINTS = (
     },
 )
 LAP_TIME_TOLERANCE_MS = 50
+MAXIMUM_POSITION_DELTA = 1.0
+MAXIMUM_PROGRESS_DELTA = 1.0
+MAXIMUM_DISPLAY_SPEED_DELTA = 5.0
+MAXIMUM_ACTION_DELTA = 0.30
+_map_request_needed = True
 
 
 def _records_by_episode(path: Path) -> dict[int, list[dict[str, Any]]]:
@@ -143,7 +148,9 @@ def compare_to_one_x(
     }
 
 
-def _configure(checkpoint: dict[str, Any], speed: float) -> tuple[Path, Path, Path]:
+def _configure(
+    checkpoint: dict[str, Any], speed: float, *, request_map: bool
+) -> tuple[Path, Path, Path]:
     speed_label = f"{speed:g}x".replace(".", "p")
     label = str(checkpoint["label"])
     output = RUN_DIR / label / speed_label
@@ -166,14 +173,19 @@ def _configure(checkpoint: dict[str, Any], speed: float) -> tuple[Path, Path, Pa
     evaluator.POLICY_RANDOM_SEED = None
     evaluator.POLICY_SDE_SAMPLE_FREQ = None
     evaluator.SIMULATION_SPEED = speed
-    evaluator.MAP_TO_LOAD = None
-    evaluator.AUTO_RESPAWN_ON_CONNECT = True
-    evaluator.WAIT_FOR_RACE_START_ON_CONNECT = False
+    evaluator.MAP_TO_LOAD = "A01-Race.Challenge.Gbx" if request_map else None
+    evaluator.AUTO_RESPAWN_ON_CONNECT = not request_map
+    evaluator.WAIT_FOR_RACE_START_ON_CONNECT = request_map
     return action_log, summary, replay_dir
 
 
 def evaluate(checkpoint: dict[str, Any], speed: float) -> dict[str, Any]:
-    action_log, summary_path, replay_dir = _configure(checkpoint, speed)
+    global _map_request_needed
+    action_log, summary_path, replay_dir = _configure(
+        checkpoint,
+        speed,
+        request_map=_map_request_needed,
+    )
     existing_replays = list(replay_dir.glob("*.txt"))
     complete = action_log.is_file() and summary_path.is_file()
     if complete != (len(existing_replays) == EPISODES):
@@ -201,6 +213,7 @@ def evaluate(checkpoint: dict[str, Any], speed: float) -> dict[str, Any]:
             raise RuntimeError(
                 f"fidelity evaluation failed: {checkpoint['label']} {speed:g}x"
             )
+        _map_request_needed = False
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     if not math.isclose(float(summary["simulation_speed"]), speed):
         raise RuntimeError("evaluator reported the wrong simulation speed")
@@ -228,6 +241,10 @@ def classify(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for result in results:
         comparison = compare_to_one_x(reference_signature, result["signature"])
         same_finish_count = result["finishes"] == reference["finishes"]
+        same_failure_profile = (
+            result["falls"] == reference["falls"]
+            and result["stuck"] == reference["stuck"]
+        )
         if reference["mean_finish_time_ms"] is None:
             lap_delta = None
             lap_within_tolerance = result["mean_finish_time_ms"] is None
@@ -237,14 +254,31 @@ def classify(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             lap_delta = float(result["mean_finish_time_ms"] - reference["mean_finish_time_ms"])
             lap_within_tolerance = abs(lap_delta) <= LAP_TIME_TOLERANCE_MS
+        trajectory_within_tolerance = (
+            comparison["maximum_median_position_distance"]
+            <= MAXIMUM_POSITION_DELTA
+            and comparison["maximum_absolute_median_progress_delta"]
+            <= MAXIMUM_PROGRESS_DELTA
+            and comparison["maximum_absolute_median_display_speed_delta"]
+            <= MAXIMUM_DISPLAY_SPEED_DELTA
+            and comparison["maximum_median_action_l2_distance"]
+            <= MAXIMUM_ACTION_DELTA
+        )
         classified.append(
             {
                 **result,
                 "comparison_to_1x": comparison,
                 "mean_finish_time_delta_from_1x_ms": lap_delta,
                 "same_finish_count_as_1x": same_finish_count,
+                "same_failure_profile_as_1x": same_failure_profile,
                 "lap_time_within_50ms_of_1x": lap_within_tolerance,
-                "outcome_fidelity_gate": same_finish_count and lap_within_tolerance,
+                "trajectory_within_tolerance": trajectory_within_tolerance,
+                "fidelity_gate": (
+                    same_finish_count
+                    and same_failure_profile
+                    and lap_within_tolerance
+                    and trajectory_within_tolerance
+                ),
             }
         )
     return classified
@@ -273,11 +307,16 @@ def main() -> int:
         for speed in SPEEDS
         if all(
             next(row for row in checkpoint["speeds"] if row["speed"] == speed)[
-                "outcome_fidelity_gate"
+                "fidelity_gate"
             ]
             for checkpoint in checkpoint_results
         )
     ]
+    contiguous_accepted = []
+    for speed in SPEEDS:
+        if speed not in accepted:
+            break
+        contiguous_accepted.append(speed)
     aggregate = {
         "run_name": RUN_NAME,
         "protocol": {
@@ -286,17 +325,27 @@ def main() -> int:
             "episodes_per_checkpoint_speed": EPISODES,
             "deterministic": True,
             "lap_time_tolerance_ms": LAP_TIME_TOLERANCE_MS,
-            "outcome_gate": (
-                "same finish count as 1x for both checkpoints, and mean finish time "
-                "within 50ms when the 1x checkpoint has finishes"
+            "fidelity_gate": (
+                "same finish/fall/stuck counts as 1x, mean finish time within 50ms "
+                "when 1x has finishes, and median trajectory at 5/10/15/20s within "
+                "1 position unit, 1 progress unit, 5 displayed-speed units, and "
+                "0.30 action L2 for both checkpoints"
+            ),
+            "selection_rule": (
+                "choose the highest speed in the contiguous passing range from 1x; "
+                "a speed after an earlier failure is not considered verified because "
+                "accelerated behavior was observably non-monotonic"
             ),
             "trajectory_measurement": (
                 "median closed-loop position, progress, speed, and action at 5/10/15/20s"
             ),
         },
         "checkpoints": checkpoint_results,
-        "speeds_passing_outcome_gate_for_both_checkpoints": accepted,
-        "highest_speed_passing_outcome_gate": max(accepted) if accepted else None,
+        "speeds_passing_fidelity_gate_for_both_checkpoints": accepted,
+        "contiguous_verified_speeds": contiguous_accepted,
+        "verified_simulation_speed": (
+            max(contiguous_accepted) if contiguous_accepted else None
+        ),
     }
     write_json(RUN_DIR / "summary.json", aggregate)
     print(json.dumps(aggregate, indent=2, allow_nan=False))

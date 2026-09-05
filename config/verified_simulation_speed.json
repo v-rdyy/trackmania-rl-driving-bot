@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "verified_simulation_speed": 2.0,
+  "ground_truth_simulation_speed": 1.0,
+  "study_summary": "runs/simulation_speed_fidelity_20260904/summary.json",
+  "study_summary_sha256": "11D269D9250DF49C23385D05586C44A9D268C4DC119FF5D61BA6A1C5D1643A38",
+  "selection_rule": "highest speed in the contiguous passing range from 1x",
+  "contiguous_verified_speeds": [
+    1.0,
+    2.0
+  ],
+  "rejected_boundary_speed": 4.0,
+  "reason": "2x matched 1x across the reliable and speed-sensitive policies; 4x changed the speed-sensitive policy from 0/5 to 1/5 finishes"
+}

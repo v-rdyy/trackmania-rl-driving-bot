@@ -1968,6 +1968,26 @@ and resume recommendation. The emergency model contains NaNs, while the last
 periodic optimizer was saved after divergence began. Neither is approved for
 resumed training.
 
+#### Continuous-run infrastructure resolution
+
+The 2026-09-05 [simulation-speed fidelity and hardening report](docs/simulation-speed-fidelity.md)
+resolves both blockers before a replacement run. Across 80 direct-live episodes,
+the canary checkpoint was `0/5` at playable `1x` but `5/5` at `50x/100x`;
+`100x` is therefore a different effective dynamics domain for this policy. The
+highest speed in the contiguous passing range was `2x`. A subsequent no-learning
+runner preflight completed `20/20` finishes and 4,960 finite interactions at
+`19.933` interactions/second. Future PB/reliability/slide claims use `1x` or the
+pinned `2x` domain, not `100x` results.
+
+Every PPO update in the replacement runner is now guarded by a pre-update
+policy/optimizer snapshot, finite rollout/loss/gradient/state/output checks,
+`target_kl=0.20`, a hard mean-KL ceiling of `0.50`, exact rollback, a distinct
+recovery checkpoint, and controlled stop. Tests force both NaN damage and a
+finite KL spike and verify that the pre-update state is restored. The original
+run remains preserved as an infrastructure-confounded attempt, not evidence
+that a genuinely long pure-discovery budget cannot work. No replacement
+training was started during this fix.
+
 ## Realistic expectation
 
 Yosh's public result shows that pure progress reward can discover the drop

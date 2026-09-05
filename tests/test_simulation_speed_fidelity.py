@@ -81,8 +81,47 @@ class SimulationSpeedFidelityTests(unittest.TestCase):
                 {**common, "speed": 100.0, "finishes": 4, "mean_finish_time_ms": 25_000},
             ]
         )
-        self.assertTrue(results[1]["outcome_fidelity_gate"])
-        self.assertFalse(results[2]["outcome_fidelity_gate"])
+        self.assertTrue(results[1]["fidelity_gate"])
+        self.assertFalse(results[2]["fidelity_gate"])
+
+    def test_classification_rejects_a_changed_failure_profile(self) -> None:
+        signature = {
+            "anchors_ms": [5_000, 10_000, 15_000, 20_000],
+            "episodes": [
+                {
+                    "episode": 0,
+                    "anchors": {
+                        str(anchor): {
+                            "position": [0.0, 0.0, 0.0],
+                            "progress": 0.0,
+                            "display_speed": 300,
+                            "action": [0.0, 1.0, 0.0],
+                        }
+                        for anchor in (5_000, 10_000, 15_000, 20_000)
+                    },
+                }
+            ],
+        }
+        common = {
+            "finishes": 0,
+            "finish_rate": 0.0,
+            "best_finish_time_ms": None,
+            "mean_finish_time_ms": None,
+            "worst_finish_time_ms": None,
+            "signature": signature,
+            "action_log": "actions.jsonl",
+            "action_log_sha256": "A",
+            "summary": "evaluation.json",
+            "summary_sha256": "B",
+        }
+        results = MODULE.classify(
+            [
+                {**common, "speed": 1.0, "falls": 0, "stuck": 5},
+                {**common, "speed": 20.0, "falls": 1, "stuck": 4},
+            ]
+        )
+        self.assertFalse(results[1]["same_failure_profile_as_1x"])
+        self.assertFalse(results[1]["fidelity_gate"])
 
 
 if __name__ == "__main__":

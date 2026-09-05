@@ -8,6 +8,14 @@ Status: stopped by PPO numerical failure after `1,835,008` additional
 interactions. The run was not stopped by Windows sleep, the monitor, a stop
 request, or a TMInterface disconnection. No training has been restarted.
 
+2026-09-05 infrastructure conclusion: this run is not a fair test of the full-
+length pure-discovery hypothesis. Only its finite prefix is usable, and its
+`100x` training/evaluation domain is not playable-physics faithful. The
+[live fidelity and numerical-hardening report](simulation-speed-fidelity.md)
+pins the replacement runner to `2x` and adds exact pre-update rollback. Pure
+discovery remains the approved experiment direction after a fresh launch
+confirmation; no replacement training has started.
+
 ## Outcome
 
 This longer unchanged-V4 experiment did not demonstrate useful pure discovery
@@ -128,19 +136,19 @@ are retained in their checkpoint directories. The no-finish `251,904`
 checkpoint is also preserved and can be rendered separately when a failure
 progression video is wanted.
 
-## Recommendation before more training
+## Recommendation before more training (resolved 2026-09-05)
 
 Do not resume the emergency checkpoint or the final checkpoint's optimizer
-state. Before another unattended run, make two choices explicit:
+state. The two infrastructure choices are now resolved:
 
-1. whether to retain 100x training despite the measured 100x-to-6x behavior
-   gap, or lower training speed for closer physics comparability; and
-2. whether to add a numerical safety mechanism such as a conservative KL
-   limit plus finite-parameter validation and rollback to the last verified
-   checkpoint.
+1. use `2x`, the highest contiguous speed that passed the new `1x` fidelity
+   contract; and
+2. use pre-update policy/optimizer snapshots, finite rollout/loss/gradient/
+   state/output checks, PPO `target_kl=0.20`, hard mean KL `0.50`, exact
+   rollback, and a controlled guarded stop.
 
 A safety guard changes the exact optimizer protocol, but continuing without
-one risks repeating a known numerical failure. If pure discovery is retried,
+one would repeat a known risk. If pure discovery is retried,
 the most defensible base is the original checksum-pinned Stage 1 Gate 2 model,
 not a post-divergence optimizer state. If the objective is fastest progress
 toward the record rather than one more pure-discovery budget, this result is
@@ -165,4 +173,3 @@ experiment.
   saved after the KL warning sequence began. It is useful behavioral evidence,
   but selecting its optimizer for further training would confuse a good
   evaluation snapshot with a safe learning state.
-

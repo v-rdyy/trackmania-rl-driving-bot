@@ -6,6 +6,13 @@ caused by sleep, monitor-off behavior, a stop request, or TMInterface. Training
 has not been restarted. See the
 [full checkpoint retrospective](continuous-pure-discovery-retrospective.md).
 
+2026-09-05 follow-up: a live `1x`-through-`100x` study proved that this run's
+`100x` setting can change policy outcomes and trajectories; a canary moved from
+`0/5` at `1x` to `5/5` at `100x`. The replacement runner is pinned to `2x` and
+now rolls back any nonfinite or excessive-KL optimizer update before stopping.
+See [the infrastructure report](simulation-speed-fidelity.md). This historical
+launch remains intact and has not been resumed.
+
 Launched on 2026-09-04 following the owner's explicit readiness confirmation.
 Run: `wr_pure_continuous_20260904_062051`.
 
