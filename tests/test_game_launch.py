@@ -79,6 +79,34 @@ class GameLaunchTests(unittest.TestCase):
         )
         confirm_solo.assert_not_called()
 
+    @patch("trackmania_rl.game_launch.time.sleep")
+    @patch("trackmania_rl.game_launch.confirm_a01_solo")
+    @patch("trackmania_rl.game_launch._bridge_is_listening", return_value=True)
+    @patch("trackmania_rl.game_launch.subprocess.Popen")
+    @patch("trackmania_rl.game_launch.find_trackmania_window")
+    def test_fresh_configured_map_can_be_confirmed_after_launch(
+        self,
+        find_window: Mock,
+        _popen: Mock,
+        _bridge: Mock,
+        confirm_solo: Mock,
+        _sleep: Mock,
+    ) -> None:
+        target = WindowTarget(1, "TrackMania", 0, 0, 640, 480)
+        find_window.side_effect = [VideoCaptureError("missing"), target]
+        executable = Path("TMLoader.exe")
+        with patch.object(Path, "is_file", return_value=True):
+            observed, launched = ensure_trackmania_running(
+                executable=executable,
+                timeout_seconds=1.0,
+                startup_settle_seconds=0.0,
+                confirm_launched=True,
+            )
+
+        self.assertIs(observed, target)
+        self.assertTrue(launched)
+        confirm_solo.assert_called_once_with(target)
+
     @patch("trackmania_rl.game_launch.find_trackmania_window")
     def test_existing_game_is_not_touched(self, find_window: Mock) -> None:
         target = WindowTarget(1, "TrackMania", 0, 0, 640, 480)

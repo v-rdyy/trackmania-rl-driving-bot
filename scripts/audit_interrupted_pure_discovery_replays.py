@@ -35,7 +35,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--tmi-scripts-dir", type=Path, default=DEFAULT_TMI_SCRIPTS)
     parser.add_argument("--reference-path", type=Path, default=DEFAULT_REFERENCE)
-    parser.add_argument("--map-to-load", default="A01-Race.Challenge.Gbx")
+    parser.add_argument(
+        "--map-to-load",
+        default=None,
+        help=(
+            "optional explicit map command; omit when TMInterface config.txt "
+            "already opens A01"
+        ),
+    )
     parser.add_argument("--port", type=int, default=8478)
     parser.add_argument("--simulation-speed", type=float, default=2.0)
     parser.add_argument("--reuse-game", action="store_true")
@@ -248,6 +255,7 @@ def main() -> int:
     _, launched = ensure_trackmania_running(
         port=args.port,
         confirm_existing=not args.reuse_game,
+        confirm_launched=not args.reuse_game,
     )
     print(f"TrackMania ready (launched={launched})", flush=True)
     session = LiveTmiSession(

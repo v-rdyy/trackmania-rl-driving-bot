@@ -111,6 +111,7 @@ def ensure_trackmania_running(
     timeout_seconds: float = DEFAULT_STARTUP_TIMEOUT_SECONDS,
     startup_settle_seconds: float = 10.0,
     confirm_existing: bool = False,
+    confirm_launched: bool = False,
 ) -> tuple[WindowTarget, bool]:
     """Start ModLoader's profile and wait for its bridge-ready main menu.
 
@@ -164,6 +165,9 @@ def ensure_trackmania_running(
 
     if target is None:
         raise RuntimeError("TrackMania launch completed without a visible window")
+    if confirm_launched:
+        confirm_a01_solo(target)
+        time.sleep(0.75)
     return target, True
 
 
