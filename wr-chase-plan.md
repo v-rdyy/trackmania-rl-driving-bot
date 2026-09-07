@@ -1991,9 +1991,19 @@ training was started during this fix.
 After the owner explicitly approved the repaired setup, the separate
 [verified-2x continuous run](docs/continuous-pure-discovery-verified2x-launch.md)
 launched on 2026-09-05. Its second 20-lap preflight passed, and the first guarded
-PPO update completed with finite mean KL `0.019714`. It runs for one uninterrupted
-eight-hour session unless a safety guard ends it first; deterministic slide and
-progression evaluation follows the graceful stop.
+PPO update completed with finite mean KL `0.019714`.
+
+The host then shut down unexpectedly after `25,747` collected interactions,
+including `12` complete guarded updates. Windows event 6008 identifies an
+unexpected 05:20:40 EDT shutdown; the machine did not return until 2026-09-07.
+All recorded optimizer values were finite, no numerical guard or rollback fired,
+and no owner stop or Python/TMInterface error was recorded. The first 250k
+checkpoint had not been reached, so the updated policy and its deterministic
+progression were lost. The [forensic report](docs/verified2x-interrupted-run.md)
+classifies this as an infrastructure-invalidated 21.5-minute attempt, not a
+fair test of long-budget pure discovery. Five selected input trajectories remain
+for a limited live-SimState audit once A01 is again producing race callbacks;
+they cannot establish slide behavior across the full 98-episode stream.
 
 ## Realistic expectation
 

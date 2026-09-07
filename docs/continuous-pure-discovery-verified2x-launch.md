@@ -4,9 +4,10 @@ Launched: 2026-09-05 04:55 EDT
 
 Run: `wr_pure_continuous_verified2x_20260905_045450`
 
-Status at handoff: training continuously after a successful live preflight and
-first guarded PPO update. This run uses unchanged V4 reward, no slide bonus,
-no steering term, and no action anchor.
+Final observed status: externally interrupted by an unexpected whole-host
+shutdown after about 21.5 minutes of learning. This run used unchanged V4
+reward, no slide bonus, no steering term, and no action anchor. It did not run
+long enough to test the overnight pure-discovery hypothesis.
 
 ## Frozen launch contract
 
@@ -46,12 +47,39 @@ Projected collection before PPO overhead is about 574,000 interactions in
 eight hours. The honest planning range after optimizer overhead is
 `0.52-0.57M`; six hours is `0.39-0.43M`, and ten hours is `0.65-0.72M`.
 
-A one-time local-thread morning follow-up is scheduled for 13:00 EDT, eight
-hours after launch. If training is still healthy, it will request a graceful
-stop, wait for the final checkpoint, and run the registered deterministic
-live-SimState progression evaluation at `2x`. It must report slide onset and
-safety from that evaluator, not infer either from stochastic training logs or
-input replays.
+The one-time 13:00 EDT follow-up could not run because the machine remained
+powered down. It was deleted after the reboot so it cannot fire against stale
+state.
+
+## Observed interruption
+
+The last status heartbeat was written at approximately 05:21 EDT with `25,747`
+collected interactions, `12` completed PPO updates, and model timestep
+`3,028,992`. Of those interactions, `24,576` were learned through; the remaining
+`1,171` were in the next rollout when the host stopped. Windows event 6008 says
+the prior shutdown at 05:20:40 EDT was unexpected, and event 41 on the next boot
+says Windows restarted without a clean shutdown. The small timestamp mismatch
+between the buffered status file and Windows event is not used to claim a more
+precise failure order.
+
+There is no Python traceback, TMInterface socket error, owner stop request,
+guard event, rollback model, or `guarded_stop`. All 12 TensorBoard update rows
+are finite. Mean approximate KL ranged from `0.0130` to `0.0435`, far below the
+`0.50` hard ceiling. The numerical guard therefore did not intervene and shows
+no evidence that it should have.
+
+The stochastic collection stream recorded `66/98` finishes (`67.35%`), a
+`24.800s` best finish, and `25.093s` mean among finishes. These are health data,
+not a deterministic policy evaluation. The process died before the first
+nominal 250k checkpoint, so all 12 updated policy states were lost and no valid
+checkpoint progression or global slide-onset conclusion can be produced.
+
+Five selected input trajectories survived. A live-SimState audit was prepared,
+but after the reboot TMInterface listened without A01 producing race-step
+callbacks. Three clean connection attempts timed out before replay playback.
+The audit remains pending; input replay telemetry alone is not substituted for
+the frozen live-SimState slide contract. Even after it runs, it will describe
+only those five trajectories, not all 98 episodes.
 
 ## Local evidence
 
@@ -61,6 +89,8 @@ input replays.
 - TensorBoard: `tensorboard/wr_pure_continuous_verified2x_20260905_045450_0/`.
 - Process logs:
   `artifacts/logs/continuous_launcher/wr_pure_continuous_verified2x_20260905_045450.*.log`.
+- Forensic report:
+  [verified2x-interrupted-run.md](verified2x-interrupted-run.md).
 
 ## Notable moments
 
@@ -71,3 +101,7 @@ input replays.
   its finite `0.0197` KL is well below both guard levels.
 - The much slower verified domain means the first nominal checkpoint should
   arrive after roughly 3.5-3.9 hours, not every 11-14 minutes as at 100x.
+- That cadence became a real recovery weakness: an external host failure before
+  250k preserved logs and selected inputs but no learned policy. A future retry
+  should consider 25k-50k recovery checkpoints, while retaining 250k formal
+  evaluation spacing, as a separately approved protocol change.

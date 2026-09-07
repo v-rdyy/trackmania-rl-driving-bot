@@ -17,6 +17,14 @@ discovery remained the approved experiment direction; after a fresh launch
 confirmation it began as the separate
 [verified-2x run](continuous-pure-discovery-verified2x-launch.md).
 
+2026-09-07 update: the verified-2x replacement was itself invalidated by an
+unexpected whole-host shutdown after only `25,747` collected interactions and
+before its first checkpoint. Its 12 optimizer rows remained finite and the
+active numerical guard had no reason to intervene. The separate
+[interrupted-run report](verified2x-interrupted-run.md) records the Windows
+events, surviving evidence, and checkpoint-recovery recommendation. This second
+attempt also remains insufficient to accept or reject long-budget discovery.
+
 ## Outcome
 
 This longer unchanged-V4 experiment did not demonstrate useful pure discovery
